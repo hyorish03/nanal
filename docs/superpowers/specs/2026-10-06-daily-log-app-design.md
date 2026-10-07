@@ -196,8 +196,10 @@
 
 ### 11.5 말로 적기 (2차)
 - 기기 음성 인식(STT) → 받아쓴 글을 Supabase Edge Function에서 Claude Haiku로 정리(종류, 내용, 날짜) → "이렇게 정리했어요" 확인 후 추가.
-- 음성 원본은 저장하지 않는다. 서버 함수에 하루 호출 제한(예: 50회). 오프라인이면 받아쓴 글을 메모로 저장.
+- 음성 원본은 저장하지 않는다. 정리 호출은 사용자마다 논리 날짜(새벽 4시 경계)당 10번까지. 오프라인이면 받아쓴 글을 메모로 저장.
 - 개발용 빌드 필요(Expo Go 불가).
+- 구현(계획 C): Edge Function `organize-voice`가 Claude Haiku 4.5(`claude-haiku-4-5`)의 구조화 출력으로 `{items: [{kind, text, date}]}`를 받고 서버에서 다시 검증한다(모르는 종류·빈 글 버림, 지난·잘못된·1년 넘게 먼 날짜는 오늘로, 최대 10개). 글은 저장하지 않고 로그에도 남기지 않는다. 횟수는 모델을 부르기 전에 센다.
+- 음성 인식 전까지는 오늘 화면의 "정리해서 넣기"(연필 버튼, 마이크 자리)에서 글을 써서 같은 흐름을 쓴다. 계획 D의 마이크는 받아 적은 글을 이 시트에 넘긴다.
 
 ### 11.6 위젯 (2차, 개발용 빌드 + Swift WidgetKit)
 - 잠금화면: 직사각형(다음 할 일 + 완료 버튼), 원형(남은 수, 오늘 기분), 컨트롤 버튼(말로 적기, 한 줄 적기, iOS 18+).
@@ -227,5 +229,11 @@
 - 결과 구성(정해진 JSON 형식으로 받아 화면에 그린다): 한 달의 잉크(달력, 무기력했던 날 표시), 기분의 흐름, 무기력했던 날(횟수, 날짜, 평균 간격, 회고에서 반복된 원인, 회복에 도움된 것), 할 일과 마음(이월·완료율과 기분의 관계), 자주 고마웠던 것, 다음 달에 해 볼 한 가지.
 - 말투: 판단·진단 없이 기록에 근거한 관찰만. "진단이 아니다" 안내와 오래 힘들면 주변·전문가와 이야기하라는 문장을 함께 보여준다.
 - 기록한 날이 7일 미만이면 만들지 않고 "기록이 조금 더 쌓이면 볼 수 있어요".
-- 저장: 새 테이블 `monthly_reviews`(user_id, month `YYYY-MM`, content jsonb, model, created_at, updated_at, deleted_at), 동기화 대상. "다시 만들기"는 같은 달 행을 덮어쓴다.
-- 비용 보호: Edge Function에 사용자별 호출 제한(말로 적기 하루 50회, 월간 회고 하루 3회). Anthropic Console에 월 사용 한도 설정.
+- 저장: 새 테이블 `monthly_reviews`(user_id, month `YYYY-MM`, content jsonb, model, created_at, updated_at, deleted_at), 동기화 대상.
+- 월간 회고는 대상 달마다 1번 무료로 만든다. "다시 만들기"는 유료 이용으로 보여 주고, 지금은 "더 만들려면 유료 이용이 필요해요 (준비 중)" 안내만 한다(결제는 애플 앱 내 구입이 필요해 다음 계획). 서버는 한도를 넘으면 `paid_required`를 돌려준다. 유료 이용권이 생기면 같은 달 행을 덮어쓴다.
+- 비용 보호: 사용자별 호출 제한(말로 적기 논리 날짜당 10번, 월간 회고 대상 달당 1번). Anthropic Console에 월 사용 한도 설정.
+- 구현(계획 C): Edge Function `monthly-review`가 사용자 JWT로 그 달의 `days`(기분), `items`(종류·상태만, 글 제외), `reflections`를 읽는다. 숫자(기록한 날, 날짜별 기분·할 일·이월, 무기력했던 날 날짜·평균 간격, 완료율)는 함수가 계산하고, Claude Sonnet 5.5(effort `medium`)는 구조화 출력으로 글(기분의 흐름, 반복된 원인 3개까지, 할 일과 마음, 고마웠던 것, 해 볼 한 가지)만 쓴다. 결과는 `{version: 1, stats, insights}`로 `monthly_reviews`에 저장한다.
+- 거절(refusal)이면 "정리하지 못했어요". 서버 측 대체 모델(fallbacks)은 쓰지 않는다.
+- 한도: `ai_usage(user_id, kind, period, count)` + `consume_ai_quota(kind, month)`·`ai_quota_remaining(kind, month)`(security definer, 기본 한도는 함수 안에 고정). 월간 회고는 미리 남은 횟수만 보고, 저장에 성공한 뒤에 센다(실패하면 줄지 않음). 기록 7일 미만은 그 전에 거절한다.
+- 유료 이용 자리: `ai_entitlements(user_id, kind, extra_per_period, expires_at)`. 한도 = 기본 + 유효한 이용권. 지금은 비어 있고, 나중에 앱 내 구입을 확인한 서버가 채운다.
+- 앱: 기기 v3 `monthly_reviews`(키 `month`), 동기화 대상. 함수가 돌려준 결과는 outbox 없이 기기에 바로 저장한다(서버에 이미 있음).
