@@ -41,7 +41,7 @@ test('fromRemote: 서버 전용 컬럼을 버리고 시각을 toISOString 형식
     template: 'free',
     answers: '{"body":"hi"}',
     created_at: '2026-10-06T00:00:00.000Z',
-    updated_at: '2026-10-06T09:30:00.500Z',
+    updated_at: '2026-10-06T00:30:00.500Z',
     deleted_at: null,
   });
 });
