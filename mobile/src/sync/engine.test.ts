@@ -92,3 +92,17 @@ test('실패해도 다음 호출은 다시 실행된다', async () => {
   await engine.sync();
   expect(fake.store.items.size).toBe(1);
 });
+
+test('push가 실패해도 pull은 진행하고 push 오류로 거절된다', async () => {
+  const db = openTestDb();
+  await migrate(db);
+  await addItem(db, { kind: 'task', text: 'a' }, new Date(2026, 9, 6, 9));
+  const fake = createFakeRemote();
+  fake.serverWrite('days', { user_id: 'u1', date: '2026-10-06', mood: 3, updated_at: '2026-10-06T00:00:00Z', deleted_at: null });
+  const onPulled = jest.fn();
+  const engine = createSyncEngine(db, fake.remote, onPulled);
+
+  fake.state.failUpsert = true;
+  await expect(engine.sync()).rejects.toThrow('network down');
+  expect(onPulled).toHaveBeenCalledTimes(1);
+});

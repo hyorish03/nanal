@@ -11,8 +11,22 @@ export function createSyncEngine(db: Db, remote: Remote, onPulled?: () => void) 
     try {
       do {
         rerun = false;
-        await push(db, remote);
-        if (await pull(db, remote)) onPulled?.();
+        let pushError: unknown;
+        let pushFailed = false;
+        try {
+          await push(db, remote);
+        } catch (e) {
+          pushFailed = true;
+          pushError = e;
+        }
+        // push가 실패해도 서버의 변경은 받아 둔다. 오류는 pull 뒤에 다시 던진다.
+        try {
+          if (await pull(db, remote)) onPulled?.();
+        } catch (e) {
+          if (!pushFailed) throw e;
+          console.warn('pull failed after push failure', e);
+        }
+        if (pushFailed) throw pushError;
       } while (rerun);
     } finally {
       // 마지막 검사와 같은 틱에서 초기화해, 그 사이에 들어온 호출이 놓치지 않게 한다.
