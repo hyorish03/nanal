@@ -1,4 +1,4 @@
-import type { Db } from '../db/types';
+import type { Db, Tx } from '../db/types';
 import { logicalDate } from '../lib/date';
 import { newId } from '../lib/id';
 import { markDirty } from '../sync/outbox';
@@ -20,8 +20,8 @@ export type Item = {
 
 const COLUMNS = 'id, date, kind, text, status, migrated_from, created_at, updated_at, deleted_at';
 
-async function insertItem(db: Db, item: Item): Promise<void> {
-  await db.runAsync(`INSERT INTO items (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+async function insertItem(tx: Tx, item: Item): Promise<void> {
+  await tx.runAsync(`INSERT INTO items (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
     item.id,
     item.date,
     item.kind,
@@ -32,18 +32,18 @@ async function insertItem(db: Db, item: Item): Promise<void> {
     item.updated_at,
     item.deleted_at,
   ]);
-  await markDirty(db, 'items', item.id);
+  await markDirty(tx, 'items', item.id);
 }
 
-async function requireItem(db: Db, id: string): Promise<Item> {
-  const item = await db.getFirstAsync<Item>(`SELECT ${COLUMNS} FROM items WHERE id = ? AND deleted_at IS NULL`, [id]);
+async function requireItem(tx: Tx, id: string): Promise<Item> {
+  const item = await tx.getFirstAsync<Item>(`SELECT ${COLUMNS} FROM items WHERE id = ? AND deleted_at IS NULL`, [id]);
   if (!item) throw new Error(`항목을 찾을 수 없습니다: ${id}`);
   return item;
 }
 
-async function updateStatus(db: Db, id: string, status: TaskStatus, now: Date): Promise<void> {
-  await db.runAsync('UPDATE items SET status = ?, updated_at = ? WHERE id = ?', [status, now.toISOString(), id]);
-  await markDirty(db, 'items', id);
+async function updateStatus(tx: Tx, id: string, status: TaskStatus, now: Date): Promise<void> {
+  await tx.runAsync('UPDATE items SET status = ?, updated_at = ? WHERE id = ?', [status, now.toISOString(), id]);
+  await markDirty(tx, 'items', id);
 }
 
 export async function addItem(db: Db, input: { kind: ItemKind; text: string }, now = new Date()): Promise<Item> {
@@ -61,53 +61,55 @@ export async function addItem(db: Db, input: { kind: ItemKind; text: string }, n
     updated_at: ts,
     deleted_at: null,
   };
-  await db.withTransactionAsync(() => insertItem(db, item));
+  await db.transaction((tx) => insertItem(tx, item));
   return item;
 }
 
 export async function toggleDone(db: Db, id: string, now = new Date()): Promise<void> {
-  await db.withTransactionAsync(async () => {
-    const item = await requireItem(db, id);
+  await db.transaction(async (tx) => {
+    const item = await requireItem(tx, id);
     if (item.status !== 'open' && item.status !== 'done') throw new Error('완료 처리할 수 없는 항목입니다');
-    await updateStatus(db, id, item.status === 'open' ? 'done' : 'open', now);
+    await updateStatus(tx, id, item.status === 'open' ? 'done' : 'open', now);
   });
 }
 
 export async function dropItem(db: Db, id: string, now = new Date()): Promise<void> {
-  await db.withTransactionAsync(async () => {
-    const item = await requireItem(db, id);
+  await db.transaction(async (tx) => {
+    const item = await requireItem(tx, id);
     if (item.status !== 'open') throw new Error('열린 할 일만 버릴 수 있습니다');
-    await updateStatus(db, id, 'dropped', now);
+    await updateStatus(tx, id, 'dropped', now);
   });
 }
 
 export async function migrateToToday(db: Db, id: string, now = new Date()): Promise<Item> {
   const ts = now.toISOString();
-  const newItemId = newId();
-  await db.withTransactionAsync(async () => {
-    const item = await requireItem(db, id);
+  return db.transaction(async (tx) => {
+    const item = await requireItem(tx, id);
     if (item.status !== 'open') throw new Error('열린 할 일만 옮길 수 있습니다');
-    await updateStatus(db, id, 'migrated', now);
-    await insertItem(db, {
+    const today = logicalDate(now);
+    if (item.date >= today) throw new Error('이전 날짜의 할 일만 옮길 수 있습니다');
+    await updateStatus(tx, id, 'migrated', now);
+    const created: Item = {
       ...item,
-      id: newItemId,
-      date: logicalDate(now),
+      id: newId(),
+      date: today,
       status: 'open',
       migrated_from: item.id,
       created_at: ts,
       updated_at: ts,
       deleted_at: null,
-    });
+    };
+    await insertItem(tx, created);
+    return created;
   });
-  return requireItem(db, newItemId);
 }
 
 export async function deleteItem(db: Db, id: string, now = new Date()): Promise<void> {
   const ts = now.toISOString();
-  await db.withTransactionAsync(async () => {
-    await requireItem(db, id);
-    await db.runAsync('UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?', [ts, ts, id]);
-    await markDirty(db, 'items', id);
+  await db.transaction(async (tx) => {
+    await requireItem(tx, id);
+    await tx.runAsync('UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?', [ts, ts, id]);
+    await markDirty(tx, 'items', id);
   });
 }
 

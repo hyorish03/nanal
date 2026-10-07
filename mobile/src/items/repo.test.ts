@@ -84,6 +84,10 @@ test('listMigrationCandidates: 오늘 이전의 열린 할 일만, 삭제된 것
   await deleteItem(db, deleted.id, MON);
   await addItem(db, { kind: 'note', text: 'note' }, MON);
   await addItem(db, { kind: 'task', text: 'today' }, TUE);
+  const migrated = await addItem(db, { kind: 'task', text: 'migrated' }, MON);
+  await migrateToToday(db, migrated.id, TUE);
+  const dropped = await addItem(db, { kind: 'task', text: 'dropped' }, MON);
+  await dropItem(db, dropped.id, MON);
 
   const candidates = await listMigrationCandidates(db, '2026-10-06');
   expect(candidates.map((c) => c.id)).toEqual([open.id]);
@@ -98,4 +102,16 @@ test('deleteItem: 행은 남기고 deleted_at만 찍으며 목록에서 빠진�
     deleted_at: TUE.toISOString(),
   });
   expect(await outboxKeys()).toEqual([item.id]);
+});
+
+test('migrateToToday: 오늘 날짜의 할 일은 거부하고 open으로 남긴다', async () => {
+  const item = await addItem(db, { kind: 'task', text: 'a' }, TUE);
+  await expect(migrateToToday(db, item.id, TUE)).rejects.toThrow('이전 날짜의 할 일만');
+  expect((await listItemsForDate(db, '2026-10-06'))[0].status).toBe('open');
+});
+
+test('삭제된 항목을 바꾸려 하면 거부한다', async () => {
+  const item = await addItem(db, { kind: 'task', text: 'a' }, MON);
+  await deleteItem(db, item.id, MON);
+  await expect(toggleDone(db, item.id, MON)).rejects.toThrow('항목을 찾을 수 없습니다');
 });

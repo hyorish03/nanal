@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3';
-import type { Db, SqlParam } from '../src/db/types';
+import { serialize } from '../src/db/serialize';
+import type { Db, RawDb, SqlParam } from '../src/db/types';
 
-export function openTestDb(): Db {
+export function openTestRawDb(): RawDb {
   const raw = new Database(':memory:');
   return {
     async execAsync(sql: string) {
@@ -28,4 +29,8 @@ export function openTestDb(): Db {
       }
     },
   };
+}
+
+export function openTestDb(): Db {
+  return serialize(openTestRawDb());
 }

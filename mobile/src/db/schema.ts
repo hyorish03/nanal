@@ -48,9 +48,9 @@ const MIGRATIONS = [
 export async function migrate(db: Db): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', []);
   for (let v = row?.user_version ?? 0; v < MIGRATIONS.length; v++) {
-    await db.withTransactionAsync(async () => {
-      await db.execAsync(MIGRATIONS[v]);
-      await db.execAsync(`PRAGMA user_version = ${v + 1}`);
+    await db.transaction(async (tx) => {
+      await tx.execAsync(MIGRATIONS[v]);
+      await tx.execAsync(`PRAGMA user_version = ${v + 1}`);
     });
   }
 }
