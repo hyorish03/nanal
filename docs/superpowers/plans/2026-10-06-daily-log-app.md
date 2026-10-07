@@ -11,6 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-10-06-daily-log-app-design.md`
 
 **공통 규칙**
+- DB 사용 규칙(Task 6 리뷰 후 변경): 앱 코드는 `Db`(`src/db/serialize.ts`의 `serialize()`가 만든, 모든 호출을 차례대로 실행하는 래퍼)를 쓴다. 트랜잭션은 `db.transaction(async (tx) => ...)`로 열고, 그 안에서는 **인자로 받은 `tx`만** 쓴다(바깥 `db`를 쓰면 자기 차례를 기다리며 멈춘다). `markDirty`와 내부 헬퍼는 `Tx`를 받는다. 테스트의 `openTestDb()`도 같은 래퍼를 돌려준다. 이 문서의 Task 1~6 코드 블록은 변경 전 형태이며, 실제 코드는 저장소를 기준으로 한다.
 - 모든 커밋 메시지 끝에 빈 줄 다음 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`를 붙인다.
 - 명령은 별도 표기가 없으면 `mobile/` 디렉터리에서 실행한다.
 - 스펙과 다른 점 한 가지: `days`는 하루에 한 행이므로 `id` 대신 `date`(서버는 `(user_id, date)`)를 키로 쓴다. 두 기기가 오프라인에서 같은 날의 기분을 입력해도 키 충돌이 생기지 않게 하기 위함이다.
@@ -911,13 +912,13 @@ export async function setMood(db: Db, date: string, mood: number | null, now = n
   if (mood !== null && !(Number.isInteger(mood) && mood >= 1 && mood <= 5)) {
     throw new Error('기분은 1~5 사이 정수여야 합니다');
   }
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(
+  await db.transaction(async (tx) => {
+    await tx.runAsync(
       `INSERT INTO days (date, mood, updated_at, deleted_at) VALUES (?, ?, ?, NULL)
        ON CONFLICT (date) DO UPDATE SET mood = excluded.mood, updated_at = excluded.updated_at, deleted_at = NULL`,
       [date, mood, now.toISOString()],
     );
-    await markDirty(db, 'days', date);
+    await markDirty(tx, 'days', date);
   });
 }
 
@@ -1074,13 +1075,13 @@ export async function addReflection(
     updated_at: ts,
     deleted_at: null,
   };
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(
+  await db.transaction(async (tx) => {
+    await tx.runAsync(
       `INSERT INTO reflections (id, date, template, answers, created_at, updated_at, deleted_at)
        VALUES (?, ?, ?, ?, ?, ?, NULL)`,
       [reflection.id, reflection.date, reflection.template, JSON.stringify(answers), ts, ts],
     );
-    await markDirty(db, 'reflections', reflection.id);
+    await markDirty(tx, 'reflections', reflection.id);
   });
   return reflection;
 }
@@ -1590,7 +1591,7 @@ Expected: FAIL, `Cannot find module './pull'`
 `mobile/src/sync/pull.ts`:
 
 ```ts
-import type { Db, Row } from '../db/types';
+import type { Db, Row, Tx } from '../db/types';
 import { fromRemote } from './codec';
 import type { Remote } from './remote';
 import { TABLES, TABLE_NAMES, type TableName } from './tables';
@@ -1601,14 +1602,14 @@ const PAGE = 500;
 const OVERLAP_MS = 60_000;
 const EPOCH = '1970-01-01T00:00:00.000Z';
 
-export async function applyRemoteRow(db: Db, table: TableName, row: Row): Promise<boolean> {
+export async function applyRemoteRow(tx: Tx, table: TableName, row: Row): Promise<boolean> {
   const { key, columns } = TABLES[table];
   const cols = columns as readonly string[];
   const updates = cols
     .filter((c) => c !== key)
     .map((c) => `${c} = excluded.${c}`)
     .join(', ');
-  const result = await db.runAsync(
+  const result = await tx.runAsync(
     `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})
      ON CONFLICT (${key}) DO UPDATE SET ${updates}
      WHERE excluded.updated_at > ${table}.updated_at`,
@@ -1628,9 +1629,15 @@ export async function pull(db: Db, remote: Remote): Promise<boolean> {
 
     for (;;) {
       const rows = await remote.pullSince(table, since, PAGE);
-      for (const r of rows) {
-        if (await applyRemoteRow(db, table, fromRemote(table, r))) changed = true;
-      }
+      // 한 페이지를 한 트랜잭션으로 반영한다. 사용자 쓰기와 섞이지 않고, 중간에 실패하면 페이지 전체를 다시 받는다.
+      const pageChanged = await db.transaction(async (tx) => {
+        let any = false;
+        for (const r of rows) {
+          if (await applyRemoteRow(tx, table, fromRemote(table, r))) any = true;
+        }
+        return any;
+      });
+      if (pageChanged) changed = true;
       if (rows.length > 0) {
         const last = new Date(String(rows[rows.length - 1].synced_at)).toISOString();
         since = last;
@@ -2184,10 +2191,11 @@ git commit -m "feat: 앱 시작, 포그라운드, 쓰기 후, 30초 주기 동�
 ```ts
 import { openDatabaseAsync } from 'expo-sqlite';
 import { migrate } from './schema';
+import { serialize } from './serialize';
 import type { Db } from './types';
 
 export async function openDb(): Promise<Db> {
-  const db: Db = await openDatabaseAsync('daily-log.db');
+  const db = serialize(await openDatabaseAsync('daily-log.db'));
   await migrate(db);
   return db;
 }
