@@ -7,14 +7,14 @@ export function openTestDb(): Db {
     async execAsync(sql: string) {
       raw.exec(sql);
     },
-    async runAsync(sql: string, params: SqlParam[] = []) {
+    async runAsync(sql: string, params: SqlParam[]) {
       const result = raw.prepare(sql).run(params);
       return { changes: result.changes };
     },
-    async getAllAsync<T>(sql: string, params: SqlParam[] = []) {
+    async getAllAsync<T>(sql: string, params: SqlParam[]) {
       return raw.prepare(sql).all(params) as T[];
     },
-    async getFirstAsync<T>(sql: string, params: SqlParam[] = []) {
+    async getFirstAsync<T>(sql: string, params: SqlParam[]) {
       return (raw.prepare(sql).get(params) as T | undefined) ?? null;
     },
     async withTransactionAsync(task: () => Promise<void>) {
