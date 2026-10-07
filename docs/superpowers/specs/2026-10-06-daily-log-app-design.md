@@ -199,3 +199,10 @@
 ### 11.7 데이터 모델 변경 요약
 - `items.status`: `open | doing | done | migrated` (`dropped` 제거). 로컬·서버 CHECK와 기존 `dropped` 행 처리(→ soft delete) 마이그레이션 필요.
 - `items.priority`: boolean, 기본 false (로컬·서버 컬럼 추가, 동기화 컬럼 목록 추가).
+
+### 11.8 회고 템플릿 (스펙 3절 변경)
+- 기본 템플릿: 무기력했던 날(`lethargy`), 감사한 날(`gratitude`), 자유 일지(`free`). "완벽주의가 올라온 날"(`perfectionism`)은 없앤다.
+- 사용자가 템플릿을 추가할 수 있다: 이름 + 질문 1~3개(질문 1 필수).
+- 데이터: 새 테이블 `templates`(id, name, questions jsonb, created_at, updated_at, deleted_at, 동기화·RLS는 다른 테이블과 같음).
+- `reflections.template`의 고정 CHECK를 없애고 기본 키 또는 사용자 템플릿 id를 담는다. 템플릿이 바뀌거나 지워져도 지난 회고가 읽히도록, 회고 저장 시 템플릿 이름과 질문을 `reflections`에 함께 저장한다(스냅샷).
+- 기존 `perfectionism` 회고는 그대로 보여준다(스냅샷이 없으면 기본 이름 사용).
