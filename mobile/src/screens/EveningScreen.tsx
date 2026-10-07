@@ -15,7 +15,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const [mood, setMoodState] = useState<number | null>(null);
   const [saved, setSaved] = useState<Reflection[]>([]);
   const [template, setTemplate] = useState<TemplateKey | null>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Partial<Record<TemplateKey, Record<string, string>>>>({});
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
 
@@ -58,111 +58,114 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const save = () =>
     run(async () => {
       if (!template) return;
-      await addReflection(db, { template, answers });
+      await addReflection(db, { template, answers: answers[template] ?? {} });
       setTemplate(null);
-      setAnswers({});
+      setAnswers((prev) => ({ ...prev, [template]: {} }));
     });
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <ScrollView
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-    >
-      <View style={styles.header}>
-        <Text style={styles.title} accessibilityRole="header">
-          {today} 마무리
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="저녁 마무리 닫기"
-          style={styles.closeButton}
-          onPress={onClose}
-        >
-          <Text style={styles.link}>닫기</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.sectionTitle}>오늘 기분</Text>
-      <View style={styles.moods}>
-        {MOODS.map((m) => (
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        <View style={styles.header}>
+          <Text style={styles.title} accessibilityRole="header">
+            {today} 마무리
+          </Text>
           <Pressable
-            key={m}
             accessibilityRole="button"
-            accessibilityLabel={`기분 ${m}점`}
-            accessibilityState={{ selected: mood === m }}
-            style={[styles.mood, mood === m && styles.moodSelected]}
-            onPress={() => pickMood(m)}
+            accessibilityLabel="저녁 마무리 닫기"
+            style={styles.closeButton}
+            onPress={onClose}
           >
-            <Text style={[styles.moodText, mood === m && styles.moodTextSelected]}>{m}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <Text style={styles.sectionTitle}>오늘은 어떤 날이었나요? (선택)</Text>
-      <View style={styles.templates}>
-        {TEMPLATE_KEYS.map((key) => (
-          <Pressable
-            key={key}
-            accessibilityRole="button"
-            accessibilityState={{ selected: template === key }}
-            style={[styles.chip, template === key && styles.chipSelected]}
-            onPress={() => {
-              setTemplate(template === key ? null : key);
-              setAnswers({});
-            }}
-          >
-            <Text style={template === key ? styles.chipTextSelected : undefined}>{TEMPLATES[key].label}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {template && (
-        <View style={styles.form}>
-          {TEMPLATES[template].questions.map((q) => (
-            <View key={q.key} style={styles.question}>
-              <Text style={styles.questionText}>{q.text}</Text>
-              <TextInput
-                style={styles.answer}
-                multiline
-                accessibilityLabel={q.text}
-                value={answers[q.key] ?? ''}
-                onChangeText={(v) => setAnswers({ ...answers, [q.key]: v })}
-              />
-            </View>
-          ))}
-          <Pressable accessibilityRole="button" style={styles.save} onPress={save}>
-            <Text style={styles.saveText}>저장</Text>
+            <Text style={styles.link}>닫기</Text>
           </Pressable>
         </View>
-      )}
 
-      {error && (
-        <Text style={styles.error} accessibilityLiveRegion="polite">
-          {error}
-        </Text>
-      )}
-
-      {saved.length > 0 && (
-        <View style={styles.saved}>
-          <Text style={styles.sectionTitle}>오늘 남긴 회고</Text>
-          {saved.map((r) => (
-            <View key={r.id} style={styles.savedItem}>
-              <Text style={styles.savedLabel}>{TEMPLATES[r.template].label}</Text>
-              {TEMPLATES[r.template].questions
-                .filter((q) => r.answers[q.key])
-                .map((q) => (
-                  <Text key={q.key}>
-                    <Text style={styles.sub}>{q.text}{'\n'}</Text>
-                    {r.answers[q.key]}
-                  </Text>
-                ))}
-            </View>
+        <Text style={styles.sectionTitle}>오늘 기분</Text>
+        <View style={styles.moods}>
+          {MOODS.map((m) => (
+            <Pressable
+              key={m}
+              accessibilityRole="button"
+              accessibilityLabel={`기분 ${m}점`}
+              accessibilityState={{ selected: mood === m }}
+              style={[styles.mood, mood === m && styles.moodSelected]}
+              onPress={() => pickMood(m)}
+            >
+              <Text style={[styles.moodText, mood === m && styles.moodTextSelected]}>{m}</Text>
+            </Pressable>
           ))}
         </View>
-      )}
-    </ScrollView>
+
+        <Text style={styles.sectionTitle}>오늘은 어떤 날이었나요? (선택)</Text>
+        <View style={styles.templates}>
+          {TEMPLATE_KEYS.map((key) => (
+            <Pressable
+              key={key}
+              accessibilityRole="button"
+              accessibilityState={{ selected: template === key }}
+              style={[styles.chip, template === key && styles.chipSelected]}
+              onPress={() => {
+                setTemplate(template === key ? null : key);
+              }}
+            >
+              <Text style={template === key ? styles.chipTextSelected : undefined}>{TEMPLATES[key].label}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {template && (
+          <View style={styles.form}>
+            {TEMPLATES[template].questions.map((q) => (
+              <View key={q.key} style={styles.question}>
+                <Text style={styles.questionText} accessible={false} importantForAccessibility="no">
+                  {q.text}
+                </Text>
+                <TextInput
+                  style={styles.answer}
+                  multiline
+                  accessibilityLabel={q.text}
+                  value={answers[template]?.[q.key] ?? ''}
+                  onChangeText={(v) =>
+                    setAnswers((prev) => ({ ...prev, [template]: { ...prev[template], [q.key]: v } }))
+                  }
+                />
+              </View>
+            ))}
+            <Pressable accessibilityRole="button" style={styles.save} onPress={save}>
+              <Text style={styles.saveText}>저장</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {error && (
+          <Text style={styles.error} accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        )}
+
+        {saved.length > 0 && (
+          <View style={styles.saved}>
+            <Text style={styles.sectionTitle}>오늘 남긴 회고</Text>
+            {saved.map((r) => (
+              <View key={r.id} style={styles.savedItem}>
+                <Text style={styles.savedLabel}>{TEMPLATES[r.template].label}</Text>
+                {TEMPLATES[r.template].questions
+                  .filter((q) => r.answers[q.key])
+                  .map((q) => (
+                    <Text key={q.key}>
+                      <Text style={styles.sub}>{q.text}{'\n'}</Text>
+                      {r.answers[q.key]}
+                    </Text>
+                  ))}
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -194,5 +197,5 @@ const styles = StyleSheet.create({
   saved: { gap: 8 },
   savedItem: { backgroundColor: '#f4f4f4', borderRadius: 8, padding: 12, gap: 6 },
   savedLabel: { fontWeight: '600' },
-  sub: { color: '#767676', fontSize: 13 },
+  sub: { color: '#555', fontSize: 13 },
 });
