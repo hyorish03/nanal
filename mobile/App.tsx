@@ -1,6 +1,10 @@
 import 'react-native-get-random-values';
+import { GowunBatang_400Regular } from '@expo-google-fonts/gowun-batang';
+import { IBMPlexSansKR_400Regular, IBMPlexSansKR_500Medium } from '@expo-google-fonts/ibm-plex-sans-kr';
+import { NanumPenScript_400Regular } from '@expo-google-fonts/nanum-pen-script';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isAuthRetryableFetchError } from '@supabase/supabase-js';
+import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -10,10 +14,19 @@ import type { Db } from './src/db/types';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { Main } from './src/screens/Main';
 import { supabase } from './src/supabase';
+import { colors } from './src/ui/theme';
 
 const LAST_USER_KEY = 'nanal.lastUserId';
 
 export default function App() {
+  // 글꼴을 못 불러와도 시스템 글꼴로 계속 연다.
+  const [fontsLoaded, fontError] = useFonts({
+    GowunBatang_400Regular,
+    IBMPlexSansKR_400Regular,
+    IBMPlexSansKR_500Medium,
+    NanumPenScript_400Regular,
+  });
+  const fontsReady = fontsLoaded || fontError !== null;
   const [db, setDb] = useState<Db | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -62,10 +75,10 @@ export default function App() {
         <Text>{fatal}</Text>
       </View>
     );
-  else if (!db || !authReady)
+  else if (!db || !authReady || !fontsReady)
     body = (
       <View style={styles.center}>
-        <ActivityIndicator accessibilityLabel="불러오는 중" />
+        <ActivityIndicator accessibilityLabel="불러오는 중" color={colors.navy} />
       </View>
     );
   else if (!userId) body = <LoginScreen />;
@@ -80,7 +93,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
+  root: { flex: 1, backgroundColor: colors.paper },
   center: {
     flex: 1,
     justifyContent: 'center',
