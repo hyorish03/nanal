@@ -2,7 +2,7 @@ import { createFakeRemote } from '../../test/fakeRemote';
 import { openTestDb } from '../../test/sqlite';
 import { migrate } from '../db/schema';
 import type { Db } from '../db/types';
-import { addItem, toggleDone } from '../items/repo';
+import { addItem, advanceStatus } from '../items/repo';
 import { markDirty, pendingCount } from './outbox';
 import { push } from './push';
 
@@ -35,14 +35,14 @@ test('전송 중에 같은 행이 다시 바뀌면 outbox에 남겨 다음에 �
   const upsert = fake.remote.upsert;
   fake.remote.upsert = async (table, rows) => {
     await upsert(table, rows);
-    await toggleDone(db, item.id, new Date(2026, 9, 6, 9, 1));
+    await advanceStatus(db, item.id, new Date(2026, 9, 6, 9, 1));
   };
   await push(db, fake.remote);
   expect(await pendingCount(db)).toBe(1);
 
   fake.remote.upsert = upsert;
   await push(db, fake.remote);
-  expect(fake.store.items.get(item.id)).toMatchObject({ status: 'done' });
+  expect(fake.store.items.get(item.id)).toMatchObject({ status: 'doing' });
   expect(await pendingCount(db)).toBe(0);
 });
 

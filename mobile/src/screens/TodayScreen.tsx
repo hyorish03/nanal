@@ -3,14 +3,13 @@ import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, Vi
 import type { Db } from '../db/types';
 import {
   addItem,
+  advanceStatus,
   deleteItem,
-  dropItem,
   type Item,
   type ItemKind,
   listItemsForDate,
   listMigrationCandidates,
   migrateToToday,
-  toggleDone,
 } from '../items/repo';
 import { logicalDate } from '../lib/date';
 import { countRecordedDays } from '../stats/recordedDays';
@@ -19,21 +18,18 @@ type Props = { db: Db; version: number; onChanged: () => void; onOpenEvening: ()
 
 const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
   { kind: 'task', symbol: '•', label: '할 일' },
-  { kind: 'event', symbol: '○', label: '일정' },
   { kind: 'note', symbol: '–', label: '메모' },
 ];
 
 function statusWord(item: Item): string {
-  if (item.kind === 'event') return '일정';
   if (item.kind === 'note') return '메모';
   if (item.status === 'done') return '완료';
   if (item.status === 'migrated') return '옮김';
-  if (item.status === 'dropped') return '버림';
+  if (item.status === 'doing') return '진행 중';
   return '할 일(열림)';
 }
 
 function symbolOf(item: Item): string {
-  if (item.kind === 'event') return '○';
   if (item.kind === 'note') return '–';
   if (item.status === 'done') return 'X';
   if (item.status === 'migrated') return '>';
@@ -134,7 +130,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
                   accessibilityRole="button"
                   accessibilityLabel={`${c.text} 버리기`}
                   style={styles.actionButton}
-                  onPress={() => run(() => dropItem(db, c.id))}
+                  onPress={() => run(() => deleteItem(db, c.id))}
                 >
                   <Text style={[styles.action, styles.danger]}>버리기</Text>
                 </Pressable>
@@ -182,7 +178,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
         keyboardDismissMode="on-drag"
         ListEmptyComponent={<Text style={styles.empty}>아직 기록이 없습니다</Text>}
         renderItem={({ item }) => {
-          const toggleable = item.status === 'open' || item.status === 'done';
+          const toggleable = item.status === 'open' || item.status === 'doing' || item.status === 'done';
           return (
             <View style={styles.row}>
               <Pressable
@@ -191,10 +187,10 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
                 accessibilityRole={toggleable ? 'checkbox' : undefined}
                 accessibilityLabel={`${statusWord(item)} ${item.text}`}
                 accessibilityState={toggleable ? { checked: item.status === 'done' } : undefined}
-                onPress={() => run(() => toggleDone(db, item.id))}
+                onPress={() => run(() => advanceStatus(db, item.id))}
               >
                 <Text style={styles.symbol} accessible={false} importantForAccessibility="no">{symbolOf(item)}</Text>
-                <Text style={[styles.rowText, item.status === 'dropped' && styles.dropped]}>{item.text}</Text>
+                <Text style={[styles.rowText, item.status === 'done' && styles.dropped]}>{item.text}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
