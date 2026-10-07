@@ -1,5 +1,5 @@
 import { serialize } from './serialize';
-import type { RawDb } from './types';
+import type { RawDb, Tx } from './types';
 
 function fakeRaw(events: string[]): RawDb {
   const wait = () => new Promise<void>((r) => setTimeout(r, 5));
@@ -72,4 +72,22 @@ test('task가 던지면 롤백하고 그 오류로 reject하며 큐는 막히지
 test('transaction은 task의 반환값을 돌려준다', async () => {
   const db = serialize(fakeRaw([]));
   expect(await db.transaction(async () => 42)).toBe(42);
+});
+
+test('끝난 트랜잭션의 tx는 쓸 수 없다', async () => {
+  const db = serialize(fakeRaw([]));
+  let captured!: Tx;
+  await db.transaction(async (tx) => {
+    captured = tx;
+  });
+  await expect(captured.runAsync('x', [])).rejects.toThrow('트랜잭션이 이미 끝났습니다');
+
+  let captured2!: Tx;
+  await expect(
+    db.transaction(async (tx) => {
+      captured2 = tx;
+      throw new Error('boom');
+    }),
+  ).rejects.toThrow('boom');
+  await expect(captured2.getAllAsync('x', [])).rejects.toThrow('트랜잭션이 이미 끝났습니다');
 });
