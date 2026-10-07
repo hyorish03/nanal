@@ -32,11 +32,20 @@ export function Main({ db, userId }: { db: Db; userId: string }) {
     <SafeAreaView style={styles.container}>
       {(pending > 0 || error) && (
         <Text style={styles.syncBar} accessibilityLiveRegion="polite">
-          {error ? `동기화 실패, 자동으로 다시 시도합니다 (${pending}건 대기)` : `동기화 대기 ${pending}건`}
+          {error
+            ? pending > 0
+              ? `동기화 실패, 자동으로 다시 시도합니다 (${pending}건 대기)`
+              : '동기화 실패, 자동으로 다시 시도합니다'
+            : `동기화 대기 ${pending}건`}
         </Text>
       )}
       {screen === 'today' ? (
-        <TodayScreen db={db} version={version} onChanged={onChanged} onOpenEvening={() => setScreen('evening')} />
+        <TodayScreen
+          db={db}
+          version={version}
+          onChanged={onChanged}
+          onOpenEvening={() => setScreen('evening')}
+        />
       ) : (
         <EveningScreen db={db} version={version} onChanged={onChanged} onClose={() => setScreen('today')} />
       )}
@@ -46,5 +55,11 @@ export function Main({ db, userId }: { db: Db; userId: string }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  syncBar: { backgroundColor: '#fff4d6', color: '#5c4400', paddingVertical: 6, paddingHorizontal: 16, fontSize: 13 },
+  syncBar: {
+    backgroundColor: '#fff4d6',
+    color: '#5c4400',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    fontSize: 13,
+  },
 });
