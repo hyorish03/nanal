@@ -71,14 +71,25 @@ async function update(tx: Tx, id: string, fields: { status?: TaskStatus; priorit
   await markDirty(tx, 'items', id);
 }
 
-export async function addItem(db: Db, input: { kind: ItemKind; text: string }, now = new Date()): Promise<Item> {
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export async function addItem(
+  db: Db,
+  input: { kind: ItemKind; text: string; date?: string },
+  now = new Date(),
+): Promise<Item> {
   if (input.kind !== 'task' && input.kind !== 'note') throw new Error('알 수 없는 종류입니다');
   const text = input.text.trim();
   if (!text) throw new Error('내용을 입력하세요');
+  const today = logicalDate(now);
+  const date = input.date ?? today;
+  // addDays(date, 0) !== date: 2026-02-30처럼 없는 날짜를 거른다.
+  if (!DATE_RE.test(date) || addDays(date, 0) !== date) throw new Error('날짜 형식이 아닙니다');
+  if (date < today) throw new Error('지난 날짜에는 넣을 수 없어요');
   const ts = now.toISOString();
   const item: Item = {
     id: newId(),
-    date: logicalDate(now),
+    date,
     kind: input.kind,
     text,
     status: input.kind === 'task' ? 'open' : null,

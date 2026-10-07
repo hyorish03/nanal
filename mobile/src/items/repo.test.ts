@@ -168,3 +168,18 @@ test('listMigrationCandidates: 진행 중이던 지난 할 일도 포함', async
 test('addItem: 일정 종류는 거부한다', async () => {
   await expect(addItem(db, { kind: 'event' as never, text: 'x' }, MON)).rejects.toThrow('종류');
 });
+
+test('addItem: 날짜를 주면 그 날짜에 넣는다(오늘 이후만)', async () => {
+  const item = await addItem(db, { kind: 'task', text: '치과 전화', date: '2026-10-06' }, MON);
+  expect(item.date).toBe('2026-10-06');
+  await expect(addItem(db, { kind: 'task', text: 'x', date: '2026-10-04' }, MON)).rejects.toThrow('지난 날짜');
+  await expect(addItem(db, { kind: 'task', text: 'x', date: '10월 6일' }, MON)).rejects.toThrow('날짜');
+});
+
+test('addItem: 날짜를 줘도 created_at은 now에서 정하고, 없는 날짜는 거절한다', async () => {
+  const item = await addItem(db, { kind: 'note', text: '메모', date: '2026-10-20' }, MON);
+  expect(item.created_at).toBe(MON.toISOString());
+  expect(item.updated_at).toBe(MON.toISOString());
+  await expect(addItem(db, { kind: 'task', text: 'x', date: '2026-02-30' }, MON)).rejects.toThrow('날짜 형식');
+  await expect(addItem(db, { kind: 'task', text: 'x', date: '2026-10-5' }, MON)).rejects.toThrow('날짜 형식');
+});
