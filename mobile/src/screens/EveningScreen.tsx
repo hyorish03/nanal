@@ -4,7 +4,7 @@ import { getMood, setMood } from '../days/repo';
 import type { Db } from '../db/types';
 import { logicalDate } from '../lib/date';
 import { addReflection, listReflections, type Reflection } from '../reflections/repo';
-import { TEMPLATE_KEYS, TEMPLATES, type TemplateKey } from '../reflections/templates';
+import { BUILTIN_TEMPLATES } from '../reflections/templates';
 
 type Props = { db: Db; version: number; onChanged: () => void; onClose: () => void };
 
@@ -14,8 +14,8 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const today = logicalDate(new Date());
   const [mood, setMoodState] = useState<number | null>(null);
   const [saved, setSaved] = useState<Reflection[]>([]);
-  const [template, setTemplate] = useState<TemplateKey | null>(null);
-  const [answers, setAnswers] = useState<Partial<Record<TemplateKey, Record<string, string>>>>({});
+  const [template, setTemplate] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<string, Record<string, string>>>({});
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
 
@@ -58,7 +58,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const save = () =>
     run(async () => {
       if (!template) return;
-      await addReflection(db, { template, answers: answers[template] ?? {} });
+      await addReflection(db, { templateId: template, answers: answers[template] ?? {} });
       setTemplate(null);
       setAnswers((prev) => ({ ...prev, [template]: {} }));
     });
@@ -102,24 +102,24 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
         <Text style={styles.sectionTitle}>오늘은 어떤 날이었나요? (선택)</Text>
         <View style={styles.templates}>
-          {TEMPLATE_KEYS.map((key) => (
+          {BUILTIN_TEMPLATES.map((t) => (
             <Pressable
-              key={key}
+              key={t.id}
               accessibilityRole="button"
-              accessibilityState={{ selected: template === key }}
-              style={[styles.chip, template === key && styles.chipSelected]}
+              accessibilityState={{ selected: template === t.id }}
+              style={[styles.chip, template === t.id && styles.chipSelected]}
               onPress={() => {
-                setTemplate(template === key ? null : key);
+                setTemplate(template === t.id ? null : t.id);
               }}
             >
-              <Text style={template === key ? styles.chipTextSelected : undefined}>{TEMPLATES[key].label}</Text>
+              <Text style={template === t.id ? styles.chipTextSelected : undefined}>{t.name}</Text>
             </Pressable>
           ))}
         </View>
 
         {template && (
           <View style={styles.form}>
-            {TEMPLATES[template].questions.map((q) => (
+            {(BUILTIN_TEMPLATES.find((t) => t.id === template)?.questions ?? []).map((q) => (
               <View key={q.key} style={styles.question}>
                 <Text style={styles.questionText} accessible={false} importantForAccessibility="no">
                   {q.text}
@@ -152,8 +152,8 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
             <Text style={styles.sectionTitle}>오늘 남긴 회고</Text>
             {saved.map((r) => (
               <View key={r.id} style={styles.savedItem}>
-                <Text style={styles.savedLabel}>{TEMPLATES[r.template].label}</Text>
-                {TEMPLATES[r.template].questions
+                <Text style={styles.savedLabel}>{r.templateName}</Text>
+                {r.questions
                   .filter((q) => r.answers[q.key])
                   .map((q) => (
                     <Text key={q.key}>
