@@ -1595,6 +1595,7 @@ import type { Db, Row, Tx } from '../db/types';
 import { fromRemote } from './codec';
 import type { Remote } from './remote';
 import { TABLES, TABLE_NAMES, type TableName } from './tables';
+import { normalizeTimestamp } from './timestamp';
 
 const PAGE = 500;
 // 서버 트랜잭션 커밋 순서와 synced_at 순서가 어긋날 수 있어 커서보다 조금 앞에서부터 다시 받는다.
@@ -1639,7 +1640,7 @@ export async function pull(db: Db, remote: Remote): Promise<boolean> {
       });
       if (pageChanged) changed = true;
       if (rows.length > 0) {
-        const last = new Date(String(rows[rows.length - 1].synced_at)).toISOString();
+        const last = normalizeTimestamp(String(rows[rows.length - 1].synced_at));
         since = last;
         if (!cursor || last > cursor) cursor = last;
       }
