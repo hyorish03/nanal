@@ -1,7 +1,19 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { isAuthRetryableFetchError, type AuthError } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
+
+function authErrorMessage(e: AuthError): string {
+  if (isAuthRetryableFetchError(e)) return '네트워크에 연결할 수 없습니다. 연결을 확인한 뒤 다시 시도하세요';
+  if (e.code === 'invalid_credentials' || e.message.includes('Invalid login credentials')) {
+    return '이메일 또는 비밀번호가 올바르지 않습니다';
+  }
+  if (e.code === 'email_not_confirmed' || e.message.includes('Email not confirmed')) {
+    return '이메일 인증이 필요합니다';
+  }
+  return e.message;
+}
 
 export function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -18,7 +30,7 @@ export function LoginScreen() {
         email: email.trim(),
         password,
       });
-      if (e) setError(e.message);
+      if (e) setError(authErrorMessage(e));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
