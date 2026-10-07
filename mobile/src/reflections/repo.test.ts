@@ -1,7 +1,8 @@
 import { openTestDb } from '../../test/sqlite';
+import { setMood } from '../days/repo';
 import { migrate } from '../db/schema';
 import type { Db } from '../db/types';
-import { addReflection, listReflections } from './repo';
+import { addReflection, listReflectionHistory, listReflections } from './repo';
 import { createTemplate, deleteTemplate } from './templateRepo';
 
 const NOW = new Date(2026, 9, 6, 23, 0);
@@ -40,4 +41,16 @@ test('스냅샷 없는 예전 회고(완벽주의)도 이름과 질문을 복원
 
 test('모든 답변이 비어 있으면 거부한다', async () => {
   await expect(addReflection(db, { templateId: 'gratitude', answers: { good: '  ' } }, NOW)).rejects.toThrow('하나 이상');
+});
+
+test('모든 회고를 최신순으로 그날 기분과 함께 돌려준다', async () => {
+  await addReflection(db, { templateId: 'gratitude', answers: { good: '커피' } }, new Date(2026, 9, 2, 22, 0));
+  await addReflection(db, { templateId: 'lethargy', answers: { cause: '잠' } }, new Date(2026, 9, 5, 22, 0));
+  await setMood(db, '2026-10-05', 1, new Date(2026, 9, 5, 22, 0));
+
+  const all = await listReflectionHistory(db);
+  expect(all.map((r) => [r.date, r.templateName, r.mood])).toEqual([
+    ['2026-10-05', '무기력했던 날', 1],
+    ['2026-10-02', '감사한 날', null],
+  ]);
 });
