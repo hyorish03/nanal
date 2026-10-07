@@ -1,4 +1,4 @@
-import { logicalDate, addDays } from './date';
+import { addDays, addMonths, formatLongDate, formatMonth, formatShortDate, logicalDate, monthOf, weekdayOf } from './date';
 
 // new Date(y, m, d, h, min)은 기기 로컬 시간대 기준이므로 테스트가 시간대에 의존하지 않는다.
 test('04:00부터는 그날이다', () => {
@@ -21,4 +21,17 @@ test('addDays는 달과 해를 넘긴다', () => {
   expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
   expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
   expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+});
+
+test('날짜를 한국어로 표시한다', () => {
+  expect(weekdayOf('2026-10-07')).toBe(3);
+  expect(formatLongDate('2026-10-07')).toBe('10월 7일 수요일');
+  expect(formatShortDate('2026-10-06')).toBe('10/6');
+});
+
+test('달을 다룬다', () => {
+  expect(monthOf('2026-10-07')).toBe('2026-10');
+  expect(addMonths('2026-12', 1)).toBe('2027-01');
+  expect(addMonths('2026-01', -1)).toBe('2025-12');
+  expect(formatMonth('2026-10')).toBe('2026년 10월');
 });

@@ -14,3 +14,41 @@ export function addDays(date: string, n: number): string {
   const next = new Date(Date.UTC(y, m - 1, d + n));
   return `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}`;
 }
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+function partsOf(date: string) {
+  const [y, m, d] = date.split('-').map(Number);
+  return { y, m, d };
+}
+
+// 0=일요일
+export function weekdayOf(date: string): number {
+  const { y, m, d } = partsOf(date);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+export function formatLongDate(date: string): string {
+  const { m, d } = partsOf(date);
+  return `${m}월 ${d}일 ${WEEKDAYS[weekdayOf(date)]}요일`;
+}
+
+export function formatShortDate(date: string): string {
+  const { m, d } = partsOf(date);
+  return `${m}/${d}`;
+}
+
+export function monthOf(date: string): string {
+  return date.slice(0, 7);
+}
+
+export function addMonths(month: string, n: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}`;
+}
+
+export function formatMonth(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return `${y}년 ${m}월`;
+}
