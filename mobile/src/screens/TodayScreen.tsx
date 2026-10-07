@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Db } from '../db/types';
 import {
   addItem,
@@ -23,6 +23,15 @@ const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
   { kind: 'note', symbol: '–', label: '메모' },
 ];
 
+function statusWord(item: Item): string {
+  if (item.kind === 'event') return '일정';
+  if (item.kind === 'note') return '메모';
+  if (item.status === 'done') return '완료';
+  if (item.status === 'migrated') return '옮김';
+  if (item.status === 'dropped') return '버림';
+  return '할 일(열림)';
+}
+
 function symbolOf(item: Item): string {
   if (item.kind === 'event') return '○';
   if (item.kind === 'note') return '–';
@@ -40,6 +49,9 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
   const [kind, setKind] = useState<ItemKind>('task');
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const busy = useRef(false);
+
+  useEffect(() => setLater(new Set()), [today]);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,20 +61,25 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
         setItems(i);
         setCandidates(c);
         setRecordedDays(n);
+        setError(null);
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     return () => {
       cancelled = true;
     };
   }, [db, today, version]);
 
   const run = async (action: () => Promise<unknown>) => {
+    if (busy.current) return;
+    busy.current = true;
     try {
       await action();
       setError(null);
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      busy.current = false;
     }
   };
 
@@ -89,7 +106,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
       </View>
 
       {visibleCandidates.length > 0 && (
-        <View style={styles.migration}>
+        <ScrollView style={styles.migration}>
           <Text style={styles.sectionTitle}>지난 할 일 {visibleCandidates.length}개</Text>
           {visibleCandidates.map((c) => (
             <View key={c.id} style={styles.candidate}>
@@ -97,19 +114,34 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
                 {c.text} <Text style={styles.sub}>({c.date})</Text>
               </Text>
               <View style={styles.actions}>
-                <Pressable accessibilityRole="button" onPress={() => run(() => migrateToToday(db, c.id))}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${c.text} 오늘 하기`}
+                  style={styles.actionButton}
+                  onPress={() => run(() => migrateToToday(db, c.id))}
+                >
                   <Text style={styles.action}>오늘 하기</Text>
                 </Pressable>
-                <Pressable accessibilityRole="button" onPress={() => setLater(new Set(later).add(c.id))}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${c.text} 나중으로`}
+                  style={styles.actionButton}
+                  onPress={() => setLater(new Set(later).add(c.id))}
+                >
                   <Text style={styles.action}>나중으로</Text>
                 </Pressable>
-                <Pressable accessibilityRole="button" onPress={() => run(() => dropItem(db, c.id))}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${c.text} 버리기`}
+                  style={styles.actionButton}
+                  onPress={() => run(() => dropItem(db, c.id))}
+                >
                   <Text style={[styles.action, styles.danger]}>버리기</Text>
                 </Pressable>
               </View>
             </View>
           ))}
-        </View>
+        </ScrollView>
       )}
 
       <View style={styles.inputRow}>
@@ -138,12 +170,16 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
         />
       </View>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && (
+        <Text style={styles.error} accessibilityLiveRegion="polite">{error}
+        </Text>
+      )}
 
       <FlatList
         data={items}
         keyExtractor={(i) => i.id}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         ListEmptyComponent={<Text style={styles.empty}>아직 기록이 없습니다</Text>}
         renderItem={({ item }) => {
           const toggleable = item.status === 'open' || item.status === 'done';
@@ -153,15 +189,17 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
                 style={styles.rowMain}
                 disabled={!toggleable}
                 accessibilityRole={toggleable ? 'checkbox' : undefined}
+                accessibilityLabel={`${statusWord(item)} ${item.text}`}
                 accessibilityState={toggleable ? { checked: item.status === 'done' } : undefined}
                 onPress={() => run(() => toggleDone(db, item.id))}
               >
-                <Text style={styles.symbol}>{symbolOf(item)}</Text>
+                <Text style={styles.symbol} accessible={false} importantForAccessibility="no">{symbolOf(item)}</Text>
                 <Text style={[styles.rowText, item.status === 'dropped' && styles.dropped]}>{item.text}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`${item.text} 삭제`}
+                style={styles.deleteButton}
                 onPress={() => run(() => deleteItem(db, item.id))}
               >
                 <Text style={styles.delete}>삭제</Text>
@@ -181,25 +219,27 @@ const styles = StyleSheet.create({
   sub: { color: '#666', fontSize: 13 },
   eveningButton: { borderWidth: 1, borderColor: '#222', borderRadius: 16, paddingVertical: 6, paddingHorizontal: 12 },
   eveningText: { fontWeight: '600' },
-  migration: { backgroundColor: '#f4f4f4', borderRadius: 8, padding: 12, gap: 8 },
+  migration: { backgroundColor: '#f4f4f4', borderRadius: 8, padding: 12, maxHeight: 220, flexGrow: 0 },
   sectionTitle: { fontWeight: '700' },
-  candidate: { gap: 4 },
+  candidate: { gap: 4, marginTop: 8 },
   candidateText: { fontSize: 15 },
   actions: { flexDirection: 'row', gap: 16 },
-  action: { color: '#0a58ca', fontWeight: '600', paddingVertical: 4 },
+  actionButton: { minHeight: 44, justifyContent: 'center' },
+  action: { color: '#0a58ca', fontWeight: '600' },
   danger: { color: '#b00020' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  kind: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: '#ccc', alignItems: 'center', justifyContent: 'center' },
+  kind: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#ccc', alignItems: 'center', justifyContent: 'center' },
   kindSelected: { backgroundColor: '#222', borderColor: '#222' },
   kindText: { fontSize: 18 },
   kindTextSelected: { color: '#fff' },
   input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, fontSize: 16 },
   error: { color: '#b00020' },
-  empty: { color: '#999', textAlign: 'center', marginTop: 24 },
+  empty: { color: '#767676', textAlign: 'center', marginTop: 24 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#ddd' },
   rowMain: { flex: 1, flexDirection: 'row', gap: 10, alignItems: 'center' },
   symbol: { width: 16, fontSize: 16, textAlign: 'center' },
   rowText: { fontSize: 16, flexShrink: 1 },
-  dropped: { textDecorationLine: 'line-through', color: '#999' },
-  delete: { color: '#999', paddingHorizontal: 8 },
+  dropped: { textDecorationLine: 'line-through', color: '#767676' },
+  deleteButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
+  delete: { color: '#767676' },
 });
