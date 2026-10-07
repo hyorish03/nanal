@@ -118,9 +118,9 @@ export type Row = Record<string, SqlParam>;
 // expo-sqlite의 SQLiteDatabase가 이 형태를 그대로 만족한다. 테스트는 better-sqlite3로 같은 형태를 구현한다.
 export interface Db {
   execAsync(sql: string): Promise<void>;
-  runAsync(sql: string, params?: SqlParam[]): Promise<{ changes: number }>;
-  getAllAsync<T>(sql: string, params?: SqlParam[]): Promise<T[]>;
-  getFirstAsync<T>(sql: string, params?: SqlParam[]): Promise<T | null>;
+  runAsync(sql: string, params: SqlParam[]): Promise<{ changes: number }>;
+  getAllAsync<T>(sql: string, params: SqlParam[]): Promise<T[]>;
+  getFirstAsync<T>(sql: string, params: SqlParam[]): Promise<T | null>;
   withTransactionAsync(task: () => Promise<void>): Promise<void>;
 }
 ```
@@ -149,14 +149,14 @@ export function openTestDb(): Db {
     async execAsync(sql: string) {
       raw.exec(sql);
     },
-    async runAsync(sql: string, params: SqlParam[] = []) {
+    async runAsync(sql: string, params: SqlParam[]) {
       const result = raw.prepare(sql).run(params);
       return { changes: result.changes };
     },
-    async getAllAsync<T>(sql: string, params: SqlParam[] = []) {
+    async getAllAsync<T>(sql: string, params: SqlParam[]) {
       return raw.prepare(sql).all(params) as T[];
     },
-    async getFirstAsync<T>(sql: string, params: SqlParam[] = []) {
+    async getFirstAsync<T>(sql: string, params: SqlParam[]) {
       return (raw.prepare(sql).get(params) as T | undefined) ?? null;
     },
     async withTransactionAsync(task: () => Promise<void>) {
@@ -192,7 +192,7 @@ test('조회, 삽입, 트랜잭션 롤백이 동작한다', async () => {
     }),
   ).rejects.toThrow('boom');
 
-  expect(await db.getAllAsync('SELECT id FROM t')).toEqual([{ id: 'a' }]);
+  expect(await db.getAllAsync('SELECT id FROM t', [])).toEqual([{ id: 'a' }]);
   expect(await db.getFirstAsync('SELECT id FROM t WHERE id = ?', ['zzz'])).toBeNull();
 });
 ```
@@ -367,9 +367,10 @@ test('테이블을 만들고 두 번 실행해도 안전하다', async () => {
   await migrate(db);
   const tables = await db.getAllAsync<{ name: string }>(
     "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+    [],
   );
   expect(tables.map((t) => t.name)).toEqual(['days', 'items', 'outbox', 'reflections', 'sync_state']);
-  expect(await db.getFirstAsync('PRAGMA user_version')).toEqual({ user_version: 1 });
+  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 1 });
 });
 
 test('task는 status가 필요하고, 그 외 종류는 status가 없어야 한다', async () => {
@@ -459,7 +460,7 @@ const MIGRATIONS = [
 ];
 
 export async function migrate(db: Db): Promise<void> {
-  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', []);
   for (let v = row?.user_version ?? 0; v < MIGRATIONS.length; v++) {
     await db.withTransactionAsync(async () => {
       await db.execAsync(MIGRATIONS[v]);
@@ -558,7 +559,7 @@ export async function markDirty(db: Db, table: TableName, key: string): Promise<
 }
 
 export async function pendingCount(db: Db): Promise<number> {
-  const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM outbox');
+  const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM outbox', []);
   return row?.n ?? 0;
 }
 ```
@@ -611,7 +612,7 @@ beforeEach(async () => {
 });
 
 const outboxKeys = async () =>
-  (await db.getAllAsync<{ row_key: string }>("SELECT row_key FROM outbox WHERE table_name = 'items'")).map(
+  (await db.getAllAsync<{ row_key: string }>("SELECT row_key FROM outbox WHERE table_name = 'items'", [])).map(
     (r) => r.row_key,
   );
 
@@ -681,7 +682,7 @@ test('listMigrationCandidates: 오늘 이전의 열린 할 일만, 삭제된 것
 
 test('deleteItem: 행은 남기고 deleted_at만 찍으며 목록에서 빠진다', async () => {
   const item = await addItem(db, { kind: 'note', text: 'a' }, MON);
-  await db.runAsync('DELETE FROM outbox');
+  await db.runAsync('DELETE FROM outbox', []);
   await deleteItem(db, item.id, TUE);
   expect(await listItemsForDate(db, '2026-10-05')).toHaveLength(0);
   expect(await db.getFirstAsync('SELECT deleted_at FROM items WHERE id = ?', [item.id])).toEqual({
@@ -872,7 +873,7 @@ test('기분을 저장하고 다시 고치면 덮어쓴다', async () => {
   await setMood(db, '2026-10-06', 3, NOW);
   await setMood(db, '2026-10-06', 5, NOW);
   expect(await getMood(db, '2026-10-06')).toBe(5);
-  expect(await db.getAllAsync("SELECT row_key FROM outbox WHERE table_name = 'days'")).toEqual([
+  expect(await db.getAllAsync("SELECT row_key FROM outbox WHERE table_name = 'days'", [])).toEqual([
     { row_key: '2026-10-06' },
   ]);
 });
@@ -1011,7 +1012,7 @@ test('답변을 정리해 저장하고 다시 읽는다', async () => {
   const list = await listReflections(db, '2026-10-06');
   expect(list).toHaveLength(1);
   expect(list[0].answers).toEqual({ cause: '잠 부족' });
-  expect(await db.getAllAsync("SELECT row_key FROM outbox WHERE table_name = 'reflections'")).toEqual([
+  expect(await db.getAllAsync("SELECT row_key FROM outbox WHERE table_name = 'reflections'", [])).toEqual([
     { row_key: saved.id },
   ]);
 });
@@ -1161,6 +1162,7 @@ export async function countRecordedDays(db: Db): Promise<number> {
        UNION SELECT date FROM days WHERE deleted_at IS NULL AND mood IS NOT NULL
        UNION SELECT date FROM reflections WHERE deleted_at IS NULL
      )`,
+    [],
   );
   return row?.n ?? 0;
 }
@@ -1556,7 +1558,7 @@ test('커서를 저장해 변경이 없으면 다시 반영하지 않는다', as
   fake.serverWrite('items', serverItem({}));
   await pull(db, fake.remote);
   expect(await pull(db, fake.remote)).toBe(false);
-  expect(await db.getFirstAsync("SELECT cursor FROM sync_state WHERE table_name = 'items'")).toEqual({
+  expect(await db.getFirstAsync("SELECT cursor FROM sync_state WHERE table_name = 'items'", [])).toEqual({
     cursor: fake.store.items.get('srv-1')!.synced_at,
   });
 });
