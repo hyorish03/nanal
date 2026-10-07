@@ -7,12 +7,14 @@ import type { Db } from '../db/types';
 import { monthGrid } from '../lib/calendar';
 import { addMonths, formatLongDate, formatMonth, logicalDate, monthOf } from '../lib/date';
 import { listReflectionHistory, listReflections, type Reflection, type ReflectionEntry } from '../reflections/repo';
+import { monthLabel, reviewTargetMonth } from '../monthly/labels';
+import { getMonthlyReview } from '../monthly/repo';
 import { Inkwell } from '../ui/Inkwell';
 import { RuledPaper } from '../ui/RuledPaper';
 import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 
-type Props = { db: Db; version: number; onClose: () => void };
+type Props = { db: Db; version: number; onClose: () => void; onOpenReview?: (month: string) => void };
 type Tab = 'calendar' | 'collection';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -21,7 +23,7 @@ function answersOf(r: Reflection): string[] {
   return r.questions.map((q) => r.answers[q.key]).filter((a): a is string => !!a);
 }
 
-export function ArchiveScreen({ db, version, onClose }: Props) {
+export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
   const today = logicalDate(new Date());
   const [tab, setTab] = useState<Tab>('calendar');
   const [month, setMonth] = useState(monthOf(today));
@@ -31,6 +33,19 @@ export function ArchiveScreen({ db, version, onClose }: Props) {
   const [history, setHistory] = useState<ReflectionEntry[]>([]);
   const [filter, setFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const reviewMonth = reviewTargetMonth(today);
+  const [hasReview, setHasReview] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getMonthlyReview(db, reviewMonth)
+      .then((r) => !cancelled && setHasReview(r !== null))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [db, reviewMonth, version]);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,6 +130,20 @@ export function ArchiveScreen({ db, version, onClose }: Props) {
 
       {tab === 'calendar' && (
         <>
+          {onOpenReview && (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.reviewBanner}
+              onPress={() => onOpenReview(reviewMonth)}
+            >
+              <Txt variant="medium" style={styles.reviewBannerTitle}>
+                {monthLabel(reviewMonth)} 돌아보기 {hasReview ? '보기' : '만들기'}
+              </Txt>
+              <Txt style={styles.reviewBannerSub}>
+                {hasReview ? '지난달 흐름을 다시 읽어요' : '한 달의 기분과 회고를 AI와 같이 읽어 봐요'}
+              </Txt>
+            </Pressable>
+          )}
           <View style={styles.monthRow}>
             <Pressable accessibilityRole="button" accessibilityLabel="이전 달" style={styles.arrow} onPress={() => changeMonth(addMonths(month, -1))}>
               <Txt style={styles.arrowText}>‹</Txt>
@@ -277,6 +306,9 @@ const styles = StyleSheet.create({
   future: { color: colors.line },
   dot: { width: 4, height: 4, borderRadius: 2 },
   dotOn: { backgroundColor: colors.navy },
+  reviewBanner: { minHeight: 64, padding: 14, gap: 2, borderRadius: 6, backgroundColor: colors.navy },
+  reviewBannerTitle: { color: colors.onDark, fontSize: 16 },
+  reviewBannerSub: { color: colors.coverText, fontSize: 13 },
   legend: { fontSize: 12, color: colors.muted },
   detail: { gap: 10, paddingTop: 10, borderTopWidth: 1, borderStyle: 'dashed', borderTopColor: colors.line },
   detailHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },

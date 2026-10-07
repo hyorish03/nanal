@@ -13,6 +13,7 @@ import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { ArchiveScreen } from './ArchiveScreen';
 import { EveningScreen } from './EveningScreen';
+import { MonthlyReviewScreen } from './MonthlyReviewScreen';
 import { OnboardingScreen } from './OnboardingScreen';
 import { TodayScreen } from './TodayScreen';
 
@@ -50,7 +51,7 @@ export function Main({ db, userId }: { db: Db; userId: string }) {
   return <MainContent db={db} userId={userId} />;
 }
 
-type Screen = 'onboarding' | 'today' | 'evening' | 'archive';
+type Screen = 'onboarding' | 'today' | 'evening' | 'archive' | 'review';
 
 function MainContent({ db, userId }: { db: Db; userId: string }) {
   const remote = useMemo(() => createSupabaseRemote(supabase, userId), [userId]);
@@ -58,6 +59,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
   const { pending, error, requestSync } = useSync(db, remote, refresh);
   const [screen, setScreen] = useState<Screen | null>(null);
+  const [reviewMonth, setReviewMonth] = useState<string | null>(null);
   const [coverOpen, setCoverOpen] = useState(false);
   const [dayClosed, setDayClosed] = useState(false); // 저녁 마무리에서 "닫기"를 눌렀다
   const [closedShown, setClosedShown] = useState(false); // 덮기 애니메이션이 끝났다
@@ -83,9 +85,13 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     return () => sub.remove();
   }, [refresh]);
 
-  // Android 뒤로 가기: 저녁·지난 기록에서는 오늘로 돌아간다.
+  // Android 뒤로 가기: 저녁·지난 기록에서는 오늘로, 월간 돌아보기에서는 지난 기록으로 돌아간다.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (screen === 'review') {
+        setScreen('archive');
+        return true;
+      }
       if (screen === 'evening' || screen === 'archive') {
         setScreen('today');
         return true;
@@ -145,7 +151,26 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
           />
         )}
         {screen === 'evening' && <EveningScreen db={db} version={version} onChanged={onChanged} onClose={closeDay} />}
-        {screen === 'archive' && <ArchiveScreen db={db} version={version} onClose={() => setScreen('today')} />}
+        {screen === 'archive' && (
+          <ArchiveScreen
+            db={db}
+            version={version}
+            onClose={() => setScreen('today')}
+            onOpenReview={(m) => {
+              setReviewMonth(m);
+              setScreen('review');
+            }}
+          />
+        )}
+        {screen === 'review' && reviewMonth && (
+          <MonthlyReviewScreen
+            db={db}
+            month={reviewMonth}
+            version={version}
+            onChanged={onChanged}
+            onClose={() => setScreen('archive')}
+          />
+        )}
       </SafeAreaView>
       <Cover
         open={coverOpen}
