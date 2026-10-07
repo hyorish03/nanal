@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(16);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.com'),
@@ -49,6 +49,47 @@ select is(
   (select text from public.items where id = 'aaaaaaaa-0000-0000-0000-000000000001'),
   'mine',
   'B의 수정은 A의 항목에 적용되지 않았다'
+);
+
+-- 최신 updated_at의 수정은 반영된다 (LWW 대조군)
+update public.items set text = 'newer', updated_at = '2026-10-07T00:00:00Z'
+where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+select is(
+  (select text from public.items where id = 'aaaaaaaa-0000-0000-0000-000000000001'),
+  'newer',
+  '더 최신 updated_at의 수정은 반영된다'
+);
+
+select throws_ok(
+  $$ update public.items set user_id = '22222222-2222-2222-2222-222222222222'
+     where id = 'aaaaaaaa-0000-0000-0000-000000000001' $$,
+  '42501', null, 'A는 자기 행의 user_id를 B로 바꿀 수 없다'
+);
+
+insert into public.reflections (id, date, template, answers, created_at, updated_at)
+values ('bbbbbbbb-0000-0000-0000-000000000001', '2026-10-06', 'free', '{}'::jsonb,
+        '2026-10-06T00:00:00Z', '2026-10-06T00:00:00Z');
+
+set local request.jwt.claims to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select is((select count(*)::int from public.reflections), 0, 'B는 A의 회고를 못 본다');
+select throws_ok(
+  $$ insert into public.items (id, date, kind, text, status, created_at, updated_at)
+     values ('aaaaaaaa-0000-0000-0000-000000000001', '2026-10-06', 'note', 'steal', null,
+             '2026-10-06T00:00:00Z', '2027-01-01T00:00:00Z')
+     on conflict (id) do update set text = excluded.text, updated_at = excluded.updated_at $$,
+  '42501', null, 'B는 upsert로 A의 행을 가로챌 수 없다'
+);
+
+reset role;
+select ok(not has_table_privilege('anon', 'public.items', 'select'), 'anon은 items 권한이 없다');
+select ok(not has_table_privilege('anon', 'public.days', 'select'), 'anon은 days 권한이 없다');
+select ok(not has_table_privilege('anon', 'public.reflections', 'select'), 'anon은 reflections 권한이 없다');
+set local role anon;
+select throws_ok(
+  $$ insert into public.items (id, user_id, date, kind, text, status, created_at, updated_at)
+     values ('aaaaaaaa-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111',
+             '2026-10-06', 'note', 'x', null, now(), now()) $$,
+  '42501', null, 'anon은 쓸 수 없다'
 );
 
 select * from finish();

@@ -86,3 +86,8 @@ create policy reflections_update on public.reflections for update to authenticat
 
 -- 삭제는 deleted_at으로만 한다.
 revoke delete, truncate on public.items, public.days, public.reflections from anon, authenticated;
+
+-- RLS 외에 권한으로도 막는다.
+revoke all on public.items, public.days, public.reflections from anon, authenticated;
+grant select, insert, update on public.items, public.days, public.reflections to authenticated;
+revoke execute on function public.apply_lww() from public;
