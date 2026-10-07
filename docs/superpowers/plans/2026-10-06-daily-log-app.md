@@ -2062,6 +2062,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Remote } from './remote';
 import { TABLES } from './tables';
 
+// PostgREST 필터 값에 '.', ':'가 들어가므로 큰따옴표로 감싸고, 안의 따옴표와 역슬래시는 이스케이프한다.
+const quote = (value: string) => `"${value.replace(/[\\"]/g, '\\$&')}"`;
+
 export function createSupabaseRemote(client: SupabaseClient, userId: string): Remote {
   return {
     async upsert(table, rows) {
@@ -2073,14 +2076,14 @@ export function createSupabaseRemote(client: SupabaseClient, userId: string): Re
     },
     async pullAfter(table, cursor, limit) {
       const { key } = TABLES[table];
-      let query = client.from(table).select('*');
+      // RLS가 본인 행만 돌려주지만, 인덱스(user_id, synced_at)를 타도록 조건을 명시한다.
+      let query = client.from(table).select('*').eq('user_id', userId);
       if (cursor) {
-        // PostgREST 필터 값에 '.', ':'가 들어가므로 큰따옴표로 감싼다.
-        const at = `"${cursor.syncedAt}"`;
+        const at = quote(cursor.syncedAt);
         query =
           cursor.key === null
             ? query.gt('synced_at', cursor.syncedAt)
-            : query.or(`synced_at.gt.${at},and(synced_at.eq.${at},${key}.gt."${cursor.key}")`);
+            : query.or(`synced_at.gt.${at},and(synced_at.eq.${at},${key}.gt.${quote(cursor.key)})`);
       }
       const { data, error } = await query
         .order('synced_at', { ascending: true })
