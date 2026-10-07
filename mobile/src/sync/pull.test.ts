@@ -53,14 +53,86 @@ test('서버가 더 최신이면 덮어쓴다', async () => {
   expect((await listItemsForDate(db, local.date))[0].text).toBe('서버 최신');
 });
 
+const storedCursor = async () => {
+  const row = await db.getFirstAsync<{ cursor: string }>("SELECT cursor FROM sync_state WHERE table_name = 'items'", []);
+  return row ? JSON.parse(row.cursor) : null;
+};
+
+const manyItems = (n: number) =>
+  Array.from({ length: n }, (_, i) => serverItem({ id: `srv-${i + 1}`, text: `서버 ${i + 1}` }));
+
+const localIds = async () =>
+  (await db.getAllAsync<{ id: string }>('SELECT id FROM items ORDER BY id', [])).map((r) => r.id);
+
 test('커서를 저장해 변경이 없으면 다시 반영하지 않는다', async () => {
   const fake = createFakeRemote();
   fake.serverWrite('items', serverItem({}));
   await pull(db, fake.remote);
   expect(await pull(db, fake.remote)).toBe(false);
-  expect(await db.getFirstAsync("SELECT cursor FROM sync_state WHERE table_name = 'items'", [])).toEqual({
-    cursor: fake.store.items.get('srv-1')!.synced_at,
+  expect(await storedCursor()).toEqual({
+    syncedAt: '2026-01-01T00:00:01.000123Z',
+    key: 'srv-1',
   });
+});
+
+test('같은 synced_at 묶음이 페이지 경계에 걸려도 모두 반영한다', async () => {
+  const fake = createFakeRemote();
+  await fake.remote.upsert('items', manyItems(5));
+  expect(await pull(db, fake.remote, { pageSize: 2 })).toBe(true);
+  expect(await localIds()).toEqual(['srv-1', 'srv-2', 'srv-3', 'srv-4', 'srv-5']);
+});
+
+test('한 밀리초 안의 행이 페이지보다 많아도 끝나고 모두 반영한다', async () => {
+  const fake = createFakeRemote();
+  await fake.remote.upsert('items', manyItems(7));
+  expect(await pull(db, fake.remote, { pageSize: 2 })).toBe(true);
+  expect(await localIds()).toHaveLength(7);
+});
+
+test('새 변경이 없는 두 번째 pull은 false이고 커서를 되돌리지 않는다', async () => {
+  const fake = createFakeRemote();
+  await fake.remote.upsert('items', manyItems(3));
+  await pull(db, fake.remote, { pageSize: 2 });
+  const before = await storedCursor();
+  expect(before).toEqual({ syncedAt: '2026-01-01T00:00:01.000123Z', key: 'srv-3' });
+  expect(await pull(db, fake.remote, { pageSize: 2 })).toBe(false);
+  expect(await storedCursor()).toEqual(before);
+});
+
+test('로컬 CHECK를 어기는 서버 행은 경고하고 건너뛰며 나머지는 반영하고 다음 pull도 막히지 않는다', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const fake = createFakeRemote();
+    await fake.remote.upsert('items', [
+      serverItem({ id: 'a-ok' }),
+      serverItem({ id: 'b-bad', kind: 'task', status: null }),
+      serverItem({ id: 'c-ok' }),
+    ]);
+    expect(await pull(db, fake.remote)).toBe(true);
+    expect(await localIds()).toEqual(['a-ok', 'c-ok']);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0].join(' '))).toEqual(expect.stringContaining('b-bad'));
+    expect(String(warn.mock.calls[0].join(' '))).toEqual(expect.stringContaining('items'));
+    expect((await storedCursor()).key).toBe('c-ok');
+
+    fake.serverWrite('items', serverItem({ id: 'd-ok' }));
+    expect(await pull(db, fake.remote)).toBe(true);
+    expect(await localIds()).toEqual(['a-ok', 'c-ok', 'd-ok']);
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+test('저장된 커서보다 조금 앞선 synced_at의 더 최신 행도 겹쳐 받아 반영한다', async () => {
+  const fake = createFakeRemote();
+  fake.serverWrite('items', serverItem({ id: 'first' }));
+  await pull(db, fake.remote);
+  fake.store.items.set(
+    'late',
+    serverItem({ id: 'late', text: '늦게 커밋됨', synced_at: '2026-01-01T00:00:00.500000+00:00' }),
+  );
+  expect(await pull(db, fake.remote)).toBe(true);
+  expect(await localIds()).toEqual(['first', 'late']);
 });
 
 test('date를 키로 쓰는 days도 반영한다', async () => {
