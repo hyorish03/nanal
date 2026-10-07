@@ -4,12 +4,11 @@
 
 ## 1. 바로 할 일
 
-### 계획 C 운영 반영 (Task 12, 사용자 확인 후)
-- [ ] `supabase db push --linked --dry-run`으로 `20261008000000_ai.sql` 하나만 나오는지 보고 적용한다.
-- [ ] 비로그인 차단 확인: `monthly_reviews`, `ai_usage`, `ai_entitlements`, `rpc/consume_ai_quota`가 모두 `42501`.
-- [ ] `supabase functions deploy organize-voice monthly-review --project-ref xckbdxtgfcvdacwrolvb`
-- [ ] 로그인 없이 함수를 부르면 `401`인지 확인한다.
-- 적용 전까지 앱 상단에 "동기화 실패"가 뜬다(앱은 `monthly_reviews`를 동기화하려는데 서버에 테이블이 없다).
+### 계획 C 운영 반영 (Task 12) — 2026-10-08 완료
+- [x] `20261008000000_ai.sql` 적용, 원격 마이그레이션 기록 확인.
+- [x] 비로그인 차단 확인: `monthly_reviews`, `ai_usage`, `ai_entitlements`, `rpc/consume_ai_quota` 모두 `42501`.
+- [x] `organize-voice`, `monthly-review` 배포(`--use-api`). 로그인 없이 부르면 `401`.
+- 참고: CLI가 macOS 키체인 허용 창을 기다리며 멈출 수 있다(`Initialising login role...`에서 멈춤). Mac 화면의 허용 창에서 "항상 허용"을 누른다.
 
 ### 사용자가 직접 할 일
 - [ ] Supabase → Settings → API Keys의 Secret keys에 만든 `anthropic_api_key`(Supabase 관리자 키)를 지웠는지 확인한다. Anthropic 키는 Edge Functions → Secrets의 `ANTHROPIC_API_KEY`에만 둔다.
