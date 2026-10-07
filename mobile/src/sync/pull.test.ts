@@ -82,11 +82,61 @@ test('같은 synced_at 묶음이 페이지 경계에 걸려도 모두 반영한�
   expect(await localIds()).toEqual(['srv-1', 'srv-2', 'srv-3', 'srv-4', 'srv-5']);
 });
 
-test('한 밀리초 안의 행이 페이지보다 많아도 끝나고 모두 반영한다', async () => {
+test('모든 행의 synced_at이 같고 페이지보다 많아도 끝나고 모두 반영한다', async () => {
   const fake = createFakeRemote();
   await fake.remote.upsert('items', manyItems(7));
   expect(await pull(db, fake.remote, { pageSize: 2 })).toBe(true);
   expect(await localIds()).toHaveLength(7);
+});
+
+test('행 수가 페이지 크기의 정확한 배수여도 끝나고 모두 반영한다', async () => {
+  const fake = createFakeRemote();
+  await fake.remote.upsert('items', manyItems(4));
+  expect(await pull(db, fake.remote, { pageSize: 2 })).toBe(true);
+  expect(await localIds()).toHaveLength(4);
+});
+
+test('데이터 오류가 아닌 실패는 건너뛰지 않고 던지며 커서를 옮기지 않는다', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const fake = createFakeRemote();
+    fake.serverWrite('items', serverItem({ id: 'first' }));
+    await pull(db, fake.remote);
+    const before = await storedCursor();
+
+    await fake.remote.upsert('items', [serverItem({ id: 'x1' }), serverItem({ id: 'x2' })]);
+    const failing: Db = {
+      ...db,
+      transaction: (task) =>
+        db.transaction((tx) =>
+          task({
+            ...tx,
+            runAsync: async () => {
+              throw new Error('disk I/O error');
+            },
+          }),
+        ),
+    };
+    await expect(pull(failing, fake.remote)).rejects.toThrow('disk I/O error');
+    expect(warn).not.toHaveBeenCalled();
+    expect(await storedCursor()).toEqual(before);
+    expect(await localIds()).toEqual(['first']);
+
+    expect(await pull(db, fake.remote)).toBe(true);
+    expect(await localIds()).toEqual(['first', 'x1', 'x2']);
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+test('저장된 커서 형식이 깨졌으면 처음부터 다시 받는다', async () => {
+  const fake = createFakeRemote();
+  await fake.remote.upsert('items', manyItems(3));
+  await db.runAsync("INSERT INTO sync_state (table_name, cursor) VALUES ('items', ?)", [
+    JSON.stringify({ syncedAt: 'abc', key: 'x' }),
+  ]);
+  expect(await pull(db, fake.remote)).toBe(true);
+  expect(await localIds()).toHaveLength(3);
 });
 
 test('새 변경이 없는 두 번째 pull은 false이고 커서를 되돌리지 않는다', async () => {
