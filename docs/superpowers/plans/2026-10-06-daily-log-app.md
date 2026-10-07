@@ -2877,10 +2877,11 @@ git commit -m "feat: 저녁 마무리 화면(기분, 상황별 템플릿) 추가
 
 - [ ] **Step 1: Supabase 프로젝트 준비 (사용자, 대시보드)**
 
-1. supabase.com에서 새 프로젝트를 만든다.
-2. Authentication → Sign In / Providers에서 **"Allow new users to sign up"을 끈다** (혼자 쓰는 앱).
-3. Authentication → Users → Add user로 본인 이메일과 비밀번호 계정을 만든다.
-4. Project Settings → API에서 Project URL과 anon key를 복사한다.
+1. supabase.com에서 새 프로젝트를 만든다(Postgres 17, `supabase/config.toml`의 `major_version`과 맞춘다).
+2. Authentication → Sign In / Providers에서 **"Allow new users to sign up"을 끈다** (혼자 쓰는 앱). anon key는 앱에 들어가는 공개 값이라, 가입이 열려 있으면 누구나 계정을 만들어 행을 쓸 수 있다(RLS로 격리되긴 한다).
+3. 같은 화면에서 "Allow anonymous sign-ins"가 꺼져 있는지 확인한다.
+4. Authentication → Users → Add user로 본인 이메일과 **충분히 긴 비밀번호**(문장형 권장) 계정을 만든다.
+5. Project Settings → API에서 Project URL과 anon key를 복사한다. service_role key는 앱이나 저장소에 절대 넣지 않는다.
 
 - [ ] **Step 2: 스키마 배포 (저장소 루트, 사용자 확인 후)**
 
