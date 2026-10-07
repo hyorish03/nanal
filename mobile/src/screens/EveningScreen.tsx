@@ -25,7 +25,12 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const [recordedDays, setRecordedDays] = useState(0);
   const [template, setTemplate] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, Record<string, string>>>({});
-  const [sheet, setSheet] = useState<{ editing: TemplateDef | null } | null>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [sheetEditing, setSheetEditing] = useState<TemplateDef | null>(null); // 닫히는 애니메이션 동안 내용을 유지하려고 visible과 분리
+  const openSheet = (editing: TemplateDef | null) => {
+    setSheetEditing(editing);
+    setSheetVisible(true);
+  };
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
 
@@ -80,7 +85,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const askDelete = (t: TemplateDef) =>
     confirmDelete(`‘${t.name}’ 템플릿을 지울까요?`, '이미 쓴 회고는 그대로 남아요. 앞으로 저녁 마무리에서만 안 보여요.', () => {
       // 시트를 먼저 닫아야 실패했을 때 오류 문구가 저녁 화면에 보인다
-      setSheet(null);
+      setSheetVisible(false);
       run(async () => {
         await deleteTemplate(db, t.id);
         if (template === t.id) setTemplate(null);
@@ -89,7 +94,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
   const templateActions = (t: TemplateDef) =>
     showActionSheet(`‘${t.name}’ 템플릿`, [
-      { label: '수정하기', onPress: () => setSheet({ editing: t }) },
+      { label: '수정하기', onPress: () => openSheet(t) },
       { label: '삭제하기', destructive: true, onPress: () => askDelete(t) },
     ]);
 
@@ -155,6 +160,22 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
                   accessibilityHint={t.builtin ? undefined : '길게 누르면 고치거나 지울 수 있어요'}
+                  accessibilityActions={
+                    t.builtin
+                      ? undefined
+                      : [
+                          { name: 'edit', label: '수정하기' },
+                          { name: 'delete', label: '삭제하기' },
+                        ]
+                  }
+                  onAccessibilityAction={
+                    t.builtin
+                      ? undefined
+                      : (e) => {
+                          if (e.nativeEvent.actionName === 'edit') openSheet(t);
+                          else if (e.nativeEvent.actionName === 'delete') askDelete(t);
+                        }
+                  }
                   style={[styles.chip, selected && styles.chipOn]}
                   onPress={() => setTemplate(selected ? null : t.id)}
                   onLongPress={t.builtin ? undefined : () => templateActions(t)}
@@ -165,7 +186,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                 </Pressable>
               );
             })}
-            <Pressable accessibilityRole="button" style={styles.newChip} onPress={() => setSheet({ editing: null })}>
+            <Pressable accessibilityRole="button" style={styles.newChip} onPress={() => openSheet(null)}>
               <Txt style={styles.newChipText}>+ 새 템플릿</Txt>
             </Pressable>
           </View>
@@ -241,11 +262,11 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
       <TemplateSheet
         db={db}
-        visible={sheet !== null}
-        editing={sheet?.editing ?? null}
-        onClose={() => setSheet(null)}
+        visible={sheetVisible}
+        editing={sheetEditing}
+        onClose={() => setSheetVisible(false)}
         onSaved={(t) => {
-          setSheet(null);
+          setSheetVisible(false);
           setTemplate(t.id);
           onChanged();
         }}

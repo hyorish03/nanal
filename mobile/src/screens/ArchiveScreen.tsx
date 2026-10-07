@@ -69,6 +69,10 @@ export function ArchiveScreen({ db, version, onClose }: Props) {
   const filters = useMemo(() => reflectionFilters(history), [history]);
   const entries = filter ? history.filter((h) => h.template === filter) : history;
   const filterName = filters.find((f) => f.id === filter)?.name;
+  const changeMonth = (next: string) => {
+    setMonth(next);
+    setSelected(next === monthOf(today) ? today : `${next}-01`);
+  };
   const isCurrentMonth = month >= monthOf(today);
 
   return (
@@ -112,7 +116,7 @@ export function ArchiveScreen({ db, version, onClose }: Props) {
       {tab === 'calendar' && (
         <>
           <View style={styles.monthRow}>
-            <Pressable accessibilityRole="button" accessibilityLabel="이전 달" style={styles.arrow} onPress={() => setMonth(addMonths(month, -1))}>
+            <Pressable accessibilityRole="button" accessibilityLabel="이전 달" style={styles.arrow} onPress={() => changeMonth(addMonths(month, -1))}>
               <Txt style={styles.arrowText}>‹</Txt>
             </Pressable>
             <Txt variant="title" style={styles.monthText}>
@@ -124,7 +128,7 @@ export function ArchiveScreen({ db, version, onClose }: Props) {
               accessibilityState={{ disabled: isCurrentMonth }}
               disabled={isCurrentMonth}
               style={styles.arrow}
-              onPress={() => setMonth(addMonths(month, 1))}
+              onPress={() => changeMonth(addMonths(month, 1))}
             >
               <Txt style={[styles.arrowText, isCurrentMonth && styles.arrowOff]}>›</Txt>
             </Pressable>

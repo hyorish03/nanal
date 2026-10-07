@@ -24,7 +24,7 @@ import { ItemRow } from './today/ItemRow';
 import { PostIt, type SettleHow } from './today/PostIt';
 import { SymbolLegend } from './today/SymbolLegend';
 
-type Props = { db: Db; version: number; onChanged: () => void; onOpenEvening: () => void; onOpenArchive?: () => void; focusReady?: boolean };
+type Props = { db: Db; version: number; onChanged: () => void; onOpenEvening: () => void; onOpenArchive?: () => void; focusReady?: boolean; onFocused?: () => void };
 
 const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
   { kind: 'task', symbol: '•', label: '할 일' },
@@ -34,7 +34,7 @@ const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
 // 표지가 펼쳐지는 동안(약 950ms) 키보드가 올라오지 않도록 입력칸 포커스를 표지가 열린 뒤로 미룬다.
 const FOCUS_DELAY_MS = 1000;
 
-export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchive, focusReady = true }: Props) {
+export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchive, focusReady = true, onFocused }: Props) {
   const today = logicalDate(new Date());
   const [items, setItems] = useState<Item[]>([]);
   const [candidates, setCandidates] = useState<Item[]>([]);
@@ -48,8 +48,12 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
   useEffect(() => {
     if (!focusReady) return;
-    const t = setTimeout(() => inputRef.current?.focus(), FOCUS_DELAY_MS);
+    const t = setTimeout(() => {
+      inputRef.current?.focus();
+      onFocused?.();
+    }, FOCUS_DELAY_MS);
     return () => clearTimeout(t);
+    // onFocused는 매 렌더 새 함수라 의존성에서 뺀다
   }, [focusReady]);
 
   useEffect(() => {
@@ -98,32 +102,9 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
   const priorityCount = items.filter((i) => i.priority && (i.status === 'open' || i.status === 'doing')).length;
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Txt variant="title" accessibilityRole="header" style={styles.date}>
-            {formatLongDate(today)}
-          </Txt>
-          <Txt variant="hand">기록한 날 {recordedDays}일째</Txt>
-        </View>
-        <View style={styles.headerActions}>
-          {onOpenArchive && (
-            <Pressable accessibilityRole="button" accessibilityLabel="지난 기록" style={styles.iconButton} onPress={onOpenArchive}>
-              <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-                <Path d="M3 2.5h9.5a2 2 0 0 1 2 2v11H5a2 2 0 0 1-2-2v-11Z" stroke={colors.ink} strokeWidth={1.3} strokeLinejoin="round" />
-                <Path d="M3 13.5a2 2 0 0 1 2-2h9.5M6.5 6h5M6.5 8.5h3.5" stroke={colors.ink} strokeWidth={1.3} strokeLinecap="round" />
-              </Svg>
-            </Pressable>
-          )}
-          <Pressable accessibilityRole="button" style={styles.evening} onPress={onOpenEvening}>
-            <Txt variant="medium" style={styles.eveningText}>
-              저녁 마무리
-            </Txt>
-          </Pressable>
-        </View>
-      </View>
-
+  // 포스트잇과 입력칸을 목록 머리로 둬서 후보가 많아도 함께 스크롤된다. 컴포넌트 타입이 아닌 엘리먼트라 입력칸이 다시 마운트되지 않는다.
+  const listHeader = (
+    <View style={styles.listHeader}>
       {candidates.length > 0 && <PostIt candidates={candidates} onSettle={settle} />}
 
       <View style={styles.inputBlock}>
@@ -175,6 +156,34 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           </Pressable>
         </View>
       </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerText}>
+          <Txt variant="title" accessibilityRole="header" style={styles.date}>
+            {formatLongDate(today)}
+          </Txt>
+          <Txt variant="hand">기록한 날 {recordedDays}일째</Txt>
+        </View>
+        <View style={styles.headerActions}>
+          {onOpenArchive && (
+            <Pressable accessibilityRole="button" accessibilityLabel="지난 기록" style={styles.iconButton} onPress={onOpenArchive}>
+              <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+                <Path d="M3 2.5h9.5a2 2 0 0 1 2 2v11H5a2 2 0 0 1-2-2v-11Z" stroke={colors.ink} strokeWidth={1.3} strokeLinejoin="round" />
+                <Path d="M3 13.5a2 2 0 0 1 2-2h9.5M6.5 6h5M6.5 8.5h3.5" stroke={colors.ink} strokeWidth={1.3} strokeLinecap="round" />
+              </Svg>
+            </Pressable>
+          )}
+          <Pressable accessibilityRole="button" style={styles.evening} onPress={onOpenEvening}>
+            <Txt variant="medium" style={styles.eveningText}>
+              저녁 마무리
+            </Txt>
+          </Pressable>
+        </View>
+      </View>
 
       <Popover anchor={info.anchor} align="left" width={300} label="기호 설명" onClose={info.close}>
         <SymbolLegend kind={kind} onClose={info.close} />
@@ -192,6 +201,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         keyExtractor={(i) => i.id}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        ListHeaderComponent={listHeader}
         ListEmptyComponent={<Txt style={styles.empty}>아직 적은 줄이 없어요</Txt>}
         ListFooterComponent={
           <Txt variant="hand" style={styles.footer}>
@@ -240,12 +250,13 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.ink, paddingBottom: 4 },
   input: { flex: 1, height: 44, paddingHorizontal: 6, fontSize: 16, fontFamily: fonts.body, color: colors.ink },
   kindRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  kind: { minHeight: 40, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1, borderColor: colors.line, justifyContent: 'center' },
+  kind: { minHeight: 44, paddingHorizontal: 12, borderRadius: 22, borderWidth: 1, borderColor: colors.line, justifyContent: 'center' },
   kindSelected: { backgroundColor: colors.chipSelected, borderColor: colors.ink },
   kindText: { fontSize: 14 },
   info: { width: 44, height: 44, marginLeft: -6, alignItems: 'center', justifyContent: 'center' },
   error: { color: colors.danger, fontSize: 14 },
   list: { flex: 1 },
+  listHeader: { gap: 18, paddingBottom: 18 },
   empty: { color: colors.muted, textAlign: 'center', marginTop: 24 },
   footer: { alignSelf: 'center', marginTop: 24, marginBottom: 24, fontSize: 20, color: colors.muted },
 });

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, BackHandler, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Db } from '../db/types';
 import { hasSeenOnboarding, markOnboardingSeen } from '../lib/onboarding';
@@ -61,6 +61,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const [coverOpen, setCoverOpen] = useState(false);
   const [dayClosed, setDayClosed] = useState(false); // 저녁 마무리에서 "닫기"를 눌렀다
   const [closedShown, setClosedShown] = useState(false); // 덮기 애니메이션이 끝났다
+  const [focusPending, setFocusPending] = useState(true); // 표지가 열린 뒤 입력칸 포커스는 한 번만
 
   useEffect(() => {
     hasSeenOnboarding(AsyncStorage).then((seen) => setScreen(seen ? 'today' : 'onboarding'));
@@ -105,6 +106,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   }, []);
 
   const closeDay = useCallback(() => {
+    Keyboard.dismiss();
     setDayClosed(true);
     setCoverOpen(false);
   }, []);
@@ -113,6 +115,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     setScreen('today');
     setDayClosed(false);
     setClosedShown(false);
+    setFocusPending(true);
     setCoverOpen(true);
   }, []);
 
@@ -137,7 +140,8 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
             onChanged={onChanged}
             onOpenEvening={() => setScreen('evening')}
             onOpenArchive={() => setScreen('archive')}
-            focusReady={coverOpen}
+            focusReady={coverOpen && focusPending}
+            onFocused={() => setFocusPending(false)}
           />
         )}
         {screen === 'evening' && <EveningScreen db={db} version={version} onChanged={onChanged} onClose={closeDay} />}

@@ -19,12 +19,21 @@ export function Cover({ open, line, onClosed, children }: Props) {
   const [visible, setVisible] = useState(!open);
   const onClosedRef = useRef(onClosed);
   onClosedRef.current = onClosed;
+  const prevOpen = useRef(open);
+  const closePending = useRef(false); // 열려 있다가 실제로 덮기 시작했을 때만 true
+
 
   useEffect(() => {
     if (!open) setVisible(true);
+    if (open) closePending.current = false;
+    else if (prevOpen.current) closePending.current = true;
+    prevOpen.current = open;
     const finish = () => {
       if (open) setVisible(false);
-      else onClosedRef.current?.();
+      else if (closePending.current) {
+        closePending.current = false;
+        onClosedRef.current?.();
+      }
     };
     if (reduce) {
       progress.setValue(open ? 1 : 0);
