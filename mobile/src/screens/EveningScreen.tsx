@@ -4,7 +4,8 @@ import { getMood, setMood } from '../days/repo';
 import type { Db } from '../db/types';
 import { logicalDate } from '../lib/date';
 import { addReflection, listReflections, type Reflection } from '../reflections/repo';
-import { BUILTIN_TEMPLATES } from '../reflections/templates';
+import { listTemplates } from '../reflections/templateRepo';
+import type { TemplateDef } from '../reflections/templates';
 
 type Props = { db: Db; version: number; onChanged: () => void; onClose: () => void };
 
@@ -14,6 +15,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const today = logicalDate(new Date());
   const [mood, setMoodState] = useState<number | null>(null);
   const [saved, setSaved] = useState<Reflection[]>([]);
+  const [templates, setTemplates] = useState<TemplateDef[]>([]);
   const [template, setTemplate] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, Record<string, string>>>({});
   const [error, setError] = useState<string | null>(null);
@@ -26,11 +28,12 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getMood(db, today), listReflections(db, today)])
-      .then(([m, r]) => {
+    Promise.all([getMood(db, today), listReflections(db, today), listTemplates(db)])
+      .then(([m, r, t]) => {
         if (cancelled) return;
         setMoodState(m);
         setSaved(r);
+        setTemplates(t);
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
@@ -102,7 +105,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
         <Text style={styles.sectionTitle}>오늘은 어떤 날이었나요? (선택)</Text>
         <View style={styles.templates}>
-          {BUILTIN_TEMPLATES.map((t) => (
+          {templates.map((t) => (
             <Pressable
               key={t.id}
               accessibilityRole="button"
@@ -119,7 +122,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
         {template && (
           <View style={styles.form}>
-            {(BUILTIN_TEMPLATES.find((t) => t.id === template)?.questions ?? []).map((q) => (
+            {(templates.find((t) => t.id === template)?.questions ?? []).map((q) => (
               <View key={q.key} style={styles.question}>
                 <Text style={styles.questionText} accessible={false} importantForAccessibility="no">
                   {q.text}

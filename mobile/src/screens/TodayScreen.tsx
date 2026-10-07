@@ -10,6 +10,8 @@ import {
   listItemsForDate,
   listMigrationCandidates,
   migrateToToday,
+  migrateToTomorrow,
+  setPriority,
 } from '../items/repo';
 import { logicalDate } from '../lib/date';
 import { countRecordedDays } from '../stats/recordedDays';
@@ -31,7 +33,8 @@ function statusWord(item: Item): string {
 
 function symbolOf(item: Item): string {
   if (item.kind === 'note') return '–';
-  if (item.status === 'done') return 'X';
+  if (item.status === 'done') return '✓';
+  if (item.status === 'doing') return '◐';
   if (item.status === 'migrated') return '>';
   return '•';
 }
@@ -40,14 +43,11 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
   const today = logicalDate(new Date());
   const [items, setItems] = useState<Item[]>([]);
   const [candidates, setCandidates] = useState<Item[]>([]);
-  const [later, setLater] = useState<Set<string>>(new Set());
   const [recordedDays, setRecordedDays] = useState(0);
   const [kind, setKind] = useState<ItemKind>('task');
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
-
-  useEffect(() => setLater(new Set()), [today]);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,8 +85,6 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
       setText('');
     });
 
-  const visibleCandidates = candidates.filter((c) => !later.has(c.id));
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -101,10 +99,10 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
         </Pressable>
       </View>
 
-      {visibleCandidates.length > 0 && (
+      {candidates.length > 0 && (
         <ScrollView style={styles.migration}>
-          <Text style={styles.sectionTitle}>지난 할 일 {visibleCandidates.length}개</Text>
-          {visibleCandidates.map((c) => (
+          <Text style={styles.sectionTitle}>지난 할 일 {candidates.length}개</Text>
+          {candidates.map((c) => (
             <View key={c.id} style={styles.candidate}>
               <Text style={styles.candidateText}>
                 {c.text} <Text style={styles.sub}>({c.date})</Text>
@@ -120,19 +118,24 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`${c.text} 나중으로`}
+                  accessibilityLabel={`${c.text} 내일로`}
                   style={styles.actionButton}
-                  onPress={() => setLater(new Set(later).add(c.id))}
+                  onPress={() => run(() => migrateToTomorrow(db, c.id))}
                 >
-                  <Text style={styles.action}>나중으로</Text>
+                  <Text style={styles.action}>내일로</Text>
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`${c.text} 버리기`}
+                  accessibilityLabel={`${c.text} 지우기`}
                   style={styles.actionButton}
-                  onPress={() => run(() => deleteItem(db, c.id))}
+                  onPress={() =>
+                    Alert.alert('항목 삭제', `"${c.text}"을(를) 삭제할까요?`, [
+                      { text: '취소', style: 'cancel' },
+                      { text: '삭제', style: 'destructive', onPress: () => run(() => deleteItem(db, c.id)) },
+                    ])
+                  }
                 >
-                  <Text style={[styles.action, styles.danger]}>버리기</Text>
+                  <Text style={[styles.action, styles.danger]}>지우기</Text>
                 </Pressable>
               </View>
             </View>
@@ -178,7 +181,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
         keyboardDismissMode="on-drag"
         ListEmptyComponent={<Text style={styles.empty}>아직 기록이 없습니다</Text>}
         renderItem={({ item }) => {
-          const toggleable = item.status === 'open' || item.status === 'doing' || item.status === 'done';
+          const toggleable = item.kind === 'task' && item.status !== 'migrated';
           return (
             <View style={styles.row}>
               <Pressable
@@ -188,9 +191,10 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
                 accessibilityLabel={`${statusWord(item)} ${item.text}`}
                 accessibilityState={toggleable ? { checked: item.status === 'done' } : undefined}
                 onPress={() => run(() => advanceStatus(db, item.id))}
+                onLongPress={() => item.kind === 'task' && run(() => setPriority(db, item.id, !item.priority))}
               >
                 <Text style={styles.symbol} accessible={false} importantForAccessibility="no">{symbolOf(item)}</Text>
-                <Text style={[styles.rowText, item.status === 'done' && styles.dropped]}>{item.text}</Text>
+                <Text style={[styles.rowText, item.priority && styles.priority, item.status === 'done' && styles.dropped]}>{item.text}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -240,6 +244,7 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1, flexDirection: 'row', gap: 10, alignItems: 'center' },
   symbol: { width: 16, fontSize: 16, textAlign: 'center' },
   rowText: { fontSize: 16, flexShrink: 1 },
+  priority: { backgroundColor: '#F1DE8A' },
   dropped: { textDecorationLine: 'line-through', color: '#767676' },
   deleteButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
   delete: { color: '#767676' },
