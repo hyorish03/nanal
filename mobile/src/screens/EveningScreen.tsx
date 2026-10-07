@@ -78,13 +78,14 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     });
 
   const askDelete = (t: TemplateDef) =>
-    confirmDelete(`‘${t.name}’ 템플릿을 지울까요?`, '이미 쓴 회고는 그대로 남아요. 앞으로 저녁 마무리에서만 안 보여요.', () =>
+    confirmDelete(`‘${t.name}’ 템플릿을 지울까요?`, '이미 쓴 회고는 그대로 남아요. 앞으로 저녁 마무리에서만 안 보여요.', () => {
+      // 시트를 먼저 닫아야 실패했을 때 오류 문구가 저녁 화면에 보인다
+      setSheet(null);
       run(async () => {
         await deleteTemplate(db, t.id);
-        setSheet(null);
         if (template === t.id) setTemplate(null);
-      }),
-    );
+      });
+    });
 
   const templateActions = (t: TemplateDef) =>
     showActionSheet(`‘${t.name}’ 템플릿`, [
