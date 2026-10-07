@@ -43,11 +43,63 @@ const MIGRATIONS = [
     cursor TEXT NOT NULL
   );
   `,
+  `
+  CREATE TABLE items_v2 (
+    id TEXT PRIMARY KEY NOT NULL,
+    date TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('task', 'note')),
+    text TEXT NOT NULL CHECK (length(trim(text)) > 0),
+    status TEXT CHECK (status IN ('open', 'doing', 'done', 'migrated')),
+    priority INTEGER NOT NULL DEFAULT 0 CHECK (priority IN (0, 1)),
+    migrated_from TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    CHECK ((kind = 'task') = (status IS NOT NULL))
+  );
+  INSERT INTO items_v2 (id, date, kind, text, status, priority, migrated_from, created_at, updated_at, deleted_at)
+  SELECT id, date,
+    CASE WHEN kind = 'event' THEN 'task' ELSE kind END,
+    text,
+    CASE WHEN kind = 'event' THEN 'open' WHEN status = 'dropped' THEN 'open' ELSE status END,
+    0, migrated_from, created_at, updated_at,
+    CASE WHEN status = 'dropped' THEN COALESCE(deleted_at, updated_at) ELSE deleted_at END
+  FROM items;
+  DROP TABLE items;
+  ALTER TABLE items_v2 RENAME TO items;
+  CREATE INDEX items_date ON items (date);
+
+  CREATE TABLE reflections_v2 (
+    id TEXT PRIMARY KEY NOT NULL,
+    date TEXT NOT NULL,
+    template TEXT NOT NULL CHECK (length(template) > 0),
+    answers TEXT NOT NULL,
+    snapshot TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT
+  );
+  INSERT INTO reflections_v2 (id, date, template, answers, snapshot, created_at, updated_at, deleted_at)
+  SELECT id, date, template, answers, NULL, created_at, updated_at, deleted_at FROM reflections;
+  DROP TABLE reflections;
+  ALTER TABLE reflections_v2 RENAME TO reflections;
+  CREATE INDEX reflections_date ON reflections (date);
+
+  CREATE TABLE templates (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL CHECK (length(trim(name)) > 0),
+    questions TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT
+  );
+  `,
 ];
 
-export async function migrate(db: Db): Promise<void> {
+// target은 테스트에서 이전 버전 데이터를 만들 때만 쓴다.
+export async function migrate(db: Db, target = MIGRATIONS.length): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', []);
-  for (let v = row?.user_version ?? 0; v < MIGRATIONS.length; v++) {
+  for (let v = row?.user_version ?? 0; v < target; v++) {
     await db.transaction(async (tx) => {
       await tx.execAsync(MIGRATIONS[v]);
       await tx.execAsync(`PRAGMA user_version = ${v + 1}`);
