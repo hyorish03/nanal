@@ -2060,6 +2060,7 @@ AppState.addEventListener('change', (state) => {
 ```ts
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Remote } from './remote';
+import { TABLES } from './tables';
 
 export function createSupabaseRemote(client: SupabaseClient, userId: string): Remote {
   return {
@@ -2070,12 +2071,20 @@ export function createSupabaseRemote(client: SupabaseClient, userId: string): Re
         .upsert(rows.map((r) => ({ ...r, user_id: userId })), { onConflict });
       if (error) throw new Error(`${table} 업로드 실패: ${error.message}`);
     },
-    async pullSince(table, since, limit) {
-      const { data, error } = await client
-        .from(table)
-        .select('*')
-        .gt('synced_at', since)
+    async pullAfter(table, cursor, limit) {
+      const { key } = TABLES[table];
+      let query = client.from(table).select('*');
+      if (cursor) {
+        // PostgREST 필터 값에 '.', ':'가 들어가므로 큰따옴표로 감싼다.
+        const at = `"${cursor.syncedAt}"`;
+        query =
+          cursor.key === null
+            ? query.gt('synced_at', cursor.syncedAt)
+            : query.or(`synced_at.gt.${at},and(synced_at.eq.${at},${key}.gt."${cursor.key}")`);
+      }
+      const { data, error } = await query
         .order('synced_at', { ascending: true })
+        .order(key, { ascending: true })
         .limit(limit);
       if (error) throw new Error(`${table} 다운로드 실패: ${error.message}`);
       return data ?? [];
@@ -2088,6 +2097,8 @@ export function createSupabaseRemote(client: SupabaseClient, userId: string): Re
 
 Run: `npm run typecheck`
 Expected: 오류 없음
+
+참고: `pullAfter`의 키셋 조건(`or(...)`)은 Task 20의 실기기 확인에서 실제 Supabase로 검증한다. 같은 시각에 올린 여러 행이 모두 내려오는지 확인 목록에 포함되어 있다.
 
 - [ ] **Step 4: 커밋**
 
@@ -2896,6 +2907,7 @@ npx expo start
 - [ ] `•` 할 일, `○` 일정, `–` 메모를 각각 추가하면 목록에 기호와 함께 나타난다.
 - [ ] 할 일을 탭하면 `X`로 바뀌고, 다시 탭하면 `•`로 돌아온다.
 - [ ] 몇 초 뒤 Supabase Table Editor의 `items`에 같은 행이 보인다.
+- [ ] 비행기 모드에서 할 일을 5개 이상 연달아 추가한 뒤(한 번의 upsert로 같은 `synced_at`이 찍힘) 다른 기기나 앱 재설치 후 로그인했을 때 모두 내려온다.
 - [ ] 비행기 모드에서 항목을 추가하면 바로 목록에 나타나고 "동기화 대기 N건"이 뜬다. 비행기 모드를 끄면 30초 안에 표시가 사라지고 서버에 행이 생긴다.
 - [ ] Table Editor에서 `items`에 어제 날짜(`date`), `kind = task`, `status = open`인 행을 직접 추가하고(`id`는 `gen_random_uuid()`, `user_id`는 본인 id, `created_at`/`updated_at`은 `now()`), 앱을 백그라운드에서 다시 열면 "지난 할 일"에 나타난다.
 - [ ] "오늘 하기"를 누르면 오늘 목록으로 옮겨지고, 서버의 원래 행은 `migrated`, 새 행은 `migrated_from`이 원래 id다.
