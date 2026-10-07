@@ -94,6 +94,16 @@ const MIGRATIONS = [
     deleted_at TEXT
   );
   `,
+  `
+  CREATE TABLE monthly_reviews (
+    month TEXT PRIMARY KEY NOT NULL,
+    content TEXT NOT NULL,
+    model TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT
+  );
+  `,
 ];
 
 // target은 테스트에서 이전 버전 데이터를 만들 때만 쓴다.

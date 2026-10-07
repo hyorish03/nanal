@@ -53,3 +53,15 @@ test('로컬에 없는 키는 outbox에서만 지운다', async () => {
   expect(fake.state.upsertCalls).toBe(0);
   expect(await pendingCount(db)).toBe(0);
 });
+
+test('monthly_reviews는 month 키로 outbox에서 읽어 올린다', async () => {
+  const fake = createFakeRemote();
+  await db.runAsync(
+    `INSERT INTO monthly_reviews (month, content, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+    ['2026-09', '{"version":1}', 'm', '2026-10-07T00:00:00.000Z', '2026-10-07T00:00:00.000Z'],
+  );
+  await db.transaction((tx) => markDirty(tx, 'monthly_reviews', '2026-09'));
+  await push(db, fake.remote);
+  expect(fake.store.monthly_reviews.get('2026-09')).toMatchObject({ month: '2026-09', content: { version: 1 } });
+  expect(await pendingCount(db)).toBe(0);
+});

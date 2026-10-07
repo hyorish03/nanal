@@ -4,7 +4,7 @@ import { TABLES, type TableName } from './tables';
 import { normalizeTimestamp } from './timestamp';
 
 const TIMESTAMP_COLUMNS = new Set(['created_at', 'updated_at', 'deleted_at']);
-const JSON_COLUMNS = new Set(['answers', 'questions', 'snapshot']);
+const JSON_COLUMNS = new Set(['answers', 'questions', 'snapshot', 'content']);
 const BOOLEAN_COLUMNS = new Set(['priority']);
 
 export function toRemote(table: TableName, row: Row): RemoteRow {

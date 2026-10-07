@@ -200,3 +200,26 @@ test('서버의 삭제 표시도 반영되어 목록에서 빠진다', async () 
   await pull(db, fake.remote);
   expect(await listItemsForDate(db, '2026-10-06')).toHaveLength(0);
 });
+
+test('month를 키로 쓰는 monthly_reviews도 키셋 커서로 받아 반영한다', async () => {
+  const fake = createFakeRemote();
+  const row = (month: string, model: string) => ({
+    user_id: 'u1', month, content: { version: 1 }, model,
+    created_at: '2026-10-07T00:00:00Z', updated_at: '2026-10-07T00:00:00Z', deleted_at: null,
+  });
+  fake.serverWrite('monthly_reviews', row('2026-08', 'a'));
+  fake.serverWrite('monthly_reviews', row('2026-09', 'b'));
+  fake.serverWrite('monthly_reviews', row('2026-07', 'c'));
+  expect(await pull(db, fake.remote, { pageSize: 1 })).toBe(true);
+  const rows = await db.getAllAsync<{ month: string; content: string }>(
+    'SELECT month, content FROM monthly_reviews ORDER BY month',
+    [],
+  );
+  expect(rows.map((r) => r.month)).toEqual(['2026-07', '2026-08', '2026-09']);
+  expect(JSON.parse(rows[0].content)).toEqual({ version: 1 });
+  const cursor = await db.getFirstAsync<{ cursor: string }>(
+    "SELECT cursor FROM sync_state WHERE table_name = 'monthly_reviews'",
+    [],
+  );
+  expect(JSON.parse(cursor!.cursor).key).toMatch(/^2026-0\d$/);
+});

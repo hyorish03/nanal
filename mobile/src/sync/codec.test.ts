@@ -64,3 +64,14 @@ test('templates.questions와 reflections.snapshot은 JSON으로 오간다', () =
     created_at: '2026-10-07T00:00:00+00:00', updated_at: '2026-10-07T00:00:00+00:00', deleted_at: null });
   expect(r.snapshot).toBeNull();
 });
+
+test('monthly_reviews: content는 JSON으로 주고받는다', () => {
+  const content = { version: 1, stats: { month: '2026-09' } };
+  const local = {
+    month: '2026-09', content: JSON.stringify(content), model: 'claude-sonnet-5-5',
+    created_at: '2026-10-07T00:00:00.000Z', updated_at: '2026-10-07T00:00:00.000Z', deleted_at: null,
+  };
+  const remote = toRemote('monthly_reviews', local);
+  expect(remote.content).toEqual(content);
+  expect(fromRemote('monthly_reviews', remote)).toEqual(local);
+});

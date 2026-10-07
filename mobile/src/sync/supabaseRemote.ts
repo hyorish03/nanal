@@ -8,7 +8,9 @@ const quote = (value: string) => `"${value.replace(/[\\"]/g, '\\$&')}"`;
 export function createSupabaseRemote(client: SupabaseClient, userId: string): Remote {
   return {
     async upsert(table, rows) {
-      const onConflict = table === 'days' ? 'user_id,date' : 'id';
+      const { key } = TABLES[table];
+      // 서버에서 id가 아닌 키는 모두 (user_id, 키) 복합 키다.
+      const onConflict = key === 'id' ? 'id' : `user_id,${key}`;
       const { error } = await client
         .from(table)
         .upsert(rows.map((r) => ({ ...r, user_id: userId })), { onConflict });

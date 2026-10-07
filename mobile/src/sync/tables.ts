@@ -15,6 +15,10 @@ export const TABLES = {
     key: 'id',
     columns: ['id', 'name', 'questions', 'created_at', 'updated_at', 'deleted_at'],
   },
+  monthly_reviews: {
+    key: 'month',
+    columns: ['month', 'content', 'model', 'created_at', 'updated_at', 'deleted_at'],
+  },
 } as const;
 
 export type TableName = keyof typeof TABLES;
