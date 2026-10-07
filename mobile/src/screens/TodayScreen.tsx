@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Db } from '../db/types';
 import {
   addItem,
@@ -200,7 +200,12 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
                 accessibilityRole="button"
                 accessibilityLabel={`${item.text} 삭제`}
                 style={styles.deleteButton}
-                onPress={() => run(() => deleteItem(db, item.id))}
+                onPress={() =>
+                  Alert.alert('항목 삭제', `"${item.text}"을(를) 삭제할까요?`, [
+                    { text: '취소', style: 'cancel' },
+                    { text: '삭제', style: 'destructive', onPress: () => run(() => deleteItem(db, item.id)) },
+                  ])
+                }
               >
                 <Text style={styles.delete}>삭제</Text>
               </Pressable>
