@@ -11,6 +11,7 @@ import { useSync } from '../sync/useSync';
 import { Cover } from '../ui/Cover';
 import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { ArchiveScreen } from './ArchiveScreen';
 import { EveningScreen } from './EveningScreen';
 import { OnboardingScreen } from './OnboardingScreen';
 import { TodayScreen } from './TodayScreen';
@@ -135,10 +136,12 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
             version={version}
             onChanged={onChanged}
             onOpenEvening={() => setScreen('evening')}
+            onOpenArchive={() => setScreen('archive')}
             focusReady={coverOpen}
           />
         )}
         {screen === 'evening' && <EveningScreen db={db} version={version} onChanged={onChanged} onClose={closeDay} />}
+        {screen === 'archive' && <ArchiveScreen db={db} version={version} onClose={() => setScreen('today')} />}
       </SafeAreaView>
       <Cover
         open={coverOpen}
