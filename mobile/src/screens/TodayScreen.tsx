@@ -21,6 +21,7 @@ import { Popover, useAnchor } from '../ui/Popover';
 import { colors, fonts, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { ItemRow } from './today/ItemRow';
+import { OrganizeSheet } from './today/OrganizeSheet';
 import { PostIt, type SettleHow } from './today/PostIt';
 import { SymbolLegend } from './today/SymbolLegend';
 
@@ -42,6 +43,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const [kind, setKind] = useState<ItemKind>('task');
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [organizeOpen, setOrganizeOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const busy = useRef(false);
   const info = useAnchor();
   const inputRef = useRef<TextInput>(null);
@@ -121,6 +124,21 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
             submitBehavior="submit"
             returnKeyType="done"
           />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="정리해서 넣기"
+            accessibilityHint="두서없이 쓴 글을 할 일과 메모로 정리해요"
+            style={styles.organize}
+            onPress={() => {
+              setNotice(null);
+              setOrganizeOpen(true);
+            }}
+          >
+            <Svg width={22} height={22} viewBox="0 0 20 20" fill="none">
+              <Path d="M4 16l1-4 8.5-8.5a2.1 2.1 0 0 1 3 3L8 15l-4 1Z" stroke={colors.inkSoft} strokeWidth={1.4} strokeLinejoin="round" />
+              <Path d="M12 5l3 3" stroke={colors.inkSoft} strokeWidth={1.4} />
+            </Svg>
+          </Pressable>
         </View>
         <View style={styles.kindRow}>
           {KINDS.map((k) => {
@@ -194,6 +212,11 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           {error}
         </Txt>
       )}
+      {notice && (
+        <Txt style={styles.notice} accessibilityLiveRegion="polite">
+          {notice}
+        </Txt>
+      )}
 
       <FlatList
         style={styles.list}
@@ -217,6 +240,17 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
             onDelete={() => run(() => deleteItem(db, item.id))}
           />
         )}
+      />
+      <OrganizeSheet
+        db={db}
+        visible={organizeOpen}
+        today={today}
+        onClose={() => setOrganizeOpen(false)}
+        onAdded={(message) => {
+          setOrganizeOpen(false);
+          setNotice(message ?? null);
+          onChanged();
+        }}
       />
     </View>
   );
@@ -253,6 +287,8 @@ const styles = StyleSheet.create({
   kind: { minHeight: 44, paddingHorizontal: 12, borderRadius: 22, borderWidth: 1, borderColor: colors.line, justifyContent: 'center' },
   kindSelected: { backgroundColor: colors.chipSelected, borderColor: colors.ink },
   kindText: { fontSize: 14 },
+  organize: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  notice: { color: colors.inkSoft, fontSize: 14 },
   info: { width: 44, height: 44, marginLeft: -6, alignItems: 'center', justifyContent: 'center' },
   error: { color: colors.danger, fontSize: 14 },
   list: { flex: 1 },
