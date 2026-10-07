@@ -1,5 +1,5 @@
 import type { Remote, RemoteRow } from '../src/sync/remote';
-import { TABLES, type TableName } from '../src/sync/tables';
+import { TABLES, TABLE_NAMES, type TableName } from '../src/sync/tables';
 import { normalizeTimestamp, sortableTimestamp } from '../src/sync/timestamp';
 
 const BASE_MS = Date.UTC(2026, 0, 1);
@@ -17,11 +17,10 @@ function formatSyncedAt(micros: number): string {
 // 실제 Postgres처럼 한 번의 upsert 호출에 들어온 모든 행에 같은 synced_at을 찍고,
 // updated_at이 더 오래된 쓰기는 무시한다.
 export function createFakeRemote() {
-  const store: Record<TableName, Map<string, RemoteRow>> = {
-    items: new Map(),
-    days: new Map(),
-    reflections: new Map(),
-  };
+  const store = Object.fromEntries(TABLE_NAMES.map((t) => [t, new Map<string, RemoteRow>()])) as Record<
+    TableName,
+    Map<string, RemoteRow>
+  >;
   const state = { failUpsert: false, upsertCalls: 0 };
   let clockMicros = 0;
 
