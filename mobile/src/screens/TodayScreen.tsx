@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 import type { Db } from '../db/types';
 import {
   addItem,
@@ -9,37 +10,31 @@ import {
   type ItemKind,
   listItemsForDate,
   listMigrationCandidates,
+  MAX_PRIORITY_PER_DAY,
   migrateToToday,
   migrateToTomorrow,
   setPriority,
 } from '../items/repo';
-import { logicalDate } from '../lib/date';
+import { formatLongDate, logicalDate } from '../lib/date';
 import { countRecordedDays } from '../stats/recordedDays';
+import { Popover, useAnchor } from '../ui/Popover';
+import { colors, fonts, SCREEN_X } from '../ui/theme';
+import { Txt } from '../ui/Txt';
+import { ItemRow } from './today/ItemRow';
+import { PostIt, type SettleHow } from './today/PostIt';
+import { SymbolLegend } from './today/SymbolLegend';
 
-type Props = { db: Db; version: number; onChanged: () => void; onOpenEvening: () => void };
+type Props = { db: Db; version: number; onChanged: () => void; onOpenEvening: () => void; onOpenArchive?: () => void; focusReady?: boolean };
 
 const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
   { kind: 'task', symbol: '•', label: '할 일' },
   { kind: 'note', symbol: '–', label: '메모' },
 ];
 
-function statusWord(item: Item): string {
-  if (item.kind === 'note') return '메모';
-  if (item.status === 'done') return '완료';
-  if (item.status === 'migrated') return '옮김';
-  if (item.status === 'doing') return '진행 중';
-  return '할 일(열림)';
-}
+// 표지가 펼쳐지는 동안(약 950ms) 키보드가 올라오지 않도록 입력칸 포커스를 표지가 열린 뒤로 미룬다.
+const FOCUS_DELAY_MS = 1000;
 
-function symbolOf(item: Item): string {
-  if (item.kind === 'note') return '–';
-  if (item.status === 'done') return '✓';
-  if (item.status === 'doing') return '◐';
-  if (item.status === 'migrated') return '>';
-  return '•';
-}
-
-export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
+export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchive, focusReady = true }: Props) {
   const today = logicalDate(new Date());
   const [items, setItems] = useState<Item[]>([]);
   const [candidates, setCandidates] = useState<Item[]>([]);
@@ -48,6 +43,14 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
+  const info = useAnchor();
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (!focusReady) return;
+    const t = setTimeout(() => inputRef.current?.focus(), FOCUS_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [focusReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,15 +68,18 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
     };
   }, [db, today, version]);
 
-  const run = async (action: () => Promise<unknown>) => {
-    if (busy.current) return;
+  // 저장소 작업을 하나씩 실행하고, 실패하면 문구를 보여준다. 성공 여부를 돌려준다.
+  const run = async (action: () => Promise<unknown>): Promise<boolean> => {
+    if (busy.current) return false;
     busy.current = true;
     try {
       await action();
       setError(null);
       onChanged();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      return false;
     } finally {
       busy.current = false;
     }
@@ -85,167 +91,161 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening }: Props) {
       setText('');
     });
 
+  const settle = (item: Item, how: SettleHow) =>
+    run(() =>
+      how === 'today' ? migrateToToday(db, item.id) : how === 'tomorrow' ? migrateToTomorrow(db, item.id) : deleteItem(db, item.id),
+    );
+
+  const priorityCount = items.filter((i) => i.priority && (i.status === 'open' || i.status === 'doing')).length;
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.date} accessibilityRole="header">
-            {today}
-          </Text>
-          <Text style={styles.sub}>기록한 날 {recordedDays}일</Text>
+        <View style={styles.headerText}>
+          <Txt variant="title" accessibilityRole="header" style={styles.date}>
+            {formatLongDate(today)}
+          </Txt>
+          <Txt variant="hand">기록한 날 {recordedDays}일째</Txt>
         </View>
-        <Pressable accessibilityRole="button" style={styles.eveningButton} onPress={onOpenEvening}>
-          <Text style={styles.eveningText}>저녁 마무리</Text>
-        </Pressable>
-      </View>
-
-      {candidates.length > 0 && (
-        <ScrollView style={styles.migration}>
-          <Text style={styles.sectionTitle}>지난 할 일 {candidates.length}개</Text>
-          {candidates.map((c) => (
-            <View key={c.id} style={styles.candidate}>
-              <Text style={styles.candidateText}>
-                {c.text} <Text style={styles.sub}>({c.date})</Text>
-              </Text>
-              <View style={styles.actions}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${c.text} 오늘 하기`}
-                  style={styles.actionButton}
-                  onPress={() => run(() => migrateToToday(db, c.id))}
-                >
-                  <Text style={styles.action}>오늘 하기</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${c.text} 내일로`}
-                  style={styles.actionButton}
-                  onPress={() => run(() => migrateToTomorrow(db, c.id))}
-                >
-                  <Text style={styles.action}>내일로</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${c.text} 지우기`}
-                  style={styles.actionButton}
-                  onPress={() =>
-                    Alert.alert('항목 삭제', `"${c.text}"을(를) 삭제할까요?`, [
-                      { text: '취소', style: 'cancel' },
-                      { text: '삭제', style: 'destructive', onPress: () => run(() => deleteItem(db, c.id)) },
-                    ])
-                  }
-                >
-                  <Text style={[styles.action, styles.danger]}>지우기</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-      )}
-
-      <View style={styles.inputRow}>
-        {KINDS.map((k) => (
-          <Pressable
-            key={k.kind}
-            accessibilityRole="button"
-            accessibilityLabel={k.label}
-            accessibilityState={{ selected: kind === k.kind }}
-            style={[styles.kind, kind === k.kind && styles.kindSelected]}
-            onPress={() => setKind(k.kind)}
-          >
-            <Text style={[styles.kindText, kind === k.kind && styles.kindTextSelected]}>{k.symbol}</Text>
+        <View style={styles.headerActions}>
+          {onOpenArchive && (
+            <Pressable accessibilityRole="button" accessibilityLabel="지난 기록" style={styles.iconButton} onPress={onOpenArchive}>
+              <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+                <Path d="M3 2.5h9.5a2 2 0 0 1 2 2v11H5a2 2 0 0 1-2-2v-11Z" stroke={colors.ink} strokeWidth={1.3} strokeLinejoin="round" />
+                <Path d="M3 13.5a2 2 0 0 1 2-2h9.5M6.5 6h5M6.5 8.5h3.5" stroke={colors.ink} strokeWidth={1.3} strokeLinecap="round" />
+              </Svg>
+            </Pressable>
+          )}
+          <Pressable accessibilityRole="button" style={styles.evening} onPress={onOpenEvening}>
+            <Txt variant="medium" style={styles.eveningText}>
+              저녁 마무리
+            </Txt>
           </Pressable>
-        ))}
-        <TextInput
-          style={styles.input}
-          autoFocus
-          placeholder="한 줄로 기록"
-          accessibilityLabel="새 항목"
-          value={text}
-          onChangeText={setText}
-          onSubmitEditing={submit}
-          submitBehavior="submit"
-          returnKeyType="done"
-        />
+        </View>
       </View>
+
+      {candidates.length > 0 && <PostIt candidates={candidates} onSettle={settle} />}
+
+      <View style={styles.inputBlock}>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            ref={inputRef}
+            placeholder="한 줄로 남기기"
+            placeholderTextColor={colors.faint}
+            accessibilityLabel="새 항목"
+            value={text}
+            onChangeText={setText}
+            onSubmitEditing={submit}
+            submitBehavior="submit"
+            returnKeyType="done"
+          />
+        </View>
+        <View style={styles.kindRow}>
+          {KINDS.map((k) => {
+            const selected = kind === k.kind;
+            return (
+              <Pressable
+                key={k.kind}
+                accessibilityRole="button"
+                accessibilityLabel={k.label}
+                accessibilityState={{ selected }}
+                style={[styles.kind, selected && styles.kindSelected]}
+                onPress={() => setKind(k.kind)}
+              >
+                <Txt style={styles.kindText}>
+                  {k.symbol} {k.label}
+                </Txt>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            ref={info.ref}
+            accessibilityRole="button"
+            accessibilityLabel="기호 설명"
+            accessibilityState={{ expanded: info.anchor !== null }}
+            style={styles.info}
+            onPress={info.open}
+          >
+            <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+              <Circle cx={10} cy={10} r={8.2} stroke={colors.muted} strokeWidth={1.3} />
+              <Path d="M10 9v5" stroke={colors.muted} strokeWidth={1.4} strokeLinecap="round" />
+              <Circle cx={10} cy={6.2} r={1.1} fill={colors.muted} />
+            </Svg>
+          </Pressable>
+        </View>
+      </View>
+
+      <Popover anchor={info.anchor} align="left" width={300} label="기호 설명" onClose={info.close}>
+        <SymbolLegend kind={kind} onClose={info.close} />
+      </Popover>
 
       {error && (
-        <Text style={styles.error} accessibilityLiveRegion="polite">{error}
-        </Text>
+        <Txt style={styles.error} accessibilityLiveRegion="polite">
+          {error}
+        </Txt>
       )}
 
       <FlatList
+        style={styles.list}
         data={items}
         keyExtractor={(i) => i.id}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        ListEmptyComponent={<Text style={styles.empty}>아직 기록이 없습니다</Text>}
-        renderItem={({ item }) => {
-          const toggleable = item.kind === 'task' && item.status !== 'migrated';
-          return (
-            <View style={styles.row}>
-              <Pressable
-                style={styles.rowMain}
-                disabled={!toggleable}
-                accessibilityRole={toggleable ? 'checkbox' : undefined}
-                accessibilityLabel={`${statusWord(item)} ${item.text}`}
-                accessibilityState={toggleable ? { checked: item.status === 'done' } : undefined}
-                onPress={() => run(() => advanceStatus(db, item.id))}
-                onLongPress={() => item.kind === 'task' && run(() => setPriority(db, item.id, !item.priority))}
-              >
-                <Text style={styles.symbol} accessible={false} importantForAccessibility="no">{symbolOf(item)}</Text>
-                <Text style={[styles.rowText, item.priority && styles.priority, item.status === 'done' && styles.dropped]}>{item.text}</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`${item.text} 삭제`}
-                style={styles.deleteButton}
-                onPress={() =>
-                  Alert.alert('항목 삭제', `"${item.text}"을(를) 삭제할까요?`, [
-                    { text: '취소', style: 'cancel' },
-                    { text: '삭제', style: 'destructive', onPress: () => run(() => deleteItem(db, item.id)) },
-                  ])
-                }
-              >
-                <Text style={styles.delete}>삭제</Text>
-              </Pressable>
-            </View>
-          );
-        }}
+        ListEmptyComponent={<Txt style={styles.empty}>아직 적은 줄이 없어요</Txt>}
+        ListFooterComponent={
+          <Txt variant="hand" style={styles.footer}>
+            오늘도 한 줄씩.
+          </Txt>
+        }
+        renderItem={({ item }) => (
+          <ItemRow
+            item={item}
+            priorityFull={priorityCount >= MAX_PRIORITY_PER_DAY}
+            onAdvance={() => run(() => advanceStatus(db, item.id))}
+            onTogglePriority={() => run(() => setPriority(db, item.id, !item.priority))}
+            onDelete={() => run(() => deleteItem(db, item.id))}
+          />
+        )}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, gap: 12 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  date: { fontSize: 22, fontWeight: '700' },
-  sub: { color: '#666', fontSize: 13 },
-  eveningButton: { borderWidth: 1, borderColor: '#222', borderRadius: 16, paddingVertical: 6, paddingHorizontal: 12 },
-  eveningText: { fontWeight: '600' },
-  migration: { backgroundColor: '#f4f4f4', borderRadius: 8, padding: 12, maxHeight: 220, flexGrow: 0 },
-  sectionTitle: { fontWeight: '700' },
-  candidate: { gap: 4, marginTop: 8 },
-  candidateText: { fontSize: 15 },
-  actions: { flexDirection: 'row', gap: 16 },
-  actionButton: { minHeight: 44, justifyContent: 'center' },
-  action: { color: '#0a58ca', fontWeight: '600' },
-  danger: { color: '#b00020' },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  kind: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#ccc', alignItems: 'center', justifyContent: 'center' },
-  kindSelected: { backgroundColor: '#222', borderColor: '#222' },
-  kindText: { fontSize: 18 },
-  kindTextSelected: { color: '#fff' },
-  input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, fontSize: 16 },
-  error: { color: '#b00020' },
-  empty: { color: '#767676', textAlign: 'center', marginTop: 24 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#ddd' },
-  rowMain: { flex: 1, flexDirection: 'row', gap: 10, alignItems: 'center' },
-  symbol: { width: 16, fontSize: 16, textAlign: 'center' },
-  rowText: { fontSize: 16, flexShrink: 1 },
-  priority: { backgroundColor: '#F1DE8A' },
-  dropped: { textDecorationLine: 'line-through', color: '#767676' },
-  deleteButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
-  delete: { color: '#767676' },
+  container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingTop: 16, gap: 18 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  headerText: { flexShrink: 1, gap: 2 },
+  date: { fontSize: 30, letterSpacing: -0.5 },
+  headerActions: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  evening: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.ink,
+    justifyContent: 'center',
+  },
+  eveningText: { fontSize: 14 },
+  inputBlock: { gap: 6 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.ink, paddingBottom: 4 },
+  input: { flex: 1, height: 44, paddingHorizontal: 6, fontSize: 16, fontFamily: fonts.body, color: colors.ink },
+  kindRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  kind: { minHeight: 40, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1, borderColor: colors.line, justifyContent: 'center' },
+  kindSelected: { backgroundColor: colors.chipSelected, borderColor: colors.ink },
+  kindText: { fontSize: 14 },
+  info: { width: 44, height: 44, marginLeft: -6, alignItems: 'center', justifyContent: 'center' },
+  error: { color: colors.danger, fontSize: 14 },
+  list: { flex: 1 },
+  empty: { color: colors.muted, textAlign: 'center', marginTop: 24 },
+  footer: { alignSelf: 'center', marginTop: 24, marginBottom: 24, fontSize: 20, color: colors.muted },
 });

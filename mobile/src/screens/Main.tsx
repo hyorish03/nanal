@@ -135,6 +135,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
             version={version}
             onChanged={onChanged}
             onOpenEvening={() => setScreen('evening')}
+            focusReady={coverOpen}
           />
         )}
         {screen === 'evening' && <EveningScreen db={db} version={version} onChanged={onChanged} onClose={closeDay} />}
