@@ -1,14 +1,8 @@
 import type { Db } from '../db/types';
+import { WIDGET_SQL } from '../widget/sql';
 
-// 스트릭 대신 줄어들지 않는 누적 일수를 보여준다(스펙 4절).
+// 스트릭 대신 줄어들지 않는 누적 일수를 보여준다(스펙 4절). 위젯과 같은 SQL을 쓴다.
 export async function countRecordedDays(db: Db): Promise<number> {
-  const row = await db.getFirstAsync<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM (
-       SELECT date FROM items WHERE deleted_at IS NULL
-       UNION SELECT date FROM days WHERE deleted_at IS NULL AND mood IS NOT NULL
-       UNION SELECT date FROM reflections WHERE deleted_at IS NULL
-     )`,
-    [],
-  );
+  const row = await db.getFirstAsync<{ n: number }>(WIDGET_SQL.recordedDays, []);
   return row?.n ?? 0;
 }
