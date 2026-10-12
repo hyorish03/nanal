@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, LayoutAnimation, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Keyboard, LayoutAnimation, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import type { Db } from '../db/types';
 import {
@@ -126,11 +126,17 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     }
   };
 
-  const submit = () =>
-    run(async () => {
+  // 빈 칸에서 완료를 누르면 키보드만 내린다
+  const submit = () => {
+    if (!text.trim()) {
+      Keyboard.dismiss();
+      return;
+    }
+    return run(async () => {
       await addItem(db, { kind, text });
       setText('');
     });
+  };
 
   const settle = async (item: Item, how: SettleHow) => {
     settling.current = true;
@@ -221,7 +227,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      {/* 머리 빈 곳을 누르면 키보드가 내려간다. 알림 줄은 머리 아래 여백에 겹쳐 띄워 목록을 밀지 않는다 */}
+      <Pressable accessible={false} style={styles.header} onPress={Keyboard.dismiss}>
         <View style={styles.headerText}>
           <Txt
             variant="title"
@@ -250,35 +257,39 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
             </Txt>
           </Pressable>
         </View>
-      </View>
+        {(error || notice) && (
+          <Txt
+            style={[styles.message, error ? styles.error : styles.notice]}
+            numberOfLines={1}
+            accessibilityLiveRegion="polite"
+          >
+            {error ?? notice}
+          </Txt>
+        )}
+      </Pressable>
 
       <Popover anchor={info.anchor} align="left" width={300} label="기호 설명" onClose={info.close}>
         <SymbolLegend kind={kind} onClose={info.close} />
       </Popover>
-
-      {error && (
-        <Txt style={styles.error} accessibilityLiveRegion="polite">
-          {error}
-        </Txt>
-      )}
-      {notice && (
-        <Txt style={styles.notice} accessibilityLiveRegion="polite">
-          {notice}
-        </Txt>
-      )}
 
       <FlatList
         style={styles.list}
         data={items}
         keyExtractor={(i) => i.id}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={styles.listContent}
+        ListFooterComponentStyle={styles.footerWrap}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={<Txt style={styles.empty}>아직 적은 줄이 없어요</Txt>}
         ListFooterComponent={
-          <Txt variant="hand" style={styles.footer}>
-            오늘도 한 줄씩.
-          </Txt>
+          // 목록 아래 빈 곳까지 채워, 누르면 키보드가 내려간다
+          <Pressable accessible={false} style={styles.footerWrap} onPress={Keyboard.dismiss}>
+            <Txt variant="hand" style={styles.footer}>
+              오늘도 한 줄씩.
+            </Txt>
+          </Pressable>
         }
         renderItem={({ item }) => (
           <ItemRow
@@ -328,7 +339,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingTop: 16, gap: 18 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, zIndex: 1 },
+  message: { position: 'absolute', top: '100%', left: 0, right: 0, fontSize: 13, lineHeight: 18 },
   headerText: { flex: 1, gap: 2 },
   date: { fontSize: 30, letterSpacing: -0.5 },
   headerActions: { flexDirection: 'row', gap: 6, alignItems: 'center' },
@@ -358,10 +370,12 @@ const styles = StyleSheet.create({
   kindSelected: { backgroundColor: colors.chipSelected, borderColor: colors.ink },
   kindText: { fontSize: 14 },
   organize: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  notice: { color: colors.inkSoft, fontSize: 14 },
+  notice: { color: colors.inkSoft },
   info: { width: 44, height: 44, marginLeft: -6, alignItems: 'center', justifyContent: 'center' },
-  error: { color: colors.danger, fontSize: 14 },
+  error: { color: colors.danger },
   list: { flex: 1 },
+  listContent: { flexGrow: 1 },
+  footerWrap: { flexGrow: 1 },
   listHeader: { gap: 18, paddingBottom: 18 },
   empty: { color: colors.muted, textAlign: 'center', marginTop: 24 },
   footer: { alignSelf: 'center', marginTop: 24, marginBottom: 24, fontSize: 20, color: colors.muted },

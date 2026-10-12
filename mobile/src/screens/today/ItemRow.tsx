@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { Item } from '../../items/repo';
+import { deleteQuestion } from '../../lib/josa';
 import { confirmDelete } from '../../ui/dialogs';
 import { Highlight } from '../../ui/Highlight';
 import { Popover, useAnchor } from '../../ui/Popover';
@@ -81,7 +82,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
           style={dimPressed(styles.menuItem)}
           onPress={() => {
             menu.close();
-            confirmDelete('항목 지우기', `"${item.text}"을(를) 지울까요?`, onDelete);
+            confirmDelete('항목 지우기', deleteQuestion(item.text), onDelete);
           }}
         >
           <Txt style={[styles.menuText, styles.danger, styles.swatchText]}>×</Txt>
@@ -93,13 +94,14 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center' },
-  main: { flex: 1, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 4 },
+  // 줄 노트처럼 줄마다 옅은 선을 긋는다
+  row: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.ruled },
+  main: { flex: 1, minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 4, paddingVertical: 7 },
   symbol: { width: 18, alignItems: 'center' },
   text: { fontSize: 16, flexShrink: 1 },
   note: { fontFamily: fonts.hand, fontSize: 22, flexShrink: 1 },
   done: { color: colors.faint, textDecorationLine: 'line-through' },
-  more: { width: 44, minHeight: 46, alignItems: 'center', justifyContent: 'center' },
+  more: { width: 44, minHeight: 50, alignItems: 'center', justifyContent: 'center' },
   moreText: { fontSize: 18, color: colors.faint },
   menuItem: { minHeight: 44, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   swatch: { width: 18, height: 8, backgroundColor: colors.highlight },

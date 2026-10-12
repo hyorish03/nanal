@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import type { Item } from '../../items/repo';
 import { formatShortDate } from '../../lib/date';
+import { deleteQuestion } from '../../lib/josa';
 import { confirmDelete } from '../../ui/dialogs';
 import { EASE_OUT } from '../../ui/motion';
 import { colors } from '../../ui/theme';
@@ -93,7 +94,7 @@ function CandidateRow({ item, onSettle }: { item: Item; onSettle: (item: Item, h
           accessibilityRole="button"
           accessibilityLabel={`${item.text} 지우기`}
           style={dimPressed(styles.remove)}
-          onPress={() => confirmDelete('항목 지우기', `"${item.text}"을(를) 지울까요?`, () => onSettle(item, 'delete', row))}
+          onPress={() => confirmDelete('항목 지우기', deleteQuestion(item.text), () => onSettle(item, 'delete', row))}
         >
           <Txt style={styles.removeText}>×</Txt>
         </Pressable>
