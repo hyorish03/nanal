@@ -1,4 +1,4 @@
-import type { TextStyle } from 'react-native';
+import { Platform, type TextStyle } from 'react-native';
 
 // 종이 다이어리 색과 글꼴(스펙 11.1). 화면은 여기 값만 쓴다.
 export const colors = {
@@ -42,12 +42,22 @@ export const colors = {
   onDark: '#F6F0E4',
 } as const;
 
-export const fonts = {
-  title: 'GowunBatang_400Regular',
-  body: 'IBMPlexSansKR_400Regular',
-  medium: 'IBMPlexSansKR_500Medium',
-  hand: 'NanumPenScript_400Regular',
-} as const;
+// 글꼴은 app.json의 expo-font 플러그인으로 앱에 넣어 두어 실행하자마자 쓸 수 있다(불러오기를 기다리지 않는다).
+// iOS는 TTF의 PostScript 이름으로, Android는 assets/fonts에 복사된 파일 이름으로 찾는다.
+export const fonts = Platform.select({
+  ios: {
+    title: 'GowunBatang-Regular',
+    body: 'IBMPlexSansKR-Regular',
+    medium: 'IBMPlexSansKR-Medium',
+    hand: 'NanumPen-Regular', // 나눔펜 TTF의 이름표는 'Nanum Pen'이다(NanumPenScript 아님)
+  },
+  default: {
+    title: 'GowunBatang_400Regular',
+    body: 'IBMPlexSansKR_400Regular',
+    medium: 'IBMPlexSansKR_500Medium',
+    hand: 'NanumPenScript_400Regular',
+  },
+});
 
 // 글자 크기·줄 높이. 제목은 고운바탕, 본문은 플렉스, 손글씨는 나눔펜.
 export const type = {
