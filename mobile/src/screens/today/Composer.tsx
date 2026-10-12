@@ -51,7 +51,7 @@ export const Composer = memo(function Composer({ inputRef, voice, onCapture, onS
           placeholder={kind === 'task' ? '할 일 한 줄' : '메모 한 줄'}
           placeholderTextColor={colors.muted}
           maxLength={MAX_TEXT}
-          accessibilityLabel="새 항목"
+          accessibilityLabel={kind === 'task' ? '새 할 일' : '새 메모'}
           value={text}
           onChangeText={setText}
           onSubmitEditing={submit}

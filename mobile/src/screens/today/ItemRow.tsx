@@ -48,7 +48,7 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
   // 스크린 리더에서는 줄 하나가 한 요소다. 두 번 누르면 상태가 넘어가고, 나머지는 동작 목록(위아래로 쓸기)에 있다
   const actions = [
     ...(advance ? [{ name: 'activate' }, { name: 'advance', label: '상태 바꾸기' }] : []),
-    ...(canMark && !markDisabled ? [{ name: 'priority', label: item.priority ? '중요 표시 지우기' : '중요 표시' }] : []),
+    ...(canMark && !markDisabled ? [{ name: 'priority', label: item.priority ? '중요 표시 지우기' : '중요 표시하기' }] : []),
     { name: 'edit', label: '고치기' },
     { name: 'delete', label: '지우기' },
   ];
@@ -96,14 +96,14 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
       <Pressable
         ref={menu.ref}
         accessibilityRole="button"
-        accessibilityLabel={`${item.text} 더보기`}
+        accessibilityLabel={`${item.text}, 더보기`}
         accessibilityState={{ expanded: menu.anchor !== null }}
         style={dimPressed(styles.more)}
         onPress={menu.open}
       >
         <Txt style={styles.moreText}>⋯</Txt>
       </Pressable>
-      <Popover anchor={menu.anchor} align="right" width={220} label={`${item.text} 메뉴`} onClose={menu.close}>
+      <Popover anchor={menu.anchor} align="right" width={220} label={`${item.text}, 메뉴`} onClose={menu.close}>
         {next && (
           <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => onAdvance(id))}>
             <View style={styles.swatchText}>
@@ -122,7 +122,7 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
           >
             <View style={styles.swatch} />
             <Txt style={[styles.menuText, markDisabled && styles.menuDisabled]}>
-              {item.priority ? '중요 표시 지우기' : markDisabled ? '중요는 하루 3개까지예요' : '중요 표시하기'}
+              {item.priority ? '중요 표시 지우기' : markDisabled ? '중요 표시는 하루 3개까지예요' : '중요 표시하기'}
             </Txt>
           </Pressable>
         )}

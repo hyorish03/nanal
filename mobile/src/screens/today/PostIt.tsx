@@ -115,7 +115,7 @@ function CandidateRow({ item, onSettle }: { item: Item; onSettle: (item: Item, h
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${item.text} 오늘 하기`}
+          accessibilityLabel={`${item.text}, 오늘 하기`}
           style={dimPressed(styles.action)}
           onPress={() => onSettle(item, 'today', row)}
         >
@@ -125,15 +125,15 @@ function CandidateRow({ item, onSettle }: { item: Item; onSettle: (item: Item, h
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${item.text} 내일로`}
+          accessibilityLabel={`${item.text}, 내일로 넘기기`}
           style={dimPressed(styles.action)}
           onPress={() => onSettle(item, 'tomorrow', row)}
         >
-          <Txt style={styles.tomorrow}>내일로</Txt>
+          <Txt style={styles.tomorrow}>내일로 넘기기</Txt>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${item.text} 지우기`}
+          accessibilityLabel={`${item.text}, 지우기`}
           style={dimPressed(styles.remove)}
           onPress={() => onSettle(item, 'delete', row)}
         >

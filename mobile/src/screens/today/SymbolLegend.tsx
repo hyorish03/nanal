@@ -39,7 +39,7 @@ export function SymbolLegend({ kind, onClose }: { kind: ItemKind; onClose: () =>
       ))}
       <Pressable accessibilityRole="button" style={dimPressed(styles.ok)} onPress={onClose}>
         <Txt variant="medium" style={styles.okText}>
-          알겠어요
+          닫기
         </Txt>
       </Pressable>
     </View>
