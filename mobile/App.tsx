@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { KeyboardResize } from './src/ui/KeyboardResize';
 import { openDb } from './src/db/client';
 import type { Db } from './src/db/types';
 import { LoginScreen } from './src/screens/LoginScreen';
@@ -87,7 +88,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      <View style={styles.root}>{body}</View>
+      <View style={styles.root}>
+        <KeyboardResize>{body}</KeyboardResize>
+      </View>
     </SafeAreaProvider>
   );
 }

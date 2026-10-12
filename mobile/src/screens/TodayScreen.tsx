@@ -197,6 +197,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
                 accessibilityRole="button"
                 accessibilityLabel={k.label}
                 accessibilityState={{ selected }}
+                hitSlop={CHIP_SLOP}
                 style={dimPressed([styles.kind, selected && styles.kindSelected])}
                 onPress={() => setKind(k.kind)}
               >
@@ -244,7 +245,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         </View>
         <View style={styles.headerActions}>
           {onOpenArchive && (
-            <Pressable accessibilityRole="button" accessibilityLabel="지난 기록" style={dimPressed(styles.archive)} onPress={onOpenArchive}>
+            <Pressable accessibilityRole="button" accessibilityLabel="지난 기록" hitSlop={CHIP_SLOP} style={dimPressed(styles.archive)} onPress={onOpenArchive}>
               <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
                 <Path d="M3 2.5h9.5a2 2 0 0 1 2 2v11H5a2 2 0 0 1-2-2v-11Z" stroke={colors.ink} strokeWidth={1.3} strokeLinejoin="round" />
                 <Path d="M3 13.5a2 2 0 0 1 2-2h9.5M6.5 6h5M6.5 8.5h3.5" stroke={colors.ink} strokeWidth={1.3} strokeLinecap="round" />
@@ -252,9 +253,9 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
               <Txt style={styles.archiveText}>기록</Txt>
             </Pressable>
           )}
-          <Pressable accessibilityRole="button" style={dimPressed(styles.evening)} onPress={onOpenEvening}>
+          <Pressable accessibilityRole="button" hitSlop={CHIP_SLOP} style={dimPressed(styles.evening)} onPress={onOpenEvening}>
             <Txt variant="medium" style={styles.eveningText}>
-              저녁 마무리
+              하루 마무리
             </Txt>
           </Pressable>
         </View>
@@ -278,8 +279,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         data={items}
         keyExtractor={(i) => i.id}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
-        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
         contentContainerStyle={styles.listContent}
         ListFooterComponentStyle={styles.footerWrap}
         ListHeaderComponent={listHeader}
@@ -338,19 +338,23 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   );
 }
 
+// 칩·머리 버튼은 보이는 높이만 낮추고, 누르는 영역은 hitSlop으로 44pt를 지킨다
+const CHIP_H = 34;
+const CHIP_SLOP = { top: 5, bottom: 5 };
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingTop: 16, gap: 18 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, zIndex: 1 },
   message: { position: 'absolute', top: '100%', left: 0, right: 0, fontSize: 13, lineHeight: 18 },
   headerText: { flex: 1, gap: 2 },
   date: { fontSize: 30, letterSpacing: -0.5 },
-  headerActions: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   // 지난 기록: 책 그림만으로는 뜻이 약해 짧은 글을 곁들인다
   archive: {
-    minHeight: 44,
+    minHeight: CHIP_H,
     paddingLeft: 10,
     paddingRight: 12,
-    borderRadius: 22,
+    borderRadius: CHIP_H / 2,
     borderWidth: 1,
     borderColor: colors.line,
     flexDirection: 'row',
@@ -359,19 +363,19 @@ const styles = StyleSheet.create({
   },
   archiveText: { fontSize: 14 },
   evening: {
-    minHeight: 44,
+    minHeight: CHIP_H,
     paddingHorizontal: 14,
-    borderRadius: 22,
+    borderRadius: CHIP_H / 2,
     borderWidth: 1,
     borderColor: colors.ink,
     justifyContent: 'center',
   },
   eveningText: { fontSize: 14 },
-  inputBlock: { gap: 6 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.ink, paddingBottom: 4 },
+  inputBlock: { gap: 14 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.ink, paddingBottom: 6 },
   input: { flex: 1, height: 44, paddingHorizontal: 6, fontSize: 16, fontFamily: fonts.body, color: colors.ink },
-  kindRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  kind: { minHeight: 44, paddingHorizontal: 12, borderRadius: 22, borderWidth: 1, borderColor: colors.line, justifyContent: 'center' },
+  kindRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  kind: { minHeight: CHIP_H, paddingHorizontal: 14, borderRadius: CHIP_H / 2, borderWidth: 1, borderColor: colors.line, justifyContent: 'center' },
   kindSelected: { backgroundColor: colors.chipSelected, borderColor: colors.ink },
   kindText: { fontSize: 14 },
   organize: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -381,7 +385,7 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   listContent: { flexGrow: 1 },
   footerWrap: { flexGrow: 1 },
-  listHeader: { gap: 18, paddingBottom: 18 },
+  listHeader: { gap: 26, paddingBottom: 20 },
   empty: { color: colors.muted, textAlign: 'center', marginTop: 24 },
   footer: { alignSelf: 'center', marginTop: 24, marginBottom: 24, fontSize: 20, color: colors.muted },
 });

@@ -52,7 +52,7 @@ struct NanalMoodWidget: Widget {
       LockMoodView(s: entry.snapshot).containerBackground(.clear, for: .widget)
     }
     .configurationDisplayName("나날 오늘 기분")
-    .description("저녁 마무리에서 고른 기분")
+    .description("하루 마무리에서 고른 기분")
     .supportedFamilies([.accessoryCircular])
   }
 }

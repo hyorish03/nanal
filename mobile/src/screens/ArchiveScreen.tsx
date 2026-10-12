@@ -306,7 +306,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
           <Txt style={styles.small}>
             {filter ? `${filterName} ${entries.length}번` : history.length ? `회고 ${history.length}개` : '아직 남긴 회고가 없어요'}
           </Txt>
-          {!filter && history.length === 0 && <Txt style={styles.muted}>저녁 마무리에서 남긴 회고가 여기 모여요</Txt>}
+          {!filter && history.length === 0 && <Txt style={styles.muted}>하루 마무리에서 남긴 회고가 여기 모여요</Txt>}
           {entries.map((e) => (
             <View key={e.id} style={styles.entry}>
               <View style={styles.entryHead}>

@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { MOODS, moodWord } from '../days/moods';
 import { getMood, setMood } from '../days/repo';
 import type { Db } from '../db/types';
@@ -115,7 +115,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const hasCustom = templates.some((t) => !t.builtin);
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <View style={styles.header}>
           <View style={styles.headerText}>
@@ -124,7 +124,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
             </Txt>
             <Txt style={styles.sub}>{formatLongDate(today)}</Txt>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="저녁 마무리 닫기" style={dimPressed(styles.close)} onPress={onClose}>
+          <Pressable accessibilityRole="button" accessibilityLabel="하루 마무리 닫기" style={dimPressed(styles.close)} onPress={onClose}>
             <Txt style={styles.closeText}>닫기</Txt>
           </Pressable>
         </View>
@@ -286,7 +286,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
         }}
         onDelete={askDelete}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

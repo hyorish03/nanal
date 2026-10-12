@@ -154,7 +154,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
               <Txt style={styles.deleteText}>템플릿 삭제</Txt>
             </Pressable>
           ) : (
-            <Txt style={styles.hint}>만든 템플릿은 저녁 마무리에서 길게 눌러 고치거나 지울 수 있어요.</Txt>
+            <Txt style={styles.hint}>만든 템플릿은 하루 마무리에서 길게 눌러 고치거나 지울 수 있어요.</Txt>
           )}
         </ScrollView>
       </KeyboardAvoidingView>

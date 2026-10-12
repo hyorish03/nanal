@@ -63,7 +63,7 @@ export function Main({ db, userId }: { db: Db; userId: string }) {
 }
 
 // 'today'는 오늘 → 지난 기록 → 월간 돌아보기 네이티브 스택이다(밀어 넣기, 가장자리 밀어 돌아가기).
-// 저녁 마무리는 하루를 덮는 흐름이라 스택 밖에서 화면 전체를 바꾼다(표지 덮기, 저녁 바탕이 그대로 보이게).
+// 하루 마무리는 스택 밖에서 화면 전체를 바꾼다(저녁 바탕이 화면 전체에 보이게).
 type Screen = 'onboarding' | 'today' | 'evening';
 type StackParams = { today: undefined; archive: undefined; review: { month: string } };
 
@@ -85,23 +85,19 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const [coverOpen, setCoverOpen] = useState(false);
   const [coverSettled, setCoverSettled] = useState(false); // 표지가 다 펼쳐졌다(포커스, 링크 동작은 이때부터)
   const [coverOpening, setCoverOpening] = useState<CoverOpening>('turn');
-  const [dayClosed, setDayClosed] = useState(false); // 저녁 마무리에서 "닫기"를 눌렀다
-  const [closedShown, setClosedShown] = useState(false); // 덮기 애니메이션이 끝났다
   const [focusPending, setFocusPending] = useState(true); // 표지가 열린 뒤 입력칸 포커스는 한 번만
   const [linkAction, setLinkAction] = useState<LinkAction | null>(null);
   const screenRef = useRef<Screen | null>(null);
   screenRef.current = screen;
   const reduce = useReduceMotion();
 
-  // 위젯·컨트롤에서 열면 오늘 화면으로 가서(덮여 있으면 펼친 뒤) 동작을 넘긴다. 온보딩 중이면 화면은 그대로 둔다.
+  // 위젯·컨트롤에서 열면 오늘 화면으로 가서(표지가 아직 덮여 있으면 펼친 뒤) 동작을 넘긴다. 온보딩 중이면 화면은 그대로 둔다.
   const runAction = useCallback((action: LinkAction | null) => {
     // 온보딩 중에 온 동작은 버린다(끝난 뒤 말로 적기가 갑자기 뜨지 않게).
     if (screenRef.current === 'onboarding') return;
     setScreen((s) => (s === null || s === 'onboarding' ? s : 'today'));
     // 지난 기록·월간 돌아보기에 있었으면 오늘까지 꺼낸다
     if (nav.isReady() && nav.canGoBack()) nav.dispatch(StackActions.popToTop());
-    setDayClosed(false);
-    setClosedShown(false);
     setCoverOpen(true);
     if (action === 'voice') setFocusPending(false); // 말로 적기 시트 뒤에서 키보드가 뜨지 않게
     setLinkAction(action);
@@ -199,20 +195,10 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     setScreen('today');
   }, []);
 
+  // 하루 마무리를 닫으면 할 일을 적던 오늘 화면으로 돌아간다(키보드는 올리지 않는다).
   const closeDay = useCallback(() => {
     Keyboard.dismiss();
-    setDayClosed(true);
-    setCoverOpen(false);
-    setCoverSettled(false);
-  }, []);
-
-  const reopen = useCallback(() => {
     setScreen('today');
-    setCoverOpening('turn'); // 직접 펼칠 때는 표지를 넘긴다
-    setDayClosed(false);
-    setClosedShown(false);
-    setFocusPending(true);
-    setCoverOpen(true);
   }, []);
 
   return (
@@ -280,18 +266,10 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
       <SyncBar pending={pending} error={error} />
       <Cover
         open={coverOpen}
-        line={dayClosed ? '오늘도 수고했어요' : '오늘도 한 줄씩'}
-        onClosed={() => setClosedShown(true)}
+        line="오늘도 한 줄씩"
         onOpened={onCoverOpened}
         opening={coverOpening}
       >
-        {dayClosed && closedShown && (
-          <FadeIn delay={80} duration={240} rise={reduce ? 0 : 6}>
-            <Pressable accessibilityRole="button" style={dimPressed(styles.reopen)} onPress={reopen}>
-              <Txt style={styles.reopenText}>내일 다시 펼치기</Txt>
-            </Pressable>
-          </FadeIn>
-        )}
       </Cover>
     </View>
   );
@@ -333,7 +311,7 @@ function SyncBar({ pending, error }: { pending: number; error: string | null }) 
   );
 }
 
-// 저녁 마무리에서는 바탕(안전 영역 포함)이 저녁 종이색으로 천천히 바뀐다.
+// 하루 마무리에서는 바탕(안전 영역 포함)이 저녁 종이색으로 천천히 바뀐다.
 function EveningBackdrop({ on }: { on: boolean }) {
   const opacity = useRef(new Animated.Value(on ? 1 : 0)).current;
   useEffect(() => {
@@ -352,15 +330,4 @@ const styles = StyleSheet.create({
   blocked: { padding: 24, fontSize: 16, lineHeight: 24, color: colors.ink },
   syncBar: { position: 'absolute', left: 0, right: 0, backgroundColor: colors.postit, paddingVertical: 6, paddingHorizontal: 16 },
   syncText: { color: colors.postitText, fontSize: 13 },
-  reopen: {
-    marginTop: 120,
-    width: 164,
-    minHeight: 48,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(233, 223, 200, 0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reopenText: { color: colors.coverText, fontSize: 15 },
 });

@@ -1,6 +1,6 @@
 import { isAuthRetryableFetchError, type AuthError } from '@supabase/supabase-js';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../supabase';
 import { BookCover } from '../ui/BookCover';
@@ -42,7 +42,7 @@ export function LoginScreen() {
   const disabled = busy || !email || !password;
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.flex}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={styles.cover}>
             <BookCover width={262} height={354} titleSize={46} subtitle="오늘도 한 줄씩" footer="2026" />
@@ -101,7 +101,7 @@ export function LoginScreen() {
             </Pressable>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }

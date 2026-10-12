@@ -1,7 +1,7 @@
 // 종이 다이어리 색과 글꼴(스펙 11.1). 화면은 여기 값만 쓴다.
 export const colors = {
   paper: '#F6F0E4', // 화면 배경(크림 종이)
-  paperEvening: '#F3EBDA', // 저녁 마무리 배경
+  paperEvening: '#F3EBDA', // 하루 마무리 배경
   card: '#FBF7EE', // 회고 카드, 칩
   popover: '#FFFDF8',
   chipSelected: '#EDE4D2',
