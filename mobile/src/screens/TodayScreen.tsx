@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Keyboard, LayoutAnimation, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Animated, Keyboard, LayoutAnimation, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import type { Db } from '../db/types';
 import {
@@ -23,6 +23,8 @@ import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { ItemRow } from './today/ItemRow';
+import { MarginRule, NOTE_MARGIN, RULE_GAP, RuledFill } from './today/NotebookPage';
+import { Ribbon } from './today/Ribbon';
 import type { LinkAction } from '../lib/deepLink';
 import { OrganizeSheet } from './today/OrganizeSheet';
 import { PostIt, type SettleHow } from './today/PostIt';
@@ -61,6 +63,9 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const reduce = useReduceMotion();
   const info = useAnchor();
   const inputRef = useRef<TextInput>(null);
+  const scrollY = useRef(new Animated.Value(0)).current; // 여백선이 목록 머리를 따라 움직이게
+  const [headerH, setHeaderH] = useState(0);
+  const [eveningW, setEveningW] = useState(0); // 책갈피 끈을 하루 마무리 버튼 왼쪽에 매달려고 잰다
 
   // 표지가 다 펼쳐진 뒤에만 true가 된다(Main이 Cover의 onOpened로 알려 준다). 그래서 기다리지 않고 바로 포커스한다.
   useEffect(() => {
@@ -153,7 +158,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
   // 포스트잇과 입력칸을 목록 머리로 둬서 후보가 많아도 함께 스크롤된다. 컴포넌트 타입이 아닌 엘리먼트라 입력칸이 다시 마운트되지 않는다.
   const listHeader = (
-    <View style={styles.listHeader}>
+    <View style={styles.listHeader} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}>
       {candidates.length > 0 && <PostIt candidates={candidates} onSettle={settle} />}
 
       <View style={styles.inputBlock}>
@@ -222,16 +227,13 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       {/* 머리 빈 곳을 누르면 키보드가 내려간다. 알림 줄은 머리 아래 여백에 겹쳐 띄워 목록을 밀지 않는다 */}
       <Pressable accessible={false} style={styles.header} onPress={Keyboard.dismiss}>
         <View style={styles.headerActions}>
-          {onOpenArchive && (
-            <Pressable accessibilityRole="button" accessibilityLabel="지난 기록" hitSlop={CHIP_SLOP} style={dimPressed(styles.archive)} onPress={onOpenArchive}>
-              <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-                <Path d="M3 2.5h9.5a2 2 0 0 1 2 2v11H5a2 2 0 0 1-2-2v-11Z" stroke={colors.ink} strokeWidth={1.3} strokeLinejoin="round" />
-                <Path d="M3 13.5a2 2 0 0 1 2-2h9.5M6.5 6h5M6.5 8.5h3.5" stroke={colors.ink} strokeWidth={1.3} strokeLinecap="round" />
-              </Svg>
-              <Txt style={styles.archiveText}>기록</Txt>
-            </Pressable>
-          )}
-          <Pressable accessibilityRole="button" hitSlop={CHIP_SLOP} style={dimPressed(styles.evening)} onPress={onOpenEvening}>
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={CHIP_SLOP}
+            style={dimPressed(styles.evening)}
+            onPress={onOpenEvening}
+            onLayout={(e) => setEveningW(e.nativeEvent.layout.width)}
+          >
             <Txt variant="medium" style={styles.eveningText}>
               하루 마무리
             </Txt>
@@ -261,38 +263,53 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         )}
       </Pressable>
 
+      {/* 지난 기록 책갈피 끈: 하루 마무리 버튼 왼쪽, 화면 맨 위에 매달린다 */}
+      {onOpenArchive && eveningW > 0 && <Ribbon onPress={onOpenArchive} style={{ right: SCREEN_X + eveningW + RIBBON_GAP }} />}
+
       <Popover anchor={info.anchor} align="left" width={300} label="기호 설명" onClose={info.close}>
         <SymbolLegend kind={kind} onClose={info.close} />
       </Popover>
 
-      <FlatList
-        style={styles.list}
-        data={items}
-        keyExtractor={(i) => i.id}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        contentContainerStyle={styles.listContent}
-        ListFooterComponentStyle={styles.footerWrap}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={<Txt style={styles.empty}>아직 적은 줄이 없어요</Txt>}
-        ListFooterComponent={
-          // 목록 아래 빈 곳까지 채워, 누르면 키보드가 내려간다
-          <Pressable accessible={false} style={styles.footerWrap} onPress={Keyboard.dismiss}>
-            <Txt variant="hand" style={styles.footer}>
-              오늘도 한 줄씩.
-            </Txt>
-          </Pressable>
-        }
-        renderItem={({ item }) => (
-          <ItemRow
-            item={item}
-            priorityFull={priorityCount >= MAX_PRIORITY_PER_DAY}
-            onAdvance={() => run(() => advanceStatus(db, item.id))}
-            onTogglePriority={() => run(() => setPriority(db, item.id, !item.priority))}
-            onDelete={() => run(() => deleteItem(db, item.id))}
-          />
-        )}
-      />
+      {/* 공책 한 쪽: 여백선은 목록 뒤에 깔리고, 빈 줄은 목록 꼬리에서 함께 스크롤된다 */}
+      <View style={styles.page}>
+        <MarginRule scrollY={scrollY} startY={headerH} />
+        <Animated.FlatList
+          style={styles.list}
+          data={items}
+          keyExtractor={(i) => i.id}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={styles.listContent}
+          ListFooterComponentStyle={styles.footerWrap}
+          ListHeaderComponent={listHeader}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+          scrollEventThrottle={16}
+          ListEmptyComponent={
+            // 빈 날은 첫 줄에 흐리게 적어 두고, 그 아래로 빈 줄이 이어진다
+            <View style={styles.emptyRow}>
+              <Txt style={styles.empty}>아직 적은 줄이 없어요</Txt>
+            </View>
+          }
+          ListFooterComponent={
+            // 목록 아래 빈 곳까지 빈 줄로 채워, 누르면 키보드가 내려간다
+            <Pressable accessible={false} style={styles.footerWrap} onPress={Keyboard.dismiss}>
+              <RuledFill />
+              <Txt variant="hand" style={styles.footer}>
+                오늘도 한 줄씩.
+              </Txt>
+            </Pressable>
+          }
+          renderItem={({ item }) => (
+            <ItemRow
+              item={item}
+              priorityFull={priorityCount >= MAX_PRIORITY_PER_DAY}
+              onAdvance={() => run(() => advanceStatus(db, item.id))}
+              onTogglePriority={() => run(() => setPriority(db, item.id, !item.priority))}
+              onDelete={() => run(() => deleteItem(db, item.id))}
+            />
+          )}
+        />
+      </View>
       <OrganizeSheet
         db={db}
         visible={organizeOpen}
@@ -331,6 +348,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
 // 머리 버튼도 칩처럼 보이는 높이만 낮추고, 누르는 영역은 hitSlop으로 44pt를 지킨다
 const CHIP_SLOP = { top: 5, bottom: 5 };
+const RIBBON_GAP = 16; // 끈의 44pt 누르는 영역이 하루 마무리 버튼에 겹치지 않게
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingTop: 12, gap: 24 },
@@ -340,28 +358,15 @@ const styles = StyleSheet.create({
   headerText: { gap: 4 },
   date: { fontSize: 30, letterSpacing: -0.5 },
   headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center', alignSelf: 'flex-end' },
-  // 지난 기록: 책 그림만으로는 뜻이 약해 짧은 글을 곁들인다
-  archive: {
-    minHeight: CHIP_H,
-    paddingLeft: 10,
-    paddingRight: 12,
-    borderRadius: CHIP_H / 2,
-    borderWidth: 1,
-    borderColor: colors.line,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  archiveText: { fontSize: 14 },
+  // 화면의 주 버튼 하나: 남색으로 채운다
   evening: {
     minHeight: CHIP_H,
     paddingHorizontal: 14,
     borderRadius: CHIP_H / 2,
-    borderWidth: 1,
-    borderColor: colors.ink,
+    backgroundColor: colors.navy,
     justifyContent: 'center',
   },
-  eveningText: { fontSize: 14 },
+  eveningText: { fontSize: 14, color: colors.onDark },
   inputBlock: { gap: 14 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.ink, paddingBottom: 6 },
   input: { flex: 1, height: 44, paddingHorizontal: 6, fontSize: 16, fontFamily: fonts.body, color: colors.ink },
@@ -370,11 +375,20 @@ const styles = StyleSheet.create({
   notice: { color: colors.inkSoft },
   info: { width: 44, height: 44, marginLeft: -6, alignItems: 'center', justifyContent: 'center' },
   error: { color: colors.danger },
+  page: { flex: 1, overflow: 'hidden' }, // 여백선이 머리 높이만큼 내려가도 화면 아래로 삐져나오지 않게
   list: { flex: 1 },
   listContent: { flexGrow: 1 },
   // 할 일이 적으면 화면 맨 아래에 머물고, 목록이 길면 마지막 줄 아래로 밀려난다
   footerWrap: { flexGrow: 1, justifyContent: 'flex-end' },
   listHeader: { gap: 26, paddingBottom: 20 },
-  empty: { color: colors.muted, textAlign: 'center', marginTop: 24 },
+  // 여백선 오른쪽 글 자리에서 시작하는 한 줄(줄 높이와 같은 50pt)
+  emptyRow: {
+    minHeight: RULE_GAP,
+    justifyContent: 'center',
+    paddingLeft: NOTE_MARGIN - SCREEN_X + 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.ruled,
+  },
+  empty: { color: colors.muted },
   footer: { alignSelf: 'center', marginTop: 24, marginBottom: 24, fontSize: 20, color: colors.muted },
 });
