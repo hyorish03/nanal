@@ -22,6 +22,7 @@ export type Item = {
 type ItemRow = Omit<Item, 'priority'> & { priority: number };
 
 export const MAX_PRIORITY_PER_DAY = 3;
+export const MAX_TEXT = 200; // 한 줄에 쓸 수 있는 글자 수
 const NEXT_STATUS: Partial<Record<TaskStatus, TaskStatus>> = { open: 'doing', doing: 'done', done: 'open' };
 const COLUMNS = 'id, date, kind, text, status, priority, migrated_from, created_at, updated_at, deleted_at';
 // 진행 중 → 중요 → 나머지(입력 순) → 끝냄·옮김
@@ -129,36 +130,58 @@ export async function setPriority(db: Db, id: string, on: boolean, now = new Dat
   });
 }
 
-async function migrateTo(db: Db, id: string, target: (today: string) => string, now: Date): Promise<Item> {
+async function migrateInTx(tx: Tx, id: string, target: (today: string) => string, now: Date): Promise<Item> {
   const ts = now.toISOString();
-  return db.transaction(async (tx) => {
-    const item = await requireItem(tx, id);
-    if (item.status !== 'open' && item.status !== 'doing') throw new Error('끝나지 않은 할 일만 옮길 수 있습니다');
-    const today = logicalDate(now);
-    if (item.date >= today) throw new Error('이전 날짜의 할 일만 옮길 수 있습니다');
-    await update(tx, id, { status: 'migrated' }, now);
-    const created: Item = {
-      ...item,
-      id: newId(),
-      date: target(today),
-      status: 'open',
-      priority: false,
-      migrated_from: item.id,
-      created_at: ts,
-      updated_at: ts,
-      deleted_at: null,
-    };
-    await insertItem(tx, created);
-    return created;
-  });
+  const item = await requireItem(tx, id);
+  if (item.status !== 'open' && item.status !== 'doing') throw new Error('끝나지 않은 할 일만 옮길 수 있습니다');
+  const today = logicalDate(now);
+  if (item.date >= today) throw new Error('이전 날짜의 할 일만 옮길 수 있습니다');
+  await update(tx, id, { status: 'migrated' }, now);
+  const created: Item = {
+    ...item,
+    id: newId(),
+    date: target(today),
+    status: 'open',
+    priority: false,
+    migrated_from: item.id,
+    created_at: ts,
+    updated_at: ts,
+    deleted_at: null,
+  };
+  await insertItem(tx, created);
+  return created;
+}
+
+function migrateTo(db: Db, id: string, target: (today: string) => string, now: Date): Promise<Item> {
+  return db.transaction((tx) => migrateInTx(tx, id, target, now));
 }
 
 export function migrateToToday(db: Db, id: string, now = new Date()): Promise<Item> {
   return migrateTo(db, id, (today) => today, now);
 }
 
+// 포스트잇의 '모두 오늘 하기'. 하나라도 못 옮기면 아무것도 옮기지 않는다.
+export function migrateAllToToday(db: Db, ids: string[], now = new Date()): Promise<Item[]> {
+  return db.transaction(async (tx) => {
+    const created: Item[] = [];
+    for (const id of ids) created.push(await migrateInTx(tx, id, (today) => today, now));
+    return created;
+  });
+}
+
 export function migrateToTomorrow(db: Db, id: string, now = new Date()): Promise<Item> {
   return migrateTo(db, id, (today) => addDays(today, 1), now);
+}
+
+export async function updateItemText(db: Db, id: string, text: string, now = new Date()): Promise<void> {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error('내용을 입력하세요');
+  if (Array.from(trimmed).length > MAX_TEXT) throw new Error(`${MAX_TEXT}자까지 쓸 수 있어요`);
+  await db.transaction(async (tx) => {
+    await requireItem(tx, id);
+    await tx.runAsync('UPDATE items SET text = ?, updated_at = ? WHERE id = ?', [trimmed, now.toISOString(), id]);
+    await markDirty(tx, 'items', id);
+  });
 }
 
 export async function deleteItem(db: Db, id: string, now = new Date()): Promise<void> {
@@ -166,6 +189,16 @@ export async function deleteItem(db: Db, id: string, now = new Date()): Promise<
   await db.transaction(async (tx) => {
     await requireItem(tx, id);
     await tx.runAsync('UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?', [ts, ts, id]);
+    await markDirty(tx, 'items', id);
+  });
+}
+
+// 지운 항목을 되살린다(지우고 바로 '되돌리기'를 눌렀을 때).
+export async function restoreItem(db: Db, id: string, now = new Date()): Promise<void> {
+  await db.transaction(async (tx) => {
+    const row = await tx.getFirstAsync<{ id: string }>('SELECT id FROM items WHERE id = ? AND deleted_at IS NOT NULL', [id]);
+    if (!row) throw new Error(`되돌릴 항목을 찾을 수 없습니다: ${id}`);
+    await tx.runAsync('UPDATE items SET deleted_at = NULL, updated_at = ? WHERE id = ?', [now.toISOString(), id]);
     await markDirty(tx, 'items', id);
   });
 }

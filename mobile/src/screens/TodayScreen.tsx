@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Keyboard, LayoutAnimation, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Keyboard, LayoutAnimation, type ListRenderItem, Pressable, StyleSheet, type TextInput, View } from 'react-native';
 import type { Db } from '../db/types';
 import {
   addItem,
@@ -11,14 +10,16 @@ import {
   listItemsForDate,
   listMigrationCandidates,
   MAX_PRIORITY_PER_DAY,
+  migrateAllToToday,
   migrateToToday,
   migrateToTomorrow,
+  restoreItem,
   setPriority,
+  updateItemText,
 } from '../items/repo';
 import { formatLongDate, logicalDate } from '../lib/date';
 import { countRecordedDays } from '../stats/recordedDays';
-import { Popover, useAnchor } from '../ui/Popover';
-import { colors, fonts, SCREEN_X } from '../ui/theme';
+import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
 import { useReduceMotion } from '../ui/useReduceMotion';
@@ -27,11 +28,14 @@ import { MarginRule, NOTE_MARGIN, RULE_GAP, RuledFill } from './today/NotebookPa
 import { Ribbon } from './today/Ribbon';
 import type { LinkAction } from '../lib/deepLink';
 import { OrganizeSheet } from './today/OrganizeSheet';
-import { PostIt, type SettleHow } from './today/PostIt';
-import { SymbolLegend } from './today/SymbolLegend';
+import { PostIt, POSTIT_SHOWN, type SettleHow } from './today/PostIt';
+import { Composer } from './today/Composer';
 import { voiceAvailable } from '../voice/available';
 import { dimPressed } from '../ui/press';
-import { Chip, CHIP_H } from '../ui/Chip';
+import { CHIP_H } from '../ui/Chip';
+import { haptic } from '../ui/haptics';
+import { Toast, type ToastSpec } from '../ui/Toast';
+import { useEvent } from '../ui/useEvent';
 
 // 개발용·출시 빌드에서만 말로 적기 시트를 불러온다(Expo Go에서는 네이티브 모듈이 없어 import 시 오류).
 const VoiceSheet: typeof import('./today/VoiceSheet').VoiceSheet | null = voiceAvailable
@@ -40,28 +44,22 @@ const VoiceSheet: typeof import('./today/VoiceSheet').VoiceSheet | null = voiceA
 
 type Props = { db: Db; version: number; onChanged: () => void; onOpenEvening: () => void; onOpenArchive?: () => void; focusReady?: boolean; onFocused?: () => void; pendingAction?: LinkAction | null; onActionHandled?: () => void };
 
-const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
-  { kind: 'task', symbol: '•', label: '할 일' },
-  { kind: 'note', symbol: '–', label: '메모' },
-];
-
 export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchive, focusReady = true, onFocused, pendingAction = null, onActionHandled }: Props) {
   const today = logicalDate(new Date());
   const [items, setItems] = useState<Item[]>([]);
   const [candidates, setCandidates] = useState<Item[]>([]);
   const [recordedDays, setRecordedDays] = useState(0);
-  const [kind, setKind] = useState<ItemKind>('task');
-  const [text, setText] = useState('');
+  const [loaded, setLoaded] = useState(false); // 처음 목록을 불러왔다(넘어온 일 수를 알아야 포커스를 정한다)
   const [error, setError] = useState<string | null>(null);
   const [organizeOpen, setOrganizeOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [organizeInput, setOrganizeInput] = useState<{ text: string; auto: boolean }>({ text: '', auto: false });
   const afterVoice = useRef<{ text: string; auto: boolean } | null>(null); // 말로 적기 시트가 내려간 뒤 열 정리 시트
   const [notice, setNotice] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastSpec | null>(null);
   const busy = useRef(false);
-  const settling = useRef(false); // 포스트잇 줄을 정리했다: 다음에 불러온 목록을 넣을 때만 자리 이동을 애니메이션한다
+  const reorder = useRef(false); // 상태·중요를 바꿨거나 포스트잇을 정리했다: 다음에 불러온 목록을 넣을 때만 자리 이동을 애니메이션한다
   const reduce = useReduceMotion();
-  const info = useAnchor();
   const inputRef = useRef<TextInput>(null);
   const scrollY = useRef(new Animated.Value(0)).current; // 여백선이 목록 머리를 따라 움직이게
   const [headerH, setHeaderH] = useState(0);
@@ -79,11 +77,12 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   }, []);
 
   useEffect(() => {
-    if (!focusReady) return;
-    inputRef.current?.focus();
+    if (!focusReady || !loaded) return;
+    // 넘어온 일이 많으면 키보드로 포스트잇을 가리지 않고 먼저 정리할 수 있게 둔다
+    if (candidates.length <= POSTIT_SHOWN) inputRef.current?.focus();
     onFocused?.();
-    // onFocused는 매 렌더 새 함수라 의존성에서 뺀다
-  }, [focusReady]);
+    // onFocused는 매 렌더 새 함수라, candidates는 처음 불러온 값만 보면 돼서 의존성에서 뺀다
+  }, [focusReady, loaded]);
 
   const openOrganize = (input: { text: string; auto: boolean } = { text: '', auto: false }) => {
     setNotice(null);
@@ -111,16 +110,21 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     Promise.all([listItemsForDate(db, today), listMigrationCandidates(db, today), countRecordedDays(db)])
       .then(([i, c, n]) => {
         if (cancelled) return;
-        if (settling.current) {
-          settling.current = false;
-          if (!reduce) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        if (reorder.current) {
+          reorder.current = false;
+          // 줄이 순간이동하지 않고 새 자리로 미끄러진다. 동작 줄이기면 그냥 바뀐다
+          if (!reduce) LayoutAnimation.configureNext(REORDER);
         }
         setItems(i);
         setCandidates(c);
         setRecordedDays(n);
+        setLoaded(true);
         setError(null);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : String(e));
+        setLoaded(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -143,91 +147,74 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     }
   };
 
-  // 빈 칸에서 완료를 누르면 키보드만 내린다
-  const submit = () => {
-    if (!text.trim()) {
-      Keyboard.dismiss();
-      return;
-    }
-    return run(async () => {
-      await addItem(db, { kind, text });
-      setText('');
-    });
-  };
-
-  const settle = async (item: Item, how: SettleHow) => {
-    settling.current = true;
-    const ok = await run(() =>
-      how === 'today' ? migrateToToday(db, item.id) : how === 'tomorrow' ? migrateToTomorrow(db, item.id) : deleteItem(db, item.id),
-    );
-    if (!ok) settling.current = false;
+  // 아래 함수들은 늘 같은 참조라 입력칸·목록 줄이 화면이 다시 그려질 때 따라 그려지지 않는다
+  // 진동은 저장이 된 뒤 한 번(실패하면 문구만)
+  const after = (feel: () => void) => (ok: boolean) => {
+    if (ok) feel();
     return ok;
   };
+  const submit = useEvent((kind: ItemKind, text: string) => run(() => addItem(db, { kind, text })).then(after(haptic.success)));
+  // 실패하면 다음 불러오기(다른 이유로 일어날 수 있다)에 애니메이션이 묻어가지 않게 끈다
+  const reordering = async (action: () => Promise<unknown>) => {
+    reorder.current = true;
+    const ok = await run(action);
+    if (!ok) reorder.current = false;
+    return ok;
+  };
+  const onAdvance = useEvent((id: string) => reordering(() => advanceStatus(db, id)).then(after(haptic.select)));
+  const onTogglePriority = useEvent((id: string, on: boolean) => reordering(() => setPriority(db, id, on)).then(after(haptic.light)));
+  const onEdit = useEvent((id: string, text: string) => run(() => updateItemText(db, id, text)));
+  // 지우기는 묻지 않고 바로 지운 뒤, 잠깐 '되돌리기'를 띄운다
+  const removeWithUndo = async (id: string) => {
+    const ok = await reordering(() => deleteItem(db, id));
+    if (ok) {
+      haptic.warning();
+      setToast({
+        key: Date.now(),
+        message: '지웠어요',
+        action: { label: '되돌리기', onPress: () => void reordering(() => restoreItem(db, id)) },
+      });
+    }
+    return ok;
+  };
+  const onDelete = useEvent((id: string) => removeWithUndo(id));
+  const hideToast = useCallback((key: number) => setToast((t) => (t?.key === key ? null : t)), []);
+  const onCapture = useEvent(() => openCapture());
+
+  const settle = (item: Item, how: SettleHow) =>
+    how === 'delete'
+      ? removeWithUndo(item.id)
+      : reordering(() => (how === 'today' ? migrateToToday(db, item.id) : migrateToTomorrow(db, item.id)));
+
+  const settleAll = () => reordering(() => migrateAllToToday(db, candidates.map((c) => c.id)));
 
   const priorityCount = items.filter((i) => i.priority && (i.status === 'open' || i.status === 'doing')).length;
+  const priorityFull = priorityCount >= MAX_PRIORITY_PER_DAY;
+
+  const renderItem = useCallback<ListRenderItem<Item>>(
+    ({ item }) => (
+      <ItemRow
+        id={item.id}
+        kind={item.kind}
+        text={item.text}
+        status={item.status}
+        priority={item.priority}
+        priorityFull={priorityFull}
+        onAdvance={onAdvance}
+        onTogglePriority={onTogglePriority}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+    ),
+    [priorityFull, onAdvance, onTogglePriority, onEdit, onDelete],
+  );
 
   // 포스트잇과 입력칸을 목록 머리로 둬서 후보가 많아도 함께 스크롤된다. 컴포넌트 타입이 아닌 엘리먼트라 입력칸이 다시 마운트되지 않는다.
   const listHeader = (
     <View style={styles.listHeader} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}>
-      {candidates.length > 0 && <PostIt candidates={candidates} onSettle={settle} />}
+      {candidates.length > 0 && <PostIt candidates={candidates} onSettle={settle} onSettleAll={settleAll} />}
 
-      <View style={styles.inputBlock}>
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.input}
-            ref={inputRef}
-            placeholder="한 줄로 남기기"
-            placeholderTextColor={colors.faint}
-            accessibilityLabel="새 항목"
-            value={text}
-            onChangeText={setText}
-            onSubmitEditing={submit}
-            submitBehavior="submit"
-            returnKeyType="done"
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={VoiceSheet ? '말로 적기' : '정리해서 넣기'}
-            accessibilityHint={VoiceSheet ? '말한 내용을 할 일과 메모로 정리해요' : '두서없이 쓴 글을 할 일과 메모로 정리해요'}
-            style={dimPressed(styles.organize)}
-            onPress={openCapture}
-          >
-            {VoiceSheet ? (
-              <Svg width={22} height={22} viewBox="0 0 18 18" fill="none">
-                <Rect x={6} y={1.5} width={6} height={10} rx={3} stroke={colors.inkSoft} strokeWidth={1.4} />
-                <Path d="M3 8.5a6 6 0 0 0 12 0M9 14.5v2.5" stroke={colors.inkSoft} strokeWidth={1.4} strokeLinecap="round" />
-              </Svg>
-            ) : (
-              <Svg width={22} height={22} viewBox="0 0 20 20" fill="none">
-                <Path d="M4 16l1-4 8.5-8.5a2.1 2.1 0 0 1 3 3L8 15l-4 1Z" stroke={colors.inkSoft} strokeWidth={1.4} strokeLinejoin="round" />
-                <Path d="M12 5l3 3" stroke={colors.inkSoft} strokeWidth={1.4} />
-              </Svg>
-            )}
-          </Pressable>
-        </View>
-        <View style={styles.kindRow}>
-          {KINDS.map((k) => {
-            const selected = kind === k.kind;
-            return (
-              <Chip key={k.kind} label={k.label} symbol={k.symbol} selected={selected} onPress={() => setKind(k.kind)} />
-            );
-          })}
-          <Pressable
-            ref={info.ref}
-            accessibilityRole="button"
-            accessibilityLabel="기호 설명"
-            accessibilityState={{ expanded: info.anchor !== null }}
-            style={dimPressed(styles.info)}
-            onPress={info.open}
-          >
-            <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-              <Circle cx={10} cy={10} r={8.2} stroke={colors.muted} strokeWidth={1.3} />
-              <Path d="M10 9v5" stroke={colors.muted} strokeWidth={1.4} strokeLinecap="round" />
-              <Circle cx={10} cy={6.2} r={1.1} fill={colors.muted} />
-            </Svg>
-          </Pressable>
-        </View>
-      </View>
+      <Composer inputRef={inputRef} voice={VoiceSheet !== null} onCapture={onCapture} onSubmit={submit} />
     </View>
   );
 
@@ -276,10 +263,6 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       {/* 지난 기록 책갈피 끈: 하루 마무리 버튼 왼쪽, 화면 맨 위에 매달린다 */}
       {onOpenArchive && eveningW > 0 && <Ribbon onPress={onOpenArchive} style={{ right: SCREEN_X + eveningW + RIBBON_GAP }} />}
 
-      <Popover anchor={info.anchor} align="left" width={300} label="기호 설명" onClose={info.close}>
-        <SymbolLegend kind={kind} onClose={info.close} />
-      </Popover>
-
       {/* 공책 한 쪽: 여백선은 목록 뒤에 깔리고, 빈 줄은 목록 꼬리에서 함께 스크롤된다 */}
       <View style={styles.page}>
         <MarginRule scrollY={scrollY} startY={headerH} />
@@ -309,15 +292,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
               </Txt>
             </Pressable>
           }
-          renderItem={({ item }) => (
-            <ItemRow
-              item={item}
-              priorityFull={priorityCount >= MAX_PRIORITY_PER_DAY}
-              onAdvance={() => run(() => advanceStatus(db, item.id))}
-              onTogglePriority={() => run(() => setPriority(db, item.id, !item.priority))}
-              onDelete={() => run(() => deleteItem(db, item.id))}
-            />
-          )}
+          extraData={priorityFull}
+          renderItem={renderItem}
         />
       </View>
       <OrganizeSheet
@@ -352,13 +328,15 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           }}
         />
       )}
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }
 
 // 머리 버튼도 칩처럼 보이는 높이만 낮추고, 누르는 영역은 hitSlop으로 44pt를 지킨다
 const CHIP_SLOP = { top: 5, bottom: 5 };
-const RIBBON_GAP = 16; // 끈의 44pt 누르는 영역이 하루 마무리 버튼에 겹치지 않게
+const RIBBON_GAP = 16;
+const REORDER = LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity); // 끈의 44pt 누르는 영역이 하루 마무리 버튼에 겹치지 않게
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingTop: 12, gap: 24 },
@@ -377,13 +355,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   eveningText: { fontSize: 14, color: colors.onDark },
-  inputBlock: { gap: 14 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.ink, paddingBottom: 6 },
-  input: { flex: 1, height: 44, paddingHorizontal: 6, fontSize: 16, fontFamily: fonts.body, color: colors.ink },
-  kindRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  organize: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   notice: { color: colors.inkSoft },
-  info: { width: 44, height: 44, marginLeft: -6, alignItems: 'center', justifyContent: 'center' },
   error: { color: colors.danger },
   page: { flex: 1, overflow: 'hidden' }, // 여백선이 머리 높이만큼 내려가도 화면 아래로 삐져나오지 않게
   list: { flex: 1 },
