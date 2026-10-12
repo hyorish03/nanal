@@ -156,17 +156,3 @@ export async function listReflections(db: Db, date: string): Promise<Reflection[
   );
   return rows.map(toReflection);
 }
-
-export type ReflectionEntry = Reflection & { mood: number | null };
-
-// 지난 기록의 회고 모아보기: 모든 회고를 최신순으로, 그날 기분과 함께.
-export async function listReflectionHistory(db: Db): Promise<ReflectionEntry[]> {
-  const rows = await db.getAllAsync<ReflectionRow & { mood: number | null }>(
-    `SELECT r.id, r.date, r.template, r.answers, r.snapshot, r.created_at, r.updated_at, r.deleted_at,
-       (SELECT mood FROM days WHERE date = r.date AND deleted_at IS NULL) AS mood
-     FROM reflections r WHERE r.deleted_at IS NULL
-     ORDER BY r.date DESC, r.created_at DESC`,
-    [],
-  );
-  return rows.map((r) => ({ ...toReflection(r), mood: r.mood }));
-}
