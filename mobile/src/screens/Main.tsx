@@ -12,6 +12,7 @@ import { useSync } from '../sync/useSync';
 import { Cover } from '../ui/Cover';
 import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { reloadWidgets } from '../widget/reload';
 import { ArchiveScreen } from './ArchiveScreen';
 import { EveningScreen } from './EveningScreen';
 import { MonthlyReviewScreen } from './MonthlyReviewScreen';
@@ -57,7 +58,11 @@ type Screen = 'onboarding' | 'today' | 'evening' | 'archive' | 'review';
 function MainContent({ db, userId }: { db: Db; userId: string }) {
   const remote = useMemo(() => createSupabaseRemote(supabase, userId), [userId]);
   const [version, setVersion] = useState(0);
-  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+  // 화면을 다시 그릴 때 위젯도 같은 데이터로 다시 그린다(앱이 앞에 있을 때의 새로 고침은 WidgetKit 예산을 쓰지 않는다).
+  const refresh = useCallback(() => {
+    setVersion((v) => v + 1);
+    reloadWidgets();
+  }, []);
   const { pending, error, requestSync } = useSync(db, remote, refresh);
   const [screen, setScreen] = useState<Screen | null>(null);
   const [reviewMonth, setReviewMonth] = useState<string | null>(null);

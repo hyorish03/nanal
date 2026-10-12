@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@bacons/apple-targets": "^5.0.0",
     "@expo-google-fonts/gowun-batang": "^0.4.1",
     "@expo-google-fonts/ibm-plex-sans-kr": "^0.4.1",
     "@expo-google-fonts/nanum-pen-script": "^0.4.0",
