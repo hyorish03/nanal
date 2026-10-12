@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { createMonthlyReview } from '../ai/client';
-import { AI_MESSAGES } from '../ai/errors';
+import { AiError } from '../ai/errors';
+import { listMonthSummary } from '../archive/repo';
 import type { Db } from '../db/types';
 import { monthWeeks } from '../lib/calendar';
 import { addMonths, formatShortDate } from '../lib/date';
@@ -28,6 +29,13 @@ const SECTION_MS = 260;
 const SECTION_GAP_MS = 60;
 const CELL_STEP_MS = 15; // 달력 칸은 왼쪽 위에서 대각선으로 번진다
 const CELL_TOTAL_MS = 500;
+const MIN_DAYS = 7; // 서버(monthly-review)가 돌아보기를 만드는 최소 기록일과 같다
+const LOAD_ERROR = '돌아보기를 불러오지 못했어요. 잠시 뒤에 다시 해 주세요';
+
+// 서버가 알려 준 오류는 그 문구를, 그 밖의 오류(로컬 저장소 등)는 다정한 한 줄로 보여준다
+function messageOf(e: unknown): string {
+  return e instanceof AiError ? e.message : LOAD_ERROR;
+}
 
 export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: Props) {
   const [step, setStep] = useState<Step>('loading');
@@ -61,16 +69,13 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
       })
       .catch((e) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : String(e));
+        setError(messageOf(e));
         setStep((s) => (s === 'loading' ? 'consent' : s));
       });
     return () => {
       cancelled = true;
     };
   }, [db, month, version]);
-
-  // 한 달에 한 번은 무료. 다시 만들기는 유료 이용(결제는 다음 계획)이라 지금은 안내만 한다.
-  const showPaid = () => Alert.alert('다시 만들기', `${label} 돌아보기는 한 달에 한 번 무료로 만들 수 있어요. ${AI_MESSAGES.paid_required}`);
 
   // 화면을 닫아도 서버가 저장하므로 다 되면 동기화로 지난 기록에 남는다.
   const make = async () => {
@@ -90,7 +95,14 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
       setStep('result');
     } catch (e) {
       if (!alive.current) return;
-      setError(e instanceof Error ? e.message : String(e));
+      let message = messageOf(e);
+      // 기록이 모자라면 이 기기에 쌓인 날로 며칠 더 필요한지 알려 준다
+      if (e instanceof AiError && e.code === 'not_enough_days') {
+        const days = await listMonthSummary(db, month).then((s) => s.length, () => null);
+        if (days !== null && days < MIN_DAYS) message = `${label}에 기록한 날이 ${days}일이에요. ${MIN_DAYS - days}일 더 쌓이면 볼 수 있어요`;
+      }
+      if (!alive.current) return;
+      setError(message);
       setStep(back);
     } finally {
       busy.current = false;
@@ -142,7 +154,7 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
         )}
 
         {step === 'result' && content && (
-          <ReviewResult content={content} month={month} writtenAt={writtenAt} reveal={justMade} onRemake={showPaid} />
+          <ReviewResult content={content} month={month} writtenAt={writtenAt} reveal={justMade} />
         )}
       </ScrollView>
     </View>
@@ -154,13 +166,11 @@ function ReviewResult({
   month,
   writtenAt,
   reveal,
-  onRemake,
 }: {
   content: MonthlyReviewContent;
   month: string;
   writtenAt: string | null;
   reveal: boolean; // 처음 그릴 때 한 번 차례로 나타난다
-  onRemake: () => void;
 }) {
   const reduce = useReduceMotion();
   // 동작 줄이기면 전체를 한 번에 흐리게 띄운다
@@ -226,7 +236,7 @@ function ReviewResult({
       <FadeIn {...section()}>
         <Section title="무기력했던 날">
           <View style={styles.stats}>
-            <Stat value={`${stats.lethargyDates.length}번`} label={lethargyDays ? `${lethargyDays}일` : '없음'} />
+            <Stat value={`${stats.lethargyDates.length}번`} label={lethargyDays ? `${lethargyDays}일` : '없었어요'} />
             {stats.lethargyAvgGapDays !== null && <Stat value={`약 ${Math.round(stats.lethargyAvgGapDays)}일`} label="평균 간격" />}
           </View>
           {insights.lethargy.causes.length > 0 && (
@@ -271,14 +281,8 @@ function ReviewResult({
         </Txt>
       </FadeIn>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityHint="유료 이용이 필요해요. 지금은 준비 중이에요"
-        style={dimPressed(styles.secondary)}
-        onPress={onRemake}
-      >
-        <Txt>다시 만들기 · 유료(준비 중)</Txt>
-      </Pressable>
+      {/* 한 달에 한 번은 무료. 더 만드는 기능(유료)은 아직 없어서 누르는 버튼 대신 안내만 둔다 */}
+      <Txt style={styles.muted}>이번 달 돌아보기는 이미 만들었어요. 더 만드는 기능은 준비 중이에요</Txt>
     </FadeIn>
   );
 }
@@ -330,7 +334,6 @@ const styles = StyleSheet.create({
   info: { fontSize: 13, lineHeight: 20, color: colors.inkSoft },
   primary: { minHeight: 52, borderRadius: 26, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   primaryText: { color: colors.onDark, fontSize: 16 },
-  secondary: { minHeight: 48, borderRadius: 24, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   making: { alignItems: 'center', gap: 12, paddingVertical: 48 },
   section: { gap: 10, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.lineFaint },
   sectionTitle: { fontSize: 17 },
@@ -342,7 +345,7 @@ const styles = StyleSheet.create({
   dot: { width: 4, height: 4, borderRadius: 2 },
   dotOn: { backgroundColor: colors.navy },
   legend: { fontSize: 12, color: colors.muted },
-  stats: { flexDirection: 'row', gap: 28 },
+  stats: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 28, rowGap: 12 },
   stat: { gap: 2 },
   statValue: { fontSize: 24 },
   causes: { gap: 4 },

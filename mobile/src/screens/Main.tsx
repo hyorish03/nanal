@@ -3,7 +3,7 @@ import { DefaultTheme, NavigationContainer, StackActions, type Theme, useNavigat
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, AppState, BackHandler, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, AppState, Keyboard, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import type { Db } from '../db/types';
@@ -33,6 +33,7 @@ import { TodayScreen } from './TodayScreen';
 
 export function Main({ db, userId }: { db: Db; userId: string }) {
   const [claim, setClaim] = useState<'pending' | 'ok' | 'mismatch' | 'error'>('pending');
+  const [attempt, setAttempt] = useState(0); // 다시 시도를 누를 때마다 하나씩 늘린다
 
   useEffect(() => {
     let alive = true;
@@ -48,27 +49,48 @@ export function Main({ db, userId }: { db: Db; userId: string }) {
     return () => {
       alive = false;
     };
-  }, [db, userId]);
+  }, [db, userId, attempt]);
 
-  if (claim === 'pending') return <SafeAreaView style={styles.container} />;
+  if (claim === 'pending')
+    return (
+      <SafeAreaView style={[styles.container, styles.center]}>
+        <ActivityIndicator accessibilityLabel="불러오는 중" color={colors.navy} />
+      </SafeAreaView>
+    );
   if (claim === 'mismatch' || claim === 'error') {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.blocked} accessibilityRole="alert">
-          {claim === 'mismatch'
-            ? '이 기기에는 다른 계정의 기록이 있습니다. 같은 계정으로 로그인하세요.'
-            : '기기 데이터를 확인하지 못했습니다. 앱을 다시 실행하세요.'}
-        </Text>
+        <View style={styles.blocked}>
+          <Txt style={styles.blockedText} accessibilityRole="alert">
+            {claim === 'mismatch'
+              ? '이 기기에는 다른 계정의 기록이 있어요. 그 계정으로 다시 로그인해 주세요.'
+              : '이 기기의 기록을 확인하지 못했어요. 잠시 뒤에 다시 시도해 주세요.'}
+          </Txt>
+          <View style={styles.blockedActions}>
+            <Pressable accessibilityRole="button" style={dimPressed(styles.blockedPrimary)} onPress={() => setAttempt((n) => n + 1)}>
+              <Txt variant="medium" style={styles.blockedPrimaryText}>
+                다시 시도
+              </Txt>
+            </Pressable>
+            {/* 이 기기에서만 로그아웃한다(오프라인이어도 로그인 화면으로 돌아가게) */}
+            <Pressable
+              accessibilityRole="button"
+              style={dimPressed(styles.blockedSecondary)}
+              onPress={() => supabase.auth.signOut({ scope: 'local' }).catch(() => {})}
+            >
+              <Txt>로그아웃</Txt>
+            </Pressable>
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
   return <MainContent db={db} userId={userId} />;
 }
 
-// 'today'는 오늘 → 지난 기록 → 월간 돌아보기 네이티브 스택이다(밀어 넣기, 가장자리 밀어 돌아가기).
-// 하루 마무리는 스택 밖에서 화면 전체를 바꾼다(저녁 바탕이 화면 전체에 보이게).
-type Screen = 'onboarding' | 'today' | 'evening';
-type StackParams = { today: undefined; archive: undefined; review: { month: string } };
+// 'today'는 오늘 → 하루 마무리·지난 기록 → 월간 돌아보기 네이티브 스택이다(밀어 넣기, 가장자리 밀어 돌아가기).
+type Screen = 'onboarding' | 'today';
+type StackParams = { today: undefined; evening: undefined; archive: undefined; review: { month: string } };
 
 const Stack = createNativeStackNavigator<StackParams>();
 // 화면 사이에 흰 바탕이 비치지 않게 종이색으로 칠한다.
@@ -92,14 +114,14 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const [linkAction, setLinkAction] = useState<LinkAction | null>(null);
   const screenRef = useRef<Screen | null>(null);
   screenRef.current = screen;
+  const [route, setRoute] = useState<keyof StackParams>('today'); // 저녁 바탕을 켤지 정하려고 맨 위 화면을 따라간다
   const reduce = useReduceMotion();
 
   // 위젯·컨트롤에서 열면 오늘 화면으로 가서(표지가 아직 덮여 있으면 펼친 뒤) 동작을 넘긴다. 온보딩 중이면 화면은 그대로 둔다.
   const runAction = useCallback((action: LinkAction | null) => {
     // 온보딩 중에 온 동작은 버린다(끝난 뒤 말로 적기가 갑자기 뜨지 않게).
     if (screenRef.current === 'onboarding') return;
-    setScreen((s) => (s === null || s === 'onboarding' ? s : 'today'));
-    // 지난 기록·월간 돌아보기에 있었으면 오늘까지 꺼낸다
+    // 하루 마무리·지난 기록·월간 돌아보기에 있었으면 오늘까지 꺼낸다
     if (nav.isReady() && nav.canGoBack()) nav.dispatch(StackActions.popToTop());
     setCoverOpen(true);
     if (action === 'voice') setFocusPending(false); // 말로 적기 시트 뒤에서 키보드가 뜨지 않게
@@ -178,16 +200,6 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     return () => sub.remove();
   }, [refresh]);
 
-  // Android 뒤로 가기: 저녁에서는 오늘로. 지난 기록·월간 돌아보기는 스택이 한 칸씩 돌아간다.
-  useEffect(() => {
-    if (screen !== 'evening') return;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      setScreen('today');
-      return true;
-    });
-    return () => sub.remove();
-  }, [screen]);
-
   const onChanged = useCallback(() => {
     refresh();
     requestSync();
@@ -198,23 +210,21 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     setScreen('today');
   }, []);
 
-  // 하루 마무리를 닫으면 할 일을 적던 오늘 화면으로 돌아간다(키보드는 올리지 않는다).
-  const closeDay = useCallback(() => {
-    Keyboard.dismiss();
-    setScreen('today');
-  }, []);
-
   return (
     <View style={styles.root}>
       {/* 남색 표지가 보이는 동안은 밝은 상태 막대 */}
       <StatusBar style={coverSettled ? 'dark' : 'light'} animated />
-      <EveningBackdrop on={screen === 'evening'} />
+      <EveningBackdrop on={screen === 'today' && route === 'evening'} />
       <Paper />
       <SafeAreaView style={styles.container}>
         <ScreenEnter key={screen ?? 'none'} reduce={reduce}>
           {screen === 'onboarding' && <OnboardingScreen onDone={finishOnboarding} />}
           {screen === 'today' && (
-            <NavigationContainer ref={nav} theme={navTheme}>
+            <NavigationContainer
+              ref={nav}
+              theme={navTheme}
+              onStateChange={() => setRoute(nav.getCurrentRoute()?.name ?? 'today')}
+            >
               <Stack.Navigator
                 screenOptions={{
                   headerShown: false,
@@ -228,7 +238,10 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                       db={db}
                       version={version}
                       onChanged={onChanged}
-                      onOpenEvening={() => setScreen('evening')}
+                      onOpenEvening={() => {
+                        Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
+                        navigation.navigate('evening');
+                      }}
                       onOpenArchive={() => {
                         Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
                         navigation.navigate('archive');
@@ -238,6 +251,19 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                       pendingAction={coverSettled ? linkAction : null}
                       onActionHandled={() => setLinkAction(null)}
                     />
+                  )}
+                </Stack.Screen>
+                {/* 하루 마무리는 등잔 불빛 종이를 깔고 밀려 들어온다. 닫으면(가장자리 밀기 포함) 오늘로 돌아가고 키보드는 올리지 않는다 */}
+                <Stack.Screen
+                  name="evening"
+                  options={{ contentStyle: styles.evening }}
+                  listeners={{ beforeRemove: () => Keyboard.dismiss() }}
+                >
+                  {({ navigation }) => (
+                    <>
+                      <LampShade />
+                      <EveningScreen db={db} version={version} onChanged={onChanged} onClose={() => navigation.goBack()} />
+                    </>
                   )}
                 </Stack.Screen>
                 <Stack.Screen name="archive">
@@ -264,7 +290,6 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
               </Stack.Navigator>
             </NavigationContainer>
           )}
-          {screen === 'evening' && <EveningScreen db={db} version={version} onChanged={onChanged} onClose={closeDay} />}
         </ScreenEnter>
       </SafeAreaView>
       <SyncBar pending={pending} error={error} />
@@ -279,7 +304,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   );
 }
 
-// 온보딩·오늘·저녁이 바뀌면 새 화면만 살짝 올라오며 나타난다(이전 화면은 바로 사라진다). 오늘 아래 화면은 스택이 밀어 넣는다.
+// 온보딩·오늘이 바뀌면 새 화면만 살짝 올라오며 나타난다(이전 화면은 바로 사라진다). 오늘 아래 화면은 스택이 밀어 넣는다.
 function ScreenEnter({ reduce, children }: { reduce: boolean; children: ReactNode }) {
   return (
     <FadeIn duration={200} rise={reduce ? 0 : 6} style={styles.container}>
@@ -305,11 +330,7 @@ function SyncBar({ pending, error }: { pending: number; error: string | null }) 
   return (
     <View pointerEvents="none" style={[styles.syncBar, { top: insets.top }]}>
       <Txt style={styles.syncText} accessibilityLiveRegion="polite">
-        {error
-          ? pending > 0
-            ? `동기화 실패, 자동으로 다시 시도합니다 (${pending}건 대기)`
-            : '동기화 실패, 자동으로 다시 시도합니다'
-          : `동기화 대기 ${pending}건`}
+        {error ? '아직 올리지 못했어요. 자동으로 다시 시도할게요 (기록은 이 기기에 안전해요)' : `${pending}개를 올리는 중이에요`}
       </Txt>
     </View>
   );
@@ -325,7 +346,16 @@ function EveningBackdrop({ on }: { on: boolean }) {
   }, [on, opacity]);
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.evening, { opacity }]}>
-      <Svg width="100%" height="100%" accessible={false}>
+      <LampShade />
+    </Animated.View>
+  );
+}
+
+// 안전 영역 안쪽은 하루 마무리 화면이 같은 종이(LAMP_PAPER + 이 그늘)를 깔고 밀려 들어온다(아래 오늘 화면이 비치지 않게).
+function LampShade() {
+  return (
+    <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%">
         <Defs>
           <RadialGradient id="lamp" cx="50%" cy="42%" rx="75%" ry="65%">
             <Stop offset="0.5" stopColor={LAMP_SHADE} stopOpacity={0} />
@@ -334,16 +364,22 @@ function EveningBackdrop({ on }: { on: boolean }) {
         </Defs>
         <Rect width="100%" height="100%" fill="url(#lamp)" />
       </Svg>
-    </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   evening: { backgroundColor: LAMP_PAPER },
-  container: { flex: 1 }, // 배경은 root와 각 화면이 칠한다(저녁은 EveningBackdrop이 칠한다)
+  container: { flex: 1 }, // 배경은 root와 각 화면이 칠한다(저녁은 EveningBackdrop과 하루 마무리 화면이 칠한다)
   page: { backgroundColor: colors.paper },
-  blocked: { padding: 24, fontSize: 16, lineHeight: 24, color: colors.ink },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  blocked: { padding: 24, gap: 20 },
+  blockedText: { fontSize: 16, lineHeight: 24 },
+  blockedActions: { gap: 10 },
+  blockedPrimary: { minHeight: 52, borderRadius: 26, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  blockedPrimaryText: { color: colors.onDark },
+  blockedSecondary: { minHeight: 48, borderRadius: 24, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   syncBar: { position: 'absolute', left: 0, right: 0, backgroundColor: colors.postit, paddingVertical: 6, paddingHorizontal: 16 },
   syncText: { color: colors.postitText, fontSize: 13 },
 });
