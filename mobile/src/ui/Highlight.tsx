@@ -12,15 +12,11 @@ const BOTTOM = 0.92;
 const STROKE = 220; // 한 줄 긋는 시간
 
 // 글자 아래쪽에 칠한 형광펜 띠. 줄바꿈된 글도 줄마다 띠를 깐다(onTextLayout으로 줄 위치를 잰다).
-// 자식은 Txt 하나여야 한다.
+// 자식은 Txt 하나여야 한다. 칠하든 안 칠하든 글 자리는 같다(띠만 글자 양옆으로 PAD만큼 삐져나온다).
 // animate: 방금 사용자가 칠했을 때만 왼쪽에서 오른쪽으로, 윗줄부터 긋는다(불러온 목록은 그대로 보여준다).
 export function Highlight({ on, animate = false, children }: { on: boolean; animate?: boolean; children: ReactElement<TextProps> }) {
+  // 칠하지 않을 때도 줄을 재 둔다(줄바꿈이 그대로라 칠할 때 다시 재지 않는다)
   const [lines, setLines] = useState<Line[]>([]);
-  // 지웠다 다시 칠하면 줄을 새로 잰 뒤에 긋는다
-  useEffect(() => {
-    if (!on) setLines([]);
-  }, [on]);
-  if (!on) return children;
   const onTextLayout = (e: NativeSyntheticEvent<TextLayoutEventData>) => {
     children.props.onTextLayout?.(e);
     const next = e.nativeEvent.lines.filter((l) => l.width > 0).map(({ x, y, width, height }) => ({ x, y, width, height }));
@@ -28,7 +24,7 @@ export function Highlight({ on, animate = false, children }: { on: boolean; anim
   };
   return (
     <View style={styles.wrap}>
-      {lines.length > 0 && (animate ? <DrawnBands lines={lines} /> : lines.map((l, i) => <View key={i} pointerEvents="none" style={[styles.band, bandRect(l)]} />))}
+      {on && lines.length > 0 && (animate ? <DrawnBands lines={lines} /> : lines.map((l, i) => <View key={i} pointerEvents="none" style={[styles.band, bandRect(l)]} />))}
       {cloneElement(children, { onTextLayout })}
     </View>
   );
@@ -70,7 +66,7 @@ function DrawnBands({ lines }: { lines: Line[] }) {
 }
 
 function bandRect(l: Line) {
-  return { left: l.x, width: l.width + PAD * 2, top: l.y + l.height * TOP, height: l.height * (BOTTOM - TOP) };
+  return { left: l.x - PAD, width: l.width + PAD * 2, top: l.y + l.height * TOP, height: l.height * (BOTTOM - TOP) };
 }
 
 function same(a: Line[], b: Line[]) {
@@ -78,7 +74,7 @@ function same(a: Line[], b: Line[]) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexShrink: 1, paddingHorizontal: PAD },
+  wrap: { flexShrink: 1 },
   band: { position: 'absolute', backgroundColor: colors.highlight },
   fromLeft: { transformOrigin: 'left center' },
 });
