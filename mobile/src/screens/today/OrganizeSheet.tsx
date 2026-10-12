@@ -6,6 +6,7 @@ import { dateLabel, type DraftItem, toDrafts } from '../../ai/organize';
 import type { Db } from '../../db/types';
 import { addItem } from '../../items/repo';
 import { supabase } from '../../supabase';
+import { RuledPaper } from '../../ui/RuledPaper';
 import { StatusSymbol } from '../../ui/StatusSymbol';
 import { colors, fonts, HIT, SCREEN_X } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
@@ -138,6 +139,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
                 편하게 적어 보세요
               </Txt>
               <Txt style={styles.hint}>정리되지 않아도 괜찮아요. 할 일만 골라 둘게요.</Txt>
+              <RuledPaper lineHeight={26} style={styles.paper}>
               <TextInput
                 style={styles.input}
                 multiline
@@ -149,6 +151,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
                 placeholder="예: 오늘 책도 사야 하고 빨래도 널어야 돼. 내일은 치과에 전화하기"
                 placeholderTextColor={colors.faint}
               />
+              </RuledPaper>
               <Txt style={styles.note}>정리하기를 누르면 쓴 글이 Claude(Anthropic)로 보내져요. 쓴 글은 따로 저장하지 않아요. 인터넷이 없으면 그대로 메모로 남겨요.</Txt>
               {error && (
                 <Txt style={styles.error} accessibilityLiveRegion="polite">
@@ -165,7 +168,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
                 {loading ? (
                   <ActivityIndicator color={colors.onDark} accessibilityLabel="정리하는 중" />
                 ) : (
-                  <Txt style={styles.primaryText}>정리하기</Txt>
+                  <Txt style={[styles.primaryText, !canOrganize && styles.primaryTextDisabled]}>정리하기</Txt>
                 )}
               </Pressable>
             </>
@@ -218,7 +221,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
                   style={dimPressed([styles.primary, styles.grow, (picked.length === 0 || saving) && styles.disabled])}
                   onPress={add}
                 >
-                  {saving ? <ActivityIndicator color={colors.onDark} accessibilityLabel="넣는 중" /> : <Txt style={styles.primaryText}>{picked.length}개 넣기</Txt>}
+                  {saving ? <ActivityIndicator color={colors.onDark} accessibilityLabel="넣는 중" /> : <Txt style={[styles.primaryText, picked.length === 0 && styles.primaryTextDisabled]}>{picked.length}개 넣기</Txt>}
                 </Pressable>
               </View>
             </>
@@ -232,17 +235,15 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
   sheet: { paddingHorizontal: SCREEN_X, paddingBottom: 32, gap: 12 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 56 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 52 },
   headerButton: { minWidth: 56, minHeight: HIT, justifyContent: 'center' },
   lead: { fontSize: 24, marginTop: 8 },
   hint: { color: colors.inkSoft, fontSize: 14 },
+  paper: { minHeight: 182, borderWidth: 1, borderColor: colors.lineSoft, borderRadius: 4 },
   input: {
-    minHeight: 160,
-    borderWidth: 1,
-    borderColor: colors.lineSoft,
-    borderRadius: 4,
-    backgroundColor: colors.card,
-    padding: 14,
+    minHeight: 182,
+    paddingHorizontal: 14,
+    paddingVertical: 0,
     fontSize: 16,
     lineHeight: 26,
     fontFamily: fonts.body,
@@ -251,11 +252,12 @@ const styles = StyleSheet.create({
   },
   note: { color: colors.muted, fontSize: 12 },
   error: { color: colors.danger, fontSize: 14 },
-  primary: { minHeight: 52, borderRadius: 26, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+  primary: { height: 48, borderRadius: 24, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   primaryText: { color: colors.onDark, fontSize: 16 },
-  disabled: { opacity: 0.4 },
+  disabled: { backgroundColor: '#D8CDB9' },
+  primaryTextDisabled: { color: '#6E6456' },
   grow: { flex: 1 },
-  secondary: { minHeight: 52, borderRadius: 26, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+  secondary: { height: 48, borderRadius: 24, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, borderBottomWidth: 1, borderBottomColor: colors.lineFaint },
   check: { width: 24, height: 24, borderRadius: 4, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
