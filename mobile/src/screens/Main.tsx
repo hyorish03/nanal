@@ -3,7 +3,7 @@ import { DefaultTheme, NavigationContainer, StackActions, type Theme, useNavigat
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, AppState, BackHandler, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, AppState, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import type { Db } from '../db/types';
@@ -65,10 +65,9 @@ export function Main({ db, userId }: { db: Db; userId: string }) {
   return <MainContent db={db} userId={userId} />;
 }
 
-// 'today'는 오늘 → 지난 기록 → 월간 돌아보기 네이티브 스택이다(밀어 넣기, 가장자리 밀어 돌아가기).
-// 하루 마무리는 스택 밖에서 화면 전체를 바꾼다(저녁 바탕이 화면 전체에 보이게).
-type Screen = 'onboarding' | 'today' | 'evening';
-type StackParams = { today: undefined; archive: undefined; review: { month: string } };
+// 'today'는 오늘 → 하루 마무리·지난 기록 → 월간 돌아보기 네이티브 스택이다(밀어 넣기, 가장자리 밀어 돌아가기).
+type Screen = 'onboarding' | 'today';
+type StackParams = { today: undefined; evening: undefined; archive: undefined; review: { month: string } };
 
 const Stack = createNativeStackNavigator<StackParams>();
 // 화면 사이에 흰 바탕이 비치지 않게 종이색으로 칠한다.
@@ -92,14 +91,14 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const [linkAction, setLinkAction] = useState<LinkAction | null>(null);
   const screenRef = useRef<Screen | null>(null);
   screenRef.current = screen;
+  const [route, setRoute] = useState<keyof StackParams>('today'); // 저녁 바탕을 켤지 정하려고 맨 위 화면을 따라간다
   const reduce = useReduceMotion();
 
   // 위젯·컨트롤에서 열면 오늘 화면으로 가서(표지가 아직 덮여 있으면 펼친 뒤) 동작을 넘긴다. 온보딩 중이면 화면은 그대로 둔다.
   const runAction = useCallback((action: LinkAction | null) => {
     // 온보딩 중에 온 동작은 버린다(끝난 뒤 말로 적기가 갑자기 뜨지 않게).
     if (screenRef.current === 'onboarding') return;
-    setScreen((s) => (s === null || s === 'onboarding' ? s : 'today'));
-    // 지난 기록·월간 돌아보기에 있었으면 오늘까지 꺼낸다
+    // 하루 마무리·지난 기록·월간 돌아보기에 있었으면 오늘까지 꺼낸다
     if (nav.isReady() && nav.canGoBack()) nav.dispatch(StackActions.popToTop());
     setCoverOpen(true);
     if (action === 'voice') setFocusPending(false); // 말로 적기 시트 뒤에서 키보드가 뜨지 않게
@@ -178,16 +177,6 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     return () => sub.remove();
   }, [refresh]);
 
-  // Android 뒤로 가기: 저녁에서는 오늘로. 지난 기록·월간 돌아보기는 스택이 한 칸씩 돌아간다.
-  useEffect(() => {
-    if (screen !== 'evening') return;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      setScreen('today');
-      return true;
-    });
-    return () => sub.remove();
-  }, [screen]);
-
   const onChanged = useCallback(() => {
     refresh();
     requestSync();
@@ -198,23 +187,21 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     setScreen('today');
   }, []);
 
-  // 하루 마무리를 닫으면 할 일을 적던 오늘 화면으로 돌아간다(키보드는 올리지 않는다).
-  const closeDay = useCallback(() => {
-    Keyboard.dismiss();
-    setScreen('today');
-  }, []);
-
   return (
     <View style={styles.root}>
       {/* 남색 표지가 보이는 동안은 밝은 상태 막대 */}
       <StatusBar style={coverSettled ? 'dark' : 'light'} animated />
-      <EveningBackdrop on={screen === 'evening'} />
+      <EveningBackdrop on={screen === 'today' && route === 'evening'} />
       <Paper />
       <SafeAreaView style={styles.container}>
         <ScreenEnter key={screen ?? 'none'} reduce={reduce}>
           {screen === 'onboarding' && <OnboardingScreen onDone={finishOnboarding} />}
           {screen === 'today' && (
-            <NavigationContainer ref={nav} theme={navTheme}>
+            <NavigationContainer
+              ref={nav}
+              theme={navTheme}
+              onStateChange={() => setRoute(nav.getCurrentRoute()?.name ?? 'today')}
+            >
               <Stack.Navigator
                 screenOptions={{
                   headerShown: false,
@@ -228,7 +215,10 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                       db={db}
                       version={version}
                       onChanged={onChanged}
-                      onOpenEvening={() => setScreen('evening')}
+                      onOpenEvening={() => {
+                        Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
+                        navigation.navigate('evening');
+                      }}
                       onOpenArchive={() => {
                         Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
                         navigation.navigate('archive');
@@ -238,6 +228,19 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                       pendingAction={coverSettled ? linkAction : null}
                       onActionHandled={() => setLinkAction(null)}
                     />
+                  )}
+                </Stack.Screen>
+                {/* 하루 마무리는 등잔 불빛 종이를 깔고 밀려 들어온다. 닫으면(가장자리 밀기 포함) 오늘로 돌아가고 키보드는 올리지 않는다 */}
+                <Stack.Screen
+                  name="evening"
+                  options={{ contentStyle: styles.evening }}
+                  listeners={{ beforeRemove: () => Keyboard.dismiss() }}
+                >
+                  {({ navigation }) => (
+                    <>
+                      <LampShade />
+                      <EveningScreen db={db} version={version} onChanged={onChanged} onClose={() => navigation.goBack()} />
+                    </>
                   )}
                 </Stack.Screen>
                 <Stack.Screen name="archive">
@@ -264,7 +267,6 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
               </Stack.Navigator>
             </NavigationContainer>
           )}
-          {screen === 'evening' && <EveningScreen db={db} version={version} onChanged={onChanged} onClose={closeDay} />}
         </ScreenEnter>
       </SafeAreaView>
       <SyncBar pending={pending} error={error} />
@@ -279,7 +281,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   );
 }
 
-// 온보딩·오늘·저녁이 바뀌면 새 화면만 살짝 올라오며 나타난다(이전 화면은 바로 사라진다). 오늘 아래 화면은 스택이 밀어 넣는다.
+// 온보딩·오늘이 바뀌면 새 화면만 살짝 올라오며 나타난다(이전 화면은 바로 사라진다). 오늘 아래 화면은 스택이 밀어 넣는다.
 function ScreenEnter({ reduce, children }: { reduce: boolean; children: ReactNode }) {
   return (
     <FadeIn duration={200} rise={reduce ? 0 : 6} style={styles.container}>
@@ -325,7 +327,16 @@ function EveningBackdrop({ on }: { on: boolean }) {
   }, [on, opacity]);
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.evening, { opacity }]}>
-      <Svg width="100%" height="100%" accessible={false}>
+      <LampShade />
+    </Animated.View>
+  );
+}
+
+// 안전 영역 안쪽은 하루 마무리 화면이 같은 종이(LAMP_PAPER + 이 그늘)를 깔고 밀려 들어온다(아래 오늘 화면이 비치지 않게).
+function LampShade() {
+  return (
+    <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%">
         <Defs>
           <RadialGradient id="lamp" cx="50%" cy="42%" rx="75%" ry="65%">
             <Stop offset="0.5" stopColor={LAMP_SHADE} stopOpacity={0} />
@@ -334,7 +345,7 @@ function EveningBackdrop({ on }: { on: boolean }) {
         </Defs>
         <Rect width="100%" height="100%" fill="url(#lamp)" />
       </Svg>
-    </Animated.View>
+    </View>
   );
 }
 
