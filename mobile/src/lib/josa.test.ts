@@ -1,10 +1,16 @@
-import { clip, deleteQuestion, eulReul, iGa } from './josa';
+import { clip, deleteQuestion, eulReul, euRo, iGa } from './josa';
 
 test('받침이 있으면 을·이, 없으면 를·가', () => {
   expect(eulReul('운동')).toBe('을');
   expect(eulReul('장보기')).toBe('를');
   expect(iGa('책')).toBe('이');
   expect(iGa('회의')).toBe('가');
+});
+
+test('으로·로: ㄹ 받침과 받침 없는 말 뒤에는 로', () => {
+  expect(euRo('지난 기록')).toBe('으로');
+  expect(euRo('오늘')).toBe('로');
+  expect(euRo('하루 마무리')).toBe('로');
 });
 
 test('한글이 아니거나 빈 글은 받침 없는 쪽', () => {

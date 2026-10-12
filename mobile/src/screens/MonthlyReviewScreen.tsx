@@ -12,10 +12,11 @@ import { getMonthlyReview, saveMonthlyReview } from '../monthly/repo';
 import { supabase } from '../supabase';
 import { FadeIn } from '../ui/FadeIn';
 import { Inkwell } from '../ui/Inkwell';
-import { colors, HIT, SCREEN_X } from '../ui/theme';
+import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { dimPressed } from '../ui/press';
+import { PageHeader } from '../ui/PageHeader';
 
 type Props = { db: Db; month: string; version: number; onChanged: () => void; onClose: () => void };
 type Step = 'loading' | 'consent' | 'making' | 'result';
@@ -97,15 +98,7 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
-      <View style={styles.top}>
-        <Pressable accessibilityRole="button" accessibilityLabel="지난 기록으로 돌아가기" style={dimPressed(styles.back)} onPress={onClose}>
-          <Txt style={styles.backText}>지난 기록</Txt>
-        </Pressable>
-        <Txt variant="title" accessibilityRole="header" style={styles.title}>
-          {label} 돌아보기
-        </Txt>
-        <View style={styles.backSpacer} />
-      </View>
+      <PageHeader title={`${label} 돌아보기`} onBack={onClose} backLabel="지난 기록" />
 
       {error && (
         <Txt style={styles.error} accessibilityLiveRegion="polite">
@@ -322,12 +315,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
-  container: { paddingHorizontal: SCREEN_X, paddingTop: 8, paddingBottom: 32, gap: 16 },
-  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  back: { minHeight: HIT, paddingHorizontal: 4, justifyContent: 'center' },
-  backText: { fontSize: 15 },
-  backSpacer: { width: 64 },
-  title: { fontSize: 20 },
+  container: { paddingHorizontal: SCREEN_X, paddingTop: 4, paddingBottom: 32, gap: 16 },
   error: { color: colors.danger, fontSize: 14 },
   block: { gap: 18 },
   lead: { fontSize: 22 },

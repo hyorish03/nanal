@@ -7,6 +7,11 @@ function hasBatchim(word: string): boolean {
 
 export const eulReul = (word: string) => (hasBatchim(word) ? '을' : '를');
 export const iGa = (word: string) => (hasBatchim(word) ? '이' : '가');
+// ㄹ 받침 뒤에는 '로'(오늘로)
+export const euRo = (word: string) => {
+  const code = word.trimEnd().slice(-1).charCodeAt(0) - 0xac00;
+  return hasBatchim(word) && code % 28 !== 8 ? '으로' : '로';
+};
 
 // 확인 창에 넣을 수 있게 긴 글을 줄인다
 export function clip(text: string, max = 20): string {

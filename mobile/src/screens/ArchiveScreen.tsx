@@ -15,6 +15,7 @@ import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { dimPressed } from '../ui/press';
 import { Chip } from '../ui/Chip';
+import { PageHeader } from '../ui/PageHeader';
 import { useReduceMotion } from '../ui/useReduceMotion';
 
 type Props = { db: Db; version: number; onClose: () => void; onOpenReview?: (month: string) => void };
@@ -127,15 +128,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
       onScroll={(e) => (scrollY.current = e.nativeEvent.contentOffset.y)}
       onLayout={(e) => (viewH.current = e.nativeEvent.layout.height)}
     >
-      <View style={styles.top}>
-        <Pressable accessibilityRole="button" style={dimPressed(styles.back)} onPress={onClose}>
-          <Txt style={styles.backText}>오늘로</Txt>
-        </Pressable>
-        <Txt variant="title" accessibilityRole="header" style={styles.title}>
-          지난 기록
-        </Txt>
-        <View style={styles.backSpacer} />
-      </View>
+      <PageHeader title="지난 기록" onBack={onClose} />
 
       <View accessibilityRole="tablist" style={styles.tabs}>
         {(
@@ -325,12 +318,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
-  container: { paddingHorizontal: SCREEN_X - 2, paddingTop: 8, paddingBottom: 40, gap: 14 },
-  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  back: { minHeight: 44, paddingHorizontal: 4, justifyContent: 'center' },
-  backText: { fontSize: 15 },
-  backSpacer: { width: 48 },
-  title: { fontSize: 20 },
+  container: { paddingHorizontal: SCREEN_X, paddingTop: 4, paddingBottom: 40, gap: 14 },
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
   tab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabOn: { borderBottomColor: colors.navy },

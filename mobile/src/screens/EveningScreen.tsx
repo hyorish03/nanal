@@ -18,6 +18,7 @@ import { Txt } from '../ui/Txt';
 import { TemplateSheet } from './evening/TemplateSheet';
 import { dimPressed } from '../ui/press';
 import { Chip } from '../ui/Chip';
+import { PageHeader } from '../ui/PageHeader';
 
 type Props = { db: Db; version: number; onChanged: () => void; onClose: () => void };
 
@@ -118,17 +119,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Txt variant="title" accessibilityRole="header" style={styles.title}>
-              오늘을 덮으며
-            </Txt>
-            <Txt style={styles.sub}>{formatLongDate(today)}</Txt>
-          </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="하루 마무리 닫기" style={dimPressed(styles.close)} onPress={onClose}>
-            <Txt style={styles.closeText}>닫기</Txt>
-          </Pressable>
-        </View>
+        <PageHeader title="오늘을 덮으며" subtitle={formatLongDate(today)} onBack={onClose} backAccessibilityLabel="하루 마무리 닫기" />
 
         <View style={styles.section}>
           <Txt variant="hand" accessibilityRole="header" style={styles.h2}>
@@ -303,13 +294,7 @@ function MoodWell({ selected, animate, children }: { selected: boolean; animate:
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paperEvening },
-  container: { paddingHorizontal: SCREEN_X, paddingTop: 16, paddingBottom: 24, gap: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
-  headerText: { flexShrink: 1, gap: 2 },
-  title: { fontSize: 28 },
-  sub: { fontSize: 14, color: colors.muted },
-  close: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center' },
-  closeText: { fontSize: 15 },
+  container: { paddingHorizontal: SCREEN_X, paddingTop: 4, paddingBottom: 24, gap: 20 },
   section: { gap: 10 },
   h2: { fontSize: 26 },
   moods: { flexDirection: 'row', justifyContent: 'space-between' },
