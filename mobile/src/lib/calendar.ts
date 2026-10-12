@@ -8,3 +8,14 @@ export function monthGrid(month: string): (string | null)[] {
   for (let d = 1; d <= days; d++) cells.push(`${month}-${String(d).padStart(2, '0')}`);
   return cells;
 }
+
+// 달력을 주 단위 줄로 나눈다. 줄마다 꼭 7칸이라 칸 너비 반올림으로 줄이 밀리지 않는다(마지막 주 뒤는 null).
+export function monthWeeks(month: string): (string | null)[][] {
+  const cells = monthGrid(month);
+  const weeks: (string | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    const week = cells.slice(i, i + 7);
+    weeks.push([...week, ...Array<null>(7 - week.length).fill(null)]);
+  }
+  return weeks;
+}

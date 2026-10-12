@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { type LayoutRectangle, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { reflectionFilters } from '../archive/filters';
 import { type DaySummary, listMonthSummary } from '../archive/repo';
 import { moodWord } from '../days/moods';
 import type { Db } from '../db/types';
-import { monthGrid } from '../lib/calendar';
+import { monthWeeks } from '../lib/calendar';
 import { addMonths, formatLongDate, formatMonth, logicalDate, monthOf } from '../lib/date';
 import { listReflectionHistory, listReflections, type Reflection, type ReflectionEntry } from '../reflections/repo';
 import { monthLabel, reviewTargetMonth } from '../monthly/labels';
@@ -14,11 +14,13 @@ import { RuledPaper } from '../ui/RuledPaper';
 import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { dimPressed } from '../ui/press';
+import { useReduceMotion } from '../ui/useReduceMotion';
 
 type Props = { db: Db; version: number; onClose: () => void; onOpenReview?: (month: string) => void };
 type Tab = 'calendar' | 'collection';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+const REVIEW_MIN_DAYS = 7; // 돌아보기 배너는 지난달에 이만큼은 기록했을 때만 띄운다
 
 function answersOf(r: Reflection): string[] {
   return r.questions.map((q) => r.answers[q.key]).filter((a): a is string => !!a);
@@ -37,11 +39,15 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
 
   const reviewMonth = reviewTargetMonth(today);
   const [hasReview, setHasReview] = useState(false);
+  const [reviewDays, setReviewDays] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     getMonthlyReview(db, reviewMonth)
       .then((r) => !cancelled && setHasReview(r !== null))
+      .catch(() => {});
+    listMonthSummary(db, reviewMonth)
+      .then((s) => !cancelled && setReviewDays(s.length))
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -80,7 +86,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
   }, [db, tab, version]);
 
   const byDate = useMemo(() => new Map(summary.map((s) => [s.date, s])), [summary]);
-  const cells = useMemo(() => monthGrid(month), [month]);
+  const weeks = useMemo(() => monthWeeks(month), [month]);
   const day = byDate.get(selected);
   const filters = useMemo(() => reflectionFilters(history), [history]);
   const entries = filter ? history.filter((h) => h.template === filter) : history;
@@ -91,8 +97,35 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
   };
   const isCurrentMonth = month >= monthOf(today);
 
+  // 날짜를 누르면 아래 상세가 화면 안에 들어오도록 내린다(달력은 되도록 남긴다)
+  const reduce = useReduceMotion();
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const viewH = useRef(0);
+  const detailBox = useRef<LayoutRectangle | null>(null);
+  const revealUntil = useRef(0); // 상세 높이가 바뀌어도(회고를 불러온 뒤) 잠깐은 다시 맞춘다
+  const revealDetail = () => {
+    const box = detailBox.current;
+    if (!box || !viewH.current) return;
+    const target = Math.max(0, Math.min(box.y - 12, box.y + box.height + 24 - viewH.current));
+    if (target > scrollY.current + 4) scrollRef.current?.scrollTo({ y: target, animated: !reduce });
+  };
+  const pickDate = (date: string) => {
+    setSelected(date);
+    revealUntil.current = Date.now() + 1000;
+    requestAnimationFrame(revealDetail);
+  };
+  const showBanner = !!onOpenReview && (hasReview || reviewDays >= REVIEW_MIN_DAYS);
+
   return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
+    <ScrollView
+      ref={scrollRef}
+      style={styles.flex}
+      contentContainerStyle={styles.container}
+      scrollEventThrottle={16}
+      onScroll={(e) => (scrollY.current = e.nativeEvent.contentOffset.y)}
+      onLayout={(e) => (viewH.current = e.nativeEvent.layout.height)}
+    >
       <View style={styles.top}>
         <Pressable accessibilityRole="button" style={dimPressed(styles.back)} onPress={onClose}>
           <Txt style={styles.backText}>오늘로</Txt>
@@ -131,7 +164,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
 
       {tab === 'calendar' && (
         <>
-          {onOpenReview && (
+          {showBanner && onOpenReview && (
             <Pressable
               accessibilityRole="button"
               style={dimPressed(styles.reviewBanner)}
@@ -164,47 +197,59 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
             </Pressable>
           </View>
           <View style={styles.grid}>
-            {WEEKDAYS.map((w) => (
-              <Txt key={w} style={[styles.cell, styles.weekday]}>
-                {w}
-              </Txt>
+            <View style={styles.week}>
+              {WEEKDAYS.map((w) => (
+                <Txt key={w} style={[styles.cell, styles.weekday]}>
+                  {w}
+                </Txt>
+              ))}
+            </View>
+            {weeks.map((week, row) => (
+              <View key={row} style={styles.week}>
+                {week.map((date, col) => {
+                  if (!date) return <View key={`b${col}`} style={styles.cell} />;
+                  const s = byDate.get(date);
+                  const future = date > today;
+                  const on = date === selected;
+                  const word = moodWord(s?.mood ?? null);
+                  const d = Number(date.slice(8));
+                  return (
+                    <Pressable
+                      key={date}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${Number(date.slice(5, 7))}월 ${d}일${word ? `, 기분 ${word}` : ''}${s?.hasReflection ? ', 회고 있음' : ''}`}
+                      accessibilityState={{ selected: on, disabled: future }}
+                      disabled={future}
+                      style={dimPressed([styles.cell, styles.dayCell, on && styles.dayOn])}
+                      onPress={() => pickDate(date)}
+                    >
+                      <Txt
+                        variant={date === today ? 'medium' : 'body'}
+                        style={[styles.dayNum, date === today && styles.today, future && styles.future]}
+                      >
+                        {d}
+                      </Txt>
+                      {!future && (
+                        <View style={{ opacity: s?.mood ? 1 : 0.35 }}>
+                          <Inkwell id={`cal${date}`} mood={s?.mood ?? null} size="small" />
+                        </View>
+                      )}
+                      <View style={[styles.dot, s?.hasReflection && styles.dotOn]} />
+                    </Pressable>
+                  );
+                })}
+              </View>
             ))}
-            {cells.map((date, i) => {
-              if (!date) return <View key={`b${i}`} style={styles.cell} />;
-              const s = byDate.get(date);
-              const future = date > today;
-              const on = date === selected;
-              const word = moodWord(s?.mood ?? null);
-              const d = Number(date.slice(8));
-              return (
-                <Pressable
-                  key={date}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${Number(date.slice(5, 7))}월 ${d}일${word ? `, 기분 ${word}` : ''}${s?.hasReflection ? ', 회고 있음' : ''}`}
-                  accessibilityState={{ selected: on, disabled: future }}
-                  disabled={future}
-                  style={dimPressed([styles.cell, styles.dayCell, on && styles.dayOn])}
-                  onPress={() => setSelected(date)}
-                >
-                  <Txt
-                    variant={date === today ? 'medium' : 'body'}
-                    style={[styles.dayNum, date === today && styles.today, future && styles.future]}
-                  >
-                    {d}
-                  </Txt>
-                  {!future && (
-                    <View style={{ opacity: s?.mood ? 1 : 0.35 }}>
-                      <Inkwell id={`cal${date}`} mood={s?.mood ?? null} size="small" />
-                    </View>
-                  )}
-                  <View style={[styles.dot, s?.hasReflection && styles.dotOn]} />
-                </Pressable>
-              );
-            })}
           </View>
           <Txt style={styles.legend}>잉크가 찰수록 좋았던 날. 아래 점은 회고를 남긴 날이에요.</Txt>
 
-          <View style={styles.detail}>
+          <View
+            style={styles.detail}
+            onLayout={(e) => {
+              detailBox.current = e.nativeEvent.layout;
+              if (Date.now() < revealUntil.current) revealDetail();
+            }}
+          >
             <View style={styles.detailHead}>
               <Txt variant="title" style={styles.detailTitle}>
                 {formatLongDate(selected)}
@@ -212,7 +257,11 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
               <Txt style={styles.small}>{day?.mood ? `기분 · ${moodWord(day.mood)}` : '기분 기록 없음'}</Txt>
             </View>
             <Txt style={styles.small}>
-              {day ? `할 일 ${day.tasksTotal}개 중 ${day.tasksDone}개 끝냄` : '기록이 없는 날이에요'}
+              {!day
+                ? '기록이 없는 날이에요'
+                : day.tasksTotal === 0
+                  ? '이 날은 할 일을 적지 않았어요'
+                  : `할 일 ${day.tasksTotal}개 중 ${day.tasksDone}개 끝냄`}
             </Txt>
             {dayReflections.length === 0 ? (
               <Txt style={styles.muted}>이 날은 회고를 남기지 않았어요. 괜찮아요.</Txt>
@@ -255,6 +304,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
           <Txt style={styles.small}>
             {filter ? `${filterName} ${entries.length}번` : history.length ? `회고 ${history.length}개` : '아직 남긴 회고가 없어요'}
           </Txt>
+          {!filter && history.length === 0 && <Txt style={styles.muted}>저녁 마무리에서 남긴 회고가 여기 모여요</Txt>}
           {entries.map((e) => (
             <View key={e.id} style={styles.entry}>
               <View style={styles.entryHead}>
@@ -280,7 +330,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
-  container: { paddingHorizontal: SCREEN_X - 2, paddingTop: 8, paddingBottom: 24, gap: 14 },
+  container: { paddingHorizontal: SCREEN_X - 2, paddingTop: 8, paddingBottom: 40, gap: 14 },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   back: { minHeight: 44, paddingHorizontal: 4, justifyContent: 'center' },
   backText: { fontSize: 15 },
@@ -297,8 +347,9 @@ const styles = StyleSheet.create({
   arrowText: { fontSize: 18, color: colors.muted },
   arrowOff: { color: colors.lineSoft },
   monthText: { fontSize: 18 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 2 },
-  cell: { width: `${100 / 7}%`, alignItems: 'center' },
+  grid: { gap: 2 },
+  week: { flexDirection: 'row' }, // 한 주에 꼭 7칸. 칸은 똑같이 나눠 가져서 줄이 넘치지 않는다
+  cell: { flex: 1, minWidth: 0, alignItems: 'center' },
   weekday: { fontSize: 12, color: colors.muted, textAlign: 'center', paddingBottom: 4 },
   dayCell: { minHeight: 52, paddingVertical: 4, borderRadius: 8, gap: 2 },
   dayOn: { backgroundColor: colors.chipSelected },

@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } fro
 import { createMonthlyReview } from '../ai/client';
 import { AI_MESSAGES } from '../ai/errors';
 import type { Db } from '../db/types';
-import { monthGrid } from '../lib/calendar';
+import { monthWeeks } from '../lib/calendar';
 import { addMonths, formatShortDate } from '../lib/date';
 import type { MonthlyReviewContent } from '../monthly/content';
 import { monthLabel } from '../monthly/labels';
@@ -174,7 +174,7 @@ function ReviewResult({
   const section = () => ({ on: stagger, delay: order++ * SECTION_GAP_MS, rise: 8, duration: SECTION_MS });
   const { stats, insights } = content;
   const byDate = useMemo(() => new Map(stats.days.map((d) => [d.date, d])), [stats.days]);
-  const cells = useMemo(() => monthGrid(month), [month]);
+  const weeks = useMemo(() => monthWeeks(month), [month]);
   const nextLabel = monthLabel(addMonths(month, 1));
   const lethargyDays = stats.lethargyDates.map((d) => Number(d.slice(8))).join('·');
   const written = writtenAt ? formatShortDate(writtenAt.slice(0, 10)) : null;
@@ -184,33 +184,39 @@ function ReviewResult({
       <FadeIn {...section()}>
         <Section title="한 달의 잉크">
           <View style={styles.grid} accessibilityLabel={`${monthLabel(month)} 기분 달력`}>
-            {WEEKDAYS.map((w) => (
-              <Txt key={w} style={[styles.cell, styles.weekday]} accessible={false}>
-                {w}
-              </Txt>
+            <View style={styles.week}>
+              {WEEKDAYS.map((w) => (
+                <Txt key={w} style={[styles.cell, styles.weekday]} accessible={false}>
+                  {w}
+                </Txt>
+              ))}
+            </View>
+            {weeks.map((week, row) => (
+              <View key={row} style={styles.week}>
+                {week.map((date, col) => {
+                  const d = date ? byDate.get(date) : undefined;
+                  const wave = (row + col) * CELL_STEP_MS;
+                  return (
+                    <FadeIn
+                      key={date ?? `e${col}`}
+                      on={stagger && !!date}
+                      delay={Math.min(wave, CELL_TOTAL_MS - SECTION_MS)}
+                      duration={SECTION_MS}
+                      style={styles.cell}
+                      accessible={false}
+                    >
+                      {date && (
+                        <>
+                          <Inkwell id={`rv${date}`} mood={d?.mood ?? null} size="small" paper={colors.paper} />
+                          <Txt style={styles.dayNum}>{Number(date.slice(8))}</Txt>
+                          <View style={[styles.dot, d?.lethargy && styles.dotOn]} />
+                        </>
+                      )}
+                    </FadeIn>
+                  );
+                })}
+              </View>
             ))}
-            {cells.map((date, i) => {
-              const d = date ? byDate.get(date) : undefined;
-              const wave = (Math.floor(i / 7) + (i % 7)) * CELL_STEP_MS;
-              return (
-                <FadeIn
-                  key={date ?? `e${i}`}
-                  on={stagger && !!date}
-                  delay={Math.min(wave, CELL_TOTAL_MS - SECTION_MS)}
-                  duration={SECTION_MS}
-                  style={styles.cell}
-                  accessible={false}
-                >
-                  {date && (
-                    <>
-                      <Inkwell id={`rv${date}`} mood={d?.mood ?? null} size="small" paper={colors.paper} />
-                      <Txt style={styles.dayNum}>{Number(date.slice(8))}</Txt>
-                      <View style={[styles.dot, d?.lethargy && styles.dotOn]} />
-                    </>
-                  )}
-                </FadeIn>
-              );
-            })}
           </View>
           <Txt style={styles.legend}>진할수록 좋았던 날 · ● 무기력했던 날</Txt>
         </Section>
@@ -325,8 +331,9 @@ const styles = StyleSheet.create({
   making: { alignItems: 'center', gap: 12, paddingVertical: 48 },
   section: { gap: 10, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.lineFaint },
   sectionTitle: { fontSize: 17 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 4 },
-  cell: { width: `${100 / 7}%`, alignItems: 'center', gap: 1 },
+  grid: { gap: 4 },
+  week: { flexDirection: 'row' }, // 칸은 똑같이 나눠 가져서 줄이 넘치지 않는다
+  cell: { flex: 1, minWidth: 0, alignItems: 'center', gap: 1 },
   weekday: { fontSize: 12, color: colors.muted, textAlign: 'center' },
   dayNum: { fontSize: 11, color: colors.muted },
   dot: { width: 4, height: 4, borderRadius: 2 },
