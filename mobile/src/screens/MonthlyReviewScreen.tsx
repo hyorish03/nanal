@@ -14,6 +14,7 @@ import { FadeIn } from '../ui/FadeIn';
 import { Inkwell } from '../ui/Inkwell';
 import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { Paper } from '../ui/Paper';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { dimPressed } from '../ui/press';
 import { PageHeader } from '../ui/PageHeader';
@@ -97,51 +98,54 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
   };
 
   return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
-      <PageHeader title={`${label} 돌아보기`} onBack={onClose} backLabel="지난 기록" />
+    <View style={styles.flex}>
+      <Paper />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+        <PageHeader title={`${label} 돌아보기`} onBack={onClose} backLabel="지난 기록" />
 
-      {error && (
-        <Txt style={styles.error} accessibilityLiveRegion="polite">
-          {error}
-        </Txt>
-      )}
-
-      {step === 'loading' && <ActivityIndicator accessibilityLabel="불러오는 중" />}
-
-      {step === 'consent' && (
-        <View style={styles.block}>
-          <Txt variant="title" style={styles.lead}>
-            한 달을 같이 읽어 볼까요?
+        {error && (
+          <Txt style={styles.error} accessibilityLiveRegion="polite">
+            {error}
           </Txt>
-          <Txt style={styles.body}>
-            {label}에 남긴 기분, 회고, 할 일 기록을 읽고 반복된 흐름을 정리해 드려요. 판단이나 진단이 아니라, 기록에서 보이는 모양을 함께 보는 거예요.
-          </Txt>
-          <View style={styles.infoBox}>
-            <InfoLine label="읽는 것" text="기분 점수, 회고 답변, 할 일 개수와 이월 횟수" />
-            <InfoLine label="보내는 곳" text="Claude(Anthropic). 결과는 내 기록에만 저장돼요" />
-            <InfoLine label="보내지 않는 것" text="할 일 내용" />
+        )}
+
+        {step === 'loading' && <ActivityIndicator accessibilityLabel="불러오는 중" />}
+
+        {step === 'consent' && (
+          <View style={styles.block}>
+            <Txt variant="title" style={styles.lead}>
+              한 달을 같이 읽어 볼까요?
+            </Txt>
+            <Txt style={styles.body}>
+              {label}에 남긴 기분, 회고, 할 일 기록을 읽고 반복된 흐름을 정리해 드려요. 판단이나 진단이 아니라, 기록에서 보이는 모양을 함께 보는 거예요.
+            </Txt>
+            <View style={styles.infoBox}>
+              <InfoLine label="읽는 것" text="기분 점수, 회고 답변, 할 일 개수와 이월 횟수" />
+              <InfoLine label="보내는 곳" text="Claude(Anthropic). 결과는 내 기록에만 저장돼요" />
+              <InfoLine label="보내지 않는 것" text="할 일 내용" />
+            </View>
+            <Txt style={styles.muted}>한 달에 한 번 무료로 만들 수 있어요.</Txt>
+            <Pressable accessibilityRole="button" style={dimPressed(styles.primary)} onPress={make}>
+              <Txt style={styles.primaryText}>{label} 돌아보기 만들기</Txt>
+            </Pressable>
           </View>
-          <Txt style={styles.muted}>한 달에 한 번 무료로 만들 수 있어요.</Txt>
-          <Pressable accessibilityRole="button" style={dimPressed(styles.primary)} onPress={make}>
-            <Txt style={styles.primaryText}>{label} 돌아보기 만들기</Txt>
-          </Pressable>
-        </View>
-      )}
+        )}
 
-      {step === 'making' && (
-        <View style={styles.making} accessibilityLiveRegion="polite">
-          <ActivityIndicator color={colors.navy} />
-          <Txt variant="title" style={styles.lead}>
-            {label}의 기록을 읽고 있어요
-          </Txt>
-          <Txt style={styles.muted}>30초쯤 걸려요. 화면을 닫아도 다 되면 지난 기록에 남아요.</Txt>
-        </View>
-      )}
+        {step === 'making' && (
+          <View style={styles.making} accessibilityLiveRegion="polite">
+            <ActivityIndicator color={colors.navy} />
+            <Txt variant="title" style={styles.lead}>
+              {label}의 기록을 읽고 있어요
+            </Txt>
+            <Txt style={styles.muted}>30초쯤 걸려요. 화면을 닫아도 다 되면 지난 기록에 남아요.</Txt>
+          </View>
+        )}
 
-      {step === 'result' && content && (
-        <ReviewResult content={content} month={month} writtenAt={writtenAt} reveal={justMade} onRemake={showPaid} />
-      )}
-    </ScrollView>
+        {step === 'result' && content && (
+          <ReviewResult content={content} month={month} writtenAt={writtenAt} reveal={justMade} onRemake={showPaid} />
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -315,6 +319,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
+  scroll: { flex: 1 },
   container: { paddingHorizontal: SCREEN_X, paddingTop: 4, paddingBottom: 32, gap: 16 },
   error: { color: colors.danger, fontSize: 14 },
   block: { gap: 18 },

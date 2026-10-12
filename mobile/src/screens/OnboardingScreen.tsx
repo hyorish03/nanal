@@ -7,6 +7,7 @@ import { EASE_OUT } from '../ui/motion';
 import { StatusSymbol } from '../ui/StatusSymbol';
 import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { Paper } from '../ui/Paper';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { dimPressed } from '../ui/press';
 
@@ -76,6 +77,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
   return (
     <View style={styles.container}>
+      <Paper />
       <View style={styles.top}>
         <View accessible accessibilityRole="progressbar" accessibilityLabel={`${STEPS}단계 중 ${step + 1}단계`} style={styles.dots}>
           {Array.from({ length: STEPS }, (_, i) => (

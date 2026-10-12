@@ -13,6 +13,7 @@ import { Inkwell } from '../ui/Inkwell';
 import { RuledPaper } from '../ui/RuledPaper';
 import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { Paper } from '../ui/Paper';
 import { dimPressed } from '../ui/press';
 import { Chip } from '../ui/Chip';
 import { PageHeader } from '../ui/PageHeader';
@@ -120,204 +121,208 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
   const showBanner = !!onOpenReview && (hasReview || reviewDays >= REVIEW_MIN_DAYS);
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      style={styles.flex}
-      contentContainerStyle={styles.container}
-      scrollEventThrottle={16}
-      onScroll={(e) => (scrollY.current = e.nativeEvent.contentOffset.y)}
-      onLayout={(e) => (viewH.current = e.nativeEvent.layout.height)}
-    >
-      <PageHeader title="지난 기록" onBack={onClose} />
+    <View style={styles.flex}>
+      <Paper />
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.container}
+        scrollEventThrottle={16}
+        onScroll={(e) => (scrollY.current = e.nativeEvent.contentOffset.y)}
+        onLayout={(e) => (viewH.current = e.nativeEvent.layout.height)}
+      >
+        <PageHeader title="지난 기록" onBack={onClose} />
 
-      <View accessibilityRole="tablist" style={styles.tabs}>
-        {(
-          [
-            ['calendar', '달력'],
-            ['collection', '회고 모아보기'],
-          ] as const
-        ).map(([key, label]) => {
-          const on = tab === key;
-          return (
-            <Pressable
-              key={key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: on }}
-              style={dimPressed([styles.tab, on && styles.tabOn])}
-              onPress={() => setTab(key)}
-            >
-              <Txt variant={on ? 'medium' : 'body'} style={[styles.tabText, !on && styles.tabTextOff]}>
-                {label}
-              </Txt>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {error && <Txt style={styles.error}>{error}</Txt>}
-
-      {tab === 'calendar' && (
-        <>
-          {showBanner && onOpenReview && (
-            <Pressable
-              accessibilityRole="button"
-              style={dimPressed(styles.reviewBanner)}
-              onPress={() => onOpenReview(reviewMonth)}
-            >
-              <Txt variant="medium" style={styles.reviewBannerTitle}>
-                {monthLabel(reviewMonth)} 돌아보기 {hasReview ? '보기' : '만들기'}
-              </Txt>
-              <Txt style={styles.reviewBannerSub}>
-                {hasReview ? '지난달 흐름을 다시 읽어요' : '한 달의 기분과 회고를 AI와 같이 읽어 봐요'}
-              </Txt>
-            </Pressable>
-          )}
-          <View style={styles.monthRow}>
-            <Pressable accessibilityRole="button" accessibilityLabel="이전 달" style={dimPressed(styles.arrow)} onPress={() => changeMonth(addMonths(month, -1))}>
-              <Txt style={styles.arrowText}>‹</Txt>
-            </Pressable>
-            <Txt variant="title" style={styles.monthText}>
-              {formatMonth(month)}
-            </Txt>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="다음 달"
-              accessibilityState={{ disabled: isCurrentMonth }}
-              disabled={isCurrentMonth}
-              style={dimPressed(styles.arrow)}
-              onPress={() => changeMonth(addMonths(month, 1))}
-            >
-              <Txt style={[styles.arrowText, isCurrentMonth && styles.arrowOff]}>›</Txt>
-            </Pressable>
-          </View>
-          <View style={styles.grid}>
-            <View style={styles.week}>
-              {WEEKDAYS.map((w) => (
-                <Txt key={w} style={[styles.cell, styles.weekday]}>
-                  {w}
+        <View accessibilityRole="tablist" style={styles.tabs}>
+          {(
+            [
+              ['calendar', '달력'],
+              ['collection', '회고 모아보기'],
+            ] as const
+          ).map(([key, label]) => {
+            const on = tab === key;
+            return (
+              <Pressable
+                key={key}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                style={dimPressed([styles.tab, on && styles.tabOn])}
+                onPress={() => setTab(key)}
+              >
+                <Txt variant={on ? 'medium' : 'body'} style={[styles.tabText, !on && styles.tabTextOff]}>
+                  {label}
                 </Txt>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {error && <Txt style={styles.error}>{error}</Txt>}
+
+        {tab === 'calendar' && (
+          <>
+            {showBanner && onOpenReview && (
+              <Pressable
+                accessibilityRole="button"
+                style={dimPressed(styles.reviewBanner)}
+                onPress={() => onOpenReview(reviewMonth)}
+              >
+                <Txt variant="medium" style={styles.reviewBannerTitle}>
+                  {monthLabel(reviewMonth)} 돌아보기 {hasReview ? '보기' : '만들기'}
+                </Txt>
+                <Txt style={styles.reviewBannerSub}>
+                  {hasReview ? '지난달 흐름을 다시 읽어요' : '한 달의 기분과 회고를 AI와 같이 읽어 봐요'}
+                </Txt>
+              </Pressable>
+            )}
+            <View style={styles.monthRow}>
+              <Pressable accessibilityRole="button" accessibilityLabel="이전 달" style={dimPressed(styles.arrow)} onPress={() => changeMonth(addMonths(month, -1))}>
+                <Txt style={styles.arrowText}>‹</Txt>
+              </Pressable>
+              <Txt variant="title" style={styles.monthText}>
+                {formatMonth(month)}
+              </Txt>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="다음 달"
+                accessibilityState={{ disabled: isCurrentMonth }}
+                disabled={isCurrentMonth}
+                style={dimPressed(styles.arrow)}
+                onPress={() => changeMonth(addMonths(month, 1))}
+              >
+                <Txt style={[styles.arrowText, isCurrentMonth && styles.arrowOff]}>›</Txt>
+              </Pressable>
+            </View>
+            <View style={styles.grid}>
+              <View style={styles.week}>
+                {WEEKDAYS.map((w) => (
+                  <Txt key={w} style={[styles.cell, styles.weekday]}>
+                    {w}
+                  </Txt>
+                ))}
+              </View>
+              {weeks.map((week, row) => (
+                <View key={row} style={styles.week}>
+                  {week.map((date, col) => {
+                    if (!date) return <View key={`b${col}`} style={styles.cell} />;
+                    const s = byDate.get(date);
+                    const future = date > today;
+                    const on = date === selected;
+                    const word = moodWord(s?.mood ?? null);
+                    const d = Number(date.slice(8));
+                    return (
+                      <Pressable
+                        key={date}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${Number(date.slice(5, 7))}월 ${d}일${word ? `, 기분 ${word}` : ''}${s?.hasReflection ? ', 회고 있음' : ''}`}
+                        accessibilityState={{ selected: on, disabled: future }}
+                        disabled={future}
+                        style={dimPressed([styles.cell, styles.dayCell, on && styles.dayOn])}
+                        onPress={() => pickDate(date)}
+                      >
+                        <Txt
+                          variant={date === today ? 'medium' : 'body'}
+                          style={[styles.dayNum, date === today && styles.today, future && styles.future]}
+                        >
+                          {d}
+                        </Txt>
+                        {!future && (
+                          <View style={{ opacity: s?.mood ? 1 : 0.35 }}>
+                            <Inkwell id={`cal${date}`} mood={s?.mood ?? null} size="small" />
+                          </View>
+                        )}
+                        <View style={[styles.dot, s?.hasReflection && styles.dotOn]} />
+                      </Pressable>
+                    );
+                  })}
+                </View>
               ))}
             </View>
-            {weeks.map((week, row) => (
-              <View key={row} style={styles.week}>
-                {week.map((date, col) => {
-                  if (!date) return <View key={`b${col}`} style={styles.cell} />;
-                  const s = byDate.get(date);
-                  const future = date > today;
-                  const on = date === selected;
-                  const word = moodWord(s?.mood ?? null);
-                  const d = Number(date.slice(8));
-                  return (
-                    <Pressable
-                      key={date}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${Number(date.slice(5, 7))}월 ${d}일${word ? `, 기분 ${word}` : ''}${s?.hasReflection ? ', 회고 있음' : ''}`}
-                      accessibilityState={{ selected: on, disabled: future }}
-                      disabled={future}
-                      style={dimPressed([styles.cell, styles.dayCell, on && styles.dayOn])}
-                      onPress={() => pickDate(date)}
-                    >
-                      <Txt
-                        variant={date === today ? 'medium' : 'body'}
-                        style={[styles.dayNum, date === today && styles.today, future && styles.future]}
-                      >
-                        {d}
-                      </Txt>
-                      {!future && (
-                        <View style={{ opacity: s?.mood ? 1 : 0.35 }}>
-                          <Inkwell id={`cal${date}`} mood={s?.mood ?? null} size="small" />
-                        </View>
-                      )}
-                      <View style={[styles.dot, s?.hasReflection && styles.dotOn]} />
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ))}
-          </View>
-          <Txt style={styles.legend}>잉크가 찰수록 좋았던 날. 아래 점은 회고를 남긴 날이에요.</Txt>
+            <Txt style={styles.legend}>잉크가 찰수록 좋았던 날. 아래 점은 회고를 남긴 날이에요.</Txt>
 
-          <View
-            style={styles.detail}
-            onLayout={(e) => {
-              detailBox.current = e.nativeEvent.layout;
-              if (Date.now() < revealUntil.current) revealDetail();
-            }}
-          >
-            <View style={styles.detailHead}>
-              <Txt variant="title" style={styles.detailTitle}>
-                {formatLongDate(selected)}
+            <View
+              style={styles.detail}
+              onLayout={(e) => {
+                detailBox.current = e.nativeEvent.layout;
+                if (Date.now() < revealUntil.current) revealDetail();
+              }}
+            >
+              <View style={styles.detailHead}>
+                <Txt variant="title" style={styles.detailTitle}>
+                  {formatLongDate(selected)}
+                </Txt>
+                <Txt style={styles.small}>{day?.mood ? `기분 · ${moodWord(day.mood)}` : '기분 기록 없음'}</Txt>
+              </View>
+              <Txt style={styles.small}>
+                {!day
+                  ? '기록이 없는 날이에요'
+                  : day.tasksTotal === 0
+                    ? day.tasksMigrated > 0
+                      ? '다른 날로 옮긴 일만 있어요'
+                      : '이 날은 할 일을 적지 않았어요'
+                    : `할 일 ${day.tasksTotal}개 중 ${day.tasksDone}개 끝냄${day.tasksMigrated > 0 ? `, ${day.tasksMigrated}개는 다른 날로` : ''}`}
               </Txt>
-              <Txt style={styles.small}>{day?.mood ? `기분 · ${moodWord(day.mood)}` : '기분 기록 없음'}</Txt>
+              {dayReflections.length === 0 ? (
+                <Txt style={styles.muted}>이 날은 회고를 남기지 않았어요. 괜찮아요.</Txt>
+              ) : (
+                dayReflections.map((r) => (
+                  <RuledPaper key={r.id} lineHeight={30} style={styles.card}>
+                    <Txt variant="hand" style={styles.cardTitle}>
+                      {r.templateName}
+                    </Txt>
+                    {answersOf(r).map((a, i) => (
+                      <Txt key={i} style={styles.cardLine}>
+                        {a}
+                      </Txt>
+                    ))}
+                  </RuledPaper>
+                ))
+              )}
+            </View>
+          </>
+        )}
+
+        {tab === 'collection' && (
+          <>
+            <View style={styles.filters}>
+              {[{ id: null, name: '전체' }, ...filters].map((f) => {
+                const on = filter === f.id;
+                return (
+                  <Chip key={f.id ?? 'all'} label={f.name} selected={on} onPress={() => setFilter(f.id)} />
+                );
+              })}
             </View>
             <Txt style={styles.small}>
-              {!day
-                ? '기록이 없는 날이에요'
-                : day.tasksTotal === 0
-                  ? day.tasksMigrated > 0
-                    ? '다른 날로 옮긴 일만 있어요'
-                    : '이 날은 할 일을 적지 않았어요'
-                  : `할 일 ${day.tasksTotal}개 중 ${day.tasksDone}개 끝냄${day.tasksMigrated > 0 ? `, ${day.tasksMigrated}개는 다른 날로` : ''}`}
+              {filter ? `${filterName} ${entries.length}번` : history.length ? `회고 ${history.length}개` : '아직 남긴 회고가 없어요'}
             </Txt>
-            {dayReflections.length === 0 ? (
-              <Txt style={styles.muted}>이 날은 회고를 남기지 않았어요. 괜찮아요.</Txt>
-            ) : (
-              dayReflections.map((r) => (
-                <RuledPaper key={r.id} lineHeight={30} style={styles.card}>
-                  <Txt variant="hand" style={styles.cardTitle}>
-                    {r.templateName}
+            {!filter && history.length === 0 && <Txt style={styles.muted}>하루 마무리에서 남긴 회고가 여기 모여요</Txt>}
+            {entries.map((e) => (
+              <View key={e.id} style={styles.entry}>
+                <View style={styles.entryHead}>
+                  <Txt variant="hand" style={styles.entryTitle}>
+                    {e.templateName}
                   </Txt>
-                  {answersOf(r).map((a, i) => (
-                    <Txt key={i} style={styles.cardLine}>
-                      {a}
-                    </Txt>
-                  ))}
-                </RuledPaper>
-              ))
-            )}
-          </View>
-        </>
-      )}
-
-      {tab === 'collection' && (
-        <>
-          <View style={styles.filters}>
-            {[{ id: null, name: '전체' }, ...filters].map((f) => {
-              const on = filter === f.id;
-              return (
-                <Chip key={f.id ?? 'all'} label={f.name} selected={on} onPress={() => setFilter(f.id)} />
-              );
-            })}
-          </View>
-          <Txt style={styles.small}>
-            {filter ? `${filterName} ${entries.length}번` : history.length ? `회고 ${history.length}개` : '아직 남긴 회고가 없어요'}
-          </Txt>
-          {!filter && history.length === 0 && <Txt style={styles.muted}>하루 마무리에서 남긴 회고가 여기 모여요</Txt>}
-          {entries.map((e) => (
-            <View key={e.id} style={styles.entry}>
-              <View style={styles.entryHead}>
-                <Txt variant="hand" style={styles.entryTitle}>
-                  {e.templateName}
-                </Txt>
-                <Txt style={styles.entryMeta}>
-                  {formatLongDate(e.date)} · 기분 {moodWord(e.mood) ?? '-'}
-                </Txt>
+                  <Txt style={styles.entryMeta}>
+                    {formatLongDate(e.date)} · 기분 {moodWord(e.mood) ?? '-'}
+                  </Txt>
+                </View>
+                {answersOf(e).map((a, i) => (
+                  <Txt key={i} style={styles.entryLine}>
+                    {a}
+                  </Txt>
+                ))}
               </View>
-              {answersOf(e).map((a, i) => (
-                <Txt key={i} style={styles.entryLine}>
-                  {a}
-                </Txt>
-              ))}
-            </View>
-          ))}
-        </>
-      )}
-    </ScrollView>
+            ))}
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
+  scroll: { flex: 1 },
   container: { paddingHorizontal: SCREEN_X, paddingTop: 4, paddingBottom: 40, gap: 14 },
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
   tab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },

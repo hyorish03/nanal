@@ -9,6 +9,7 @@ import { supabase } from '../../supabase';
 import { StatusSymbol } from '../../ui/StatusSymbol';
 import { colors, fonts, HIT, SCREEN_X } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
+import { Paper } from '../../ui/Paper';
 import { useReduceMotion } from '../../ui/useReduceMotion';
 import { FadeIn } from '../../ui/FadeIn';
 import { dimPressed } from '../../ui/press';
@@ -121,6 +122,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Paper />
         <ScrollView contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <Pressable accessibilityRole="button" accessibilityLabel="닫기" style={dimPressed(styles.headerButton)} onPress={onClose}>

@@ -15,6 +15,7 @@ import { EASE_OUT } from '../ui/motion';
 import { RuledPaper } from '../ui/RuledPaper';
 import { colors, fonts, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { Paper } from '../ui/Paper';
 import { TemplateSheet } from './evening/TemplateSheet';
 import { dimPressed } from '../ui/press';
 import { Chip } from '../ui/Chip';
@@ -118,6 +119,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
   return (
     <View style={styles.flex}>
+      <Paper />
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <PageHeader title="오늘을 덮으며" subtitle={formatLongDate(today)} onBack={onClose} backAccessibilityLabel="하루 마무리 닫기" />
 

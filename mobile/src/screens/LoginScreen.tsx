@@ -6,6 +6,7 @@ import { supabase } from '../supabase';
 import { BookCover } from '../ui/BookCover';
 import { colors, fonts } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { Paper } from '../ui/Paper';
 import { dimPressed } from '../ui/press';
 
 function authErrorMessage(e: AuthError): string {
@@ -42,6 +43,7 @@ export function LoginScreen() {
   const disabled = busy || !email || !password;
   return (
     <SafeAreaView style={styles.safe}>
+      <Paper />
       <View style={styles.flex}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={styles.cover}>

@@ -6,6 +6,7 @@ import { MAX_TEMPLATE_QUESTIONS, type TemplateDef } from '../../reflections/temp
 import { RuledPaper } from '../../ui/RuledPaper';
 import { colors, fonts, HIT } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
+import { Paper } from '../../ui/Paper';
 import { dimPressed } from '../../ui/press';
 
 type Props = {
@@ -56,6 +57,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Paper />
         <ScrollView contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <Pressable accessibilityRole="button" style={dimPressed(styles.headerButton)} onPress={onClose}>

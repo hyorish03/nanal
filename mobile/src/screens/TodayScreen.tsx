@@ -20,6 +20,7 @@ import { countRecordedDays } from '../stats/recordedDays';
 import { Popover, useAnchor } from '../ui/Popover';
 import { colors, fonts, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { Paper } from '../ui/Paper';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { ItemRow } from './today/ItemRow';
 import type { LinkAction } from '../lib/deepLink';
@@ -217,6 +218,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
   return (
     <View style={styles.container}>
+      <Paper />
       {/* 머리 빈 곳을 누르면 키보드가 내려간다. 알림 줄은 머리 아래 여백에 겹쳐 띄워 목록을 밀지 않는다 */}
       <Pressable accessible={false} style={styles.header} onPress={Keyboard.dismiss}>
         <View style={styles.headerActions}>

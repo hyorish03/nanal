@@ -19,6 +19,7 @@ import { EASE_OUT } from '../ui/motion';
 import { dimPressed } from '../ui/press';
 import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { Paper } from '../ui/Paper';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { takePendingAction } from '../widget/pendingAction';
 import { reloadWidgets } from '../widget/reload';
@@ -206,6 +207,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
       {/* 남색 표지가 보이는 동안은 밝은 상태 막대 */}
       <StatusBar style={coverSettled ? 'dark' : 'light'} animated />
       <EveningBackdrop on={screen === 'evening'} />
+      <Paper />
       <SafeAreaView style={styles.container}>
         <ScreenEnter key={screen ?? 'none'} reduce={reduce}>
           {screen === 'onboarding' && <OnboardingScreen onDone={finishOnboarding} />}

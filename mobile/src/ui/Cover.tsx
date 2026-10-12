@@ -1,8 +1,9 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, type StyleProp, StyleSheet, type TextStyle, useWindowDimensions, View } from 'react-native';
 import type { CoverOpening } from '../lib/coverOpening';
 import { EASE_OUT } from './motion';
 import { colors, fonts } from './theme';
+import { Paper } from './Paper';
 import { Txt } from './Txt';
 import { useReduceMotion } from './useReduceMotion';
 
@@ -95,13 +96,12 @@ export function Cover({ open, line, onClosed, onOpened, opening = 'turn', childr
   return (
     <Animated.View pointerEvents={open ? 'none' : 'auto'} accessibilityViewIsModal={!open} style={[styles.layer, { opacity: veil }]}>
       <Animated.View style={[styles.leaf, styles.cover, { transform: [{ perspective: width * 2.5 }, { rotateY }] }]}>
+        <Paper texture="cloth" />
         <View style={styles.spine} />
         <View style={styles.frame} />
         <View style={styles.band} />
         <View style={styles.titleBox}>
-          <Txt variant="title" style={styles.title}>
-            나날
-          </Txt>
+          <Debossed style={styles.title}>나날</Debossed>
           <View style={styles.rule} />
           <Txt variant="title" style={styles.line}>
             {line}
@@ -114,7 +114,23 @@ export function Cover({ open, line, onClosed, onOpened, opening = 'turn', childr
   );
 }
 
+// 천 표지에 눌러 찍은 글자. 글자 아래로 그늘이 지고, 위 가장자리에 빛이 살짝 닿는다.
+export function Debossed({ style, children }: { style: StyleProp<TextStyle>; children: string }) {
+  return (
+    <View>
+      <Txt variant="title" accessible={false} importantForAccessibility="no" style={[style, styles.debossLight]}>
+        {children}
+      </Txt>
+      <Txt variant="title" style={[style, styles.deboss]}>
+        {children}
+      </Txt>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  deboss: { textShadowColor: colors.debossShadow, textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
+  debossLight: { position: 'absolute', top: -1, left: 0, right: 0, color: colors.debossLight },
   layer: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, zIndex: 20 },
   leaf: {
     position: 'absolute',

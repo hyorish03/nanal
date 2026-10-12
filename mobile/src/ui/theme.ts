@@ -25,6 +25,8 @@ export const colors = {
   coverRule: 'rgba(233, 223, 200, 0.7)',
   coverSub: 'rgba(233, 223, 200, 0.85)', // 표지 부제
   coverFooter: 'rgba(233, 223, 200, 0.6)',
+  debossShadow: 'rgba(0, 0, 0, 0.35)', // 표지에 눌러 찍은 글자의 그늘
+  debossLight: 'rgba(255, 255, 255, 0.12)', // 눌린 자국 아래 가장자리에 닿는 빛
   pages: '#EFE6D3', // 표지 아래 속지 묶음
   pageEdge: '#DCD0BA',
   endpaper: '#E8DDC7', // 표지 안쪽 면지

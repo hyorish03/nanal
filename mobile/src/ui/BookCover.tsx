@@ -1,5 +1,7 @@
 import { Animated, StyleSheet, View } from 'react-native';
 import { colors } from './theme';
+import { Debossed } from './Cover';
+import { Paper } from './Paper';
 import { Txt } from './Txt';
 
 type Props = {
@@ -35,12 +37,11 @@ export function BookCover({ width, height, titleSize, subtitle, footer, open }: 
         <Animated.View style={[styles.cover, styles.endpaper, { width, height, transform: leaf(true) }]} />
       )}
       <Animated.View style={[styles.cover, { width, height, paddingTop: height * 0.24, transform: leaf(false) }]}>
+        <Paper texture="cloth" />
         <View style={[styles.spine, { width: 16 * scale }]} />
         <View style={[styles.frame, { top: 14 * scale, bottom: 14 * scale, left: 30 * scale, right: 14 * scale }]} />
         <View style={[styles.band, { right: 34 * scale, width: 7 * scale }]} />
-        <Txt variant="title" style={[styles.title, { fontSize: titleSize, letterSpacing: titleSize / 8 }]}>
-          나날
-        </Txt>
+        <Debossed style={[styles.title, { fontSize: titleSize, letterSpacing: titleSize / 8 }]}>나날</Debossed>
         {subtitle && (
           <>
             <View style={styles.rule} />

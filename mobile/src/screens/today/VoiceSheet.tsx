@@ -5,6 +5,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 import { EASE_OUT } from '../../ui/motion';
 import { colors, HIT, SCREEN_X } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
+import { Paper } from '../../ui/Paper';
 import { useReduceMotion } from '../../ui/useReduceMotion';
 import { voiceErrorMessage } from '../../voice/errors';
 import { initialVoiceState, voiceReducer } from '../../voice/machine';
@@ -119,6 +120,7 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} onDismiss={onDismissed}>
       <View style={styles.sheet}>
+        <Paper />
         <View style={styles.header}>
           <Pressable accessibilityRole="button" accessibilityLabel="닫기" style={dimPressed(styles.headerButton)} onPress={onClose}>
             <Txt>닫기</Txt>
