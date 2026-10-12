@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DefaultTheme, NavigationContainer, StackActions, type Theme, useNavigationContainerRef } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, AppState, BackHandler, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -59,7 +61,14 @@ export function Main({ db, userId }: { db: Db; userId: string }) {
   return <MainContent db={db} userId={userId} />;
 }
 
-type Screen = 'onboarding' | 'today' | 'evening' | 'archive' | 'review';
+// 'today'는 오늘 → 지난 기록 → 월간 돌아보기 네이티브 스택이다(밀어 넣기, 가장자리 밀어 돌아가기).
+// 저녁 마무리는 하루를 덮는 흐름이라 스택 밖에서 화면 전체를 바꾼다(표지 덮기, 저녁 바탕이 그대로 보이게).
+type Screen = 'onboarding' | 'today' | 'evening';
+type StackParams = { today: undefined; archive: undefined; review: { month: string } };
+
+const Stack = createNativeStackNavigator<StackParams>();
+// 화면 사이에 흰 바탕이 비치지 않게 종이색으로 칠한다.
+const navTheme: Theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.paper } };
 
 function MainContent({ db, userId }: { db: Db; userId: string }) {
   const remote = useMemo(() => createSupabaseRemote(supabase, userId), [userId]);
@@ -71,7 +80,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   }, []);
   const { pending, error, requestSync } = useSync(db, remote, refresh);
   const [screen, setScreen] = useState<Screen | null>(null);
-  const [reviewMonth, setReviewMonth] = useState<string | null>(null);
+  const nav = useNavigationContainerRef<StackParams>();
   const [coverOpen, setCoverOpen] = useState(false);
   const [coverSettled, setCoverSettled] = useState(false); // 표지가 다 펼쳐졌다(포커스, 링크 동작은 이때부터)
   const [coverOpening, setCoverOpening] = useState<CoverOpening>('turn');
@@ -90,11 +99,13 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     // 온보딩 중에 온 동작은 버린다(끝난 뒤 말로 적기가 갑자기 뜨지 않게).
     if (screenRef.current === 'onboarding') return;
     setScreen((s) => (s === null || s === 'onboarding' ? s : 'today'));
+    // 지난 기록·월간 돌아보기에 있었으면 오늘까지 꺼낸다
+    if (nav.isReady() && nav.canGoBack()) nav.dispatch(StackActions.popToTop());
     setDayClosed(false);
     setClosedShown(false);
     setCoverOpen(true);
     setLinkAction(link.action);
-  }, []);
+  }, [nav]);
 
   useEffect(() => {
     if (consumeInitialUrl()) Linking.getInitialURL().then(handleLink, () => {});
@@ -140,18 +151,12 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     return () => sub.remove();
   }, [refresh]);
 
-  // Android 뒤로 가기: 저녁·지난 기록에서는 오늘로, 월간 돌아보기에서는 지난 기록으로 돌아간다.
+  // Android 뒤로 가기: 저녁에서는 오늘로. 지난 기록·월간 돌아보기는 스택이 한 칸씩 돌아간다.
   useEffect(() => {
+    if (screen !== 'evening') return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (screen === 'review') {
-        setScreen('archive');
-        return true;
-      }
-      if (screen === 'evening' || screen === 'archive') {
-        setScreen('today');
-        return true;
-      }
-      return false;
+      setScreen('today');
+      return true;
     });
     return () => sub.remove();
   }, [screen]);
@@ -200,39 +205,57 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
         <ScreenEnter key={screen ?? 'none'} reduce={reduce}>
           {screen === 'onboarding' && <OnboardingScreen onDone={finishOnboarding} />}
           {screen === 'today' && (
-            <TodayScreen
-              db={db}
-              version={version}
-              onChanged={onChanged}
-              onOpenEvening={() => setScreen('evening')}
-              onOpenArchive={() => setScreen('archive')}
-              focusReady={coverSettled && focusPending}
-              onFocused={() => setFocusPending(false)}
-              pendingAction={coverSettled ? linkAction : null}
-              onActionHandled={() => setLinkAction(null)}
-            />
+            <NavigationContainer ref={nav} theme={navTheme}>
+              <Stack.Navigator
+                screenOptions={{
+                  headerShown: false,
+                  animation: reduce ? 'fade' : 'default',
+                  contentStyle: styles.page,
+                }}
+              >
+                <Stack.Screen name="today">
+                  {({ navigation }) => (
+                    <TodayScreen
+                      db={db}
+                      version={version}
+                      onChanged={onChanged}
+                      onOpenEvening={() => setScreen('evening')}
+                      onOpenArchive={() => {
+                        Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
+                        navigation.navigate('archive');
+                      }}
+                      focusReady={coverSettled && focusPending}
+                      onFocused={() => setFocusPending(false)}
+                      pendingAction={coverSettled ? linkAction : null}
+                      onActionHandled={() => setLinkAction(null)}
+                    />
+                  )}
+                </Stack.Screen>
+                <Stack.Screen name="archive">
+                  {({ navigation }) => (
+                    <ArchiveScreen
+                      db={db}
+                      version={version}
+                      onClose={() => navigation.goBack()}
+                      onOpenReview={(month) => navigation.navigate('review', { month })}
+                    />
+                  )}
+                </Stack.Screen>
+                <Stack.Screen name="review">
+                  {({ navigation, route }) => (
+                    <MonthlyReviewScreen
+                      db={db}
+                      month={route.params.month}
+                      version={version}
+                      onChanged={onChanged}
+                      onClose={() => navigation.goBack()}
+                    />
+                  )}
+                </Stack.Screen>
+              </Stack.Navigator>
+            </NavigationContainer>
           )}
           {screen === 'evening' && <EveningScreen db={db} version={version} onChanged={onChanged} onClose={closeDay} />}
-          {screen === 'archive' && (
-            <ArchiveScreen
-              db={db}
-              version={version}
-              onClose={() => setScreen('today')}
-              onOpenReview={(m) => {
-                setReviewMonth(m);
-                setScreen('review');
-              }}
-            />
-          )}
-          {screen === 'review' && reviewMonth && (
-            <MonthlyReviewScreen
-              db={db}
-              month={reviewMonth}
-              version={version}
-              onChanged={onChanged}
-              onClose={() => setScreen('archive')}
-            />
-          )}
         </ScreenEnter>
       </SafeAreaView>
       <Cover
@@ -254,7 +277,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   );
 }
 
-// 화면이 바뀌면 새 화면만 살짝 올라오며 나타난다(이전 화면은 바로 사라진다).
+// 온보딩·오늘·저녁이 바뀌면 새 화면만 살짝 올라오며 나타난다(이전 화면은 바로 사라진다). 오늘 아래 화면은 스택이 밀어 넣는다.
 function ScreenEnter({ reduce, children }: { reduce: boolean; children: ReactNode }) {
   return (
     <FadeIn duration={200} rise={reduce ? 0 : 6} style={styles.container}>
@@ -278,6 +301,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   evening: { backgroundColor: colors.paperEvening },
   container: { flex: 1 }, // 배경은 root와 각 화면이 칠한다(저녁은 paperEvening)
+  page: { backgroundColor: colors.paper },
   blocked: { padding: 24, fontSize: 16, lineHeight: 24, color: colors.ink },
   syncBar: { backgroundColor: colors.postit, color: colors.postitText, paddingVertical: 6, paddingHorizontal: 16, fontSize: 13 },
   reopen: {
