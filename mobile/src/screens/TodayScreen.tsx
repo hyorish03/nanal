@@ -21,11 +21,12 @@ import { Popover, useAnchor } from '../ui/Popover';
 import { colors, fonts, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { ItemRow } from './today/ItemRow';
+import type { LinkAction } from '../lib/deepLink';
 import { OrganizeSheet } from './today/OrganizeSheet';
 import { PostIt, type SettleHow } from './today/PostIt';
 import { SymbolLegend } from './today/SymbolLegend';
 
-type Props = { db: Db; version: number; onChanged: () => void; onOpenEvening: () => void; onOpenArchive?: () => void; focusReady?: boolean; onFocused?: () => void };
+type Props = { db: Db; version: number; onChanged: () => void; onOpenEvening: () => void; onOpenArchive?: () => void; focusReady?: boolean; onFocused?: () => void; pendingAction?: LinkAction | null; onActionHandled?: () => void };
 
 const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
   { kind: 'task', symbol: '•', label: '할 일' },
@@ -35,7 +36,7 @@ const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
 // 표지가 펼쳐지는 동안(약 950ms) 키보드가 올라오지 않도록 입력칸 포커스를 표지가 열린 뒤로 미룬다.
 const FOCUS_DELAY_MS = 1000;
 
-export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchive, focusReady = true, onFocused }: Props) {
+export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchive, focusReady = true, onFocused, pendingAction = null, onActionHandled }: Props) {
   const today = logicalDate(new Date());
   const [items, setItems] = useState<Item[]>([]);
   const [candidates, setCandidates] = useState<Item[]>([]);
@@ -58,6 +59,21 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     return () => clearTimeout(t);
     // onFocused는 매 렌더 새 함수라 의존성에서 뺀다
   }, [focusReady]);
+
+  // 위젯·컨트롤에서 온 동작. 표지가 펼쳐지는 시간만큼 기다린 뒤 실행한다.
+  useEffect(() => {
+    if (!pendingAction) return;
+    const t = setTimeout(() => {
+      if (pendingAction === 'focus') inputRef.current?.focus();
+      else {
+        setNotice(null);
+        setOrganizeOpen(true);
+      }
+      onActionHandled?.();
+    }, FOCUS_DELAY_MS);
+    return () => clearTimeout(t);
+    // onActionHandled는 매 렌더 새 함수라 의존성에서 뺀다
+  }, [pendingAction]);
 
   useEffect(() => {
     let cancelled = false;

@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppState, BackHandler, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, BackHandler, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Db } from '../db/types';
+import { type LinkAction, parseDeepLink } from '../lib/deepLink';
 import { hasSeenOnboarding, markOnboardingSeen } from '../lib/onboarding';
 import { supabase } from '../supabase';
 import { claimOwner } from '../sync/owner';
@@ -64,6 +65,24 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const [dayClosed, setDayClosed] = useState(false); // 저녁 마무리에서 "닫기"를 눌렀다
   const [closedShown, setClosedShown] = useState(false); // 덮기 애니메이션이 끝났다
   const [focusPending, setFocusPending] = useState(true); // 표지가 열린 뒤 입력칸 포커스는 한 번만
+  const [linkAction, setLinkAction] = useState<LinkAction | null>(null);
+
+  // 위젯·컨트롤에서 연 주소: 오늘 화면으로 가서(덮여 있으면 펼친 뒤) 동작을 넘긴다. 온보딩 중이면 화면은 그대로 둔다.
+  const handleLink = useCallback((url: string | null) => {
+    const link = parseDeepLink(url);
+    if (!link) return;
+    setScreen((s) => (s === null || s === 'onboarding' ? s : 'today'));
+    setDayClosed(false);
+    setClosedShown(false);
+    setCoverOpen(true);
+    setLinkAction(link.action);
+  }, []);
+
+  useEffect(() => {
+    Linking.getInitialURL().then(handleLink, () => {});
+    const sub = Linking.addEventListener('url', (e) => handleLink(e.url));
+    return () => sub.remove();
+  }, [handleLink]);
 
   useEffect(() => {
     hasSeenOnboarding(AsyncStorage).then((seen) => setScreen(seen ? 'today' : 'onboarding'));
@@ -148,6 +167,8 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
             onOpenArchive={() => setScreen('archive')}
             focusReady={coverOpen && focusPending}
             onFocused={() => setFocusPending(false)}
+            pendingAction={coverOpen ? linkAction : null}
+            onActionHandled={() => setLinkAction(null)}
           />
         )}
         {screen === 'evening' && <EveningScreen db={db} version={version} onChanged={onChanged} onClose={closeDay} />}
