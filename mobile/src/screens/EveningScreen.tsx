@@ -11,6 +11,7 @@ import { countRecordedDays } from '../stats/recordedDays';
 import { eulReul } from '../lib/josa';
 import { confirmDelete, showActionSheet } from '../ui/dialogs';
 import { Inkwell } from '../ui/Inkwell';
+import { LAMP_PAPER } from '../ui/lamp';
 import { EASE_OUT } from '../ui/motion';
 import { RuledPaper } from '../ui/RuledPaper';
 import { colors, fonts, SCREEN_X } from '../ui/theme';
@@ -154,6 +155,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                       selected={selected}
                       animate={moodPicked}
                       color={selected ? colors.navy : colors.line}
+                      paper={LAMP_PAPER}
                     />
                   </MoodWell>
                   <Txt
@@ -321,7 +323,7 @@ const SIT = 6;
 const FORM_TOP = 22;
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.paperEvening },
+  flex: { flex: 1 }, // 바탕은 Main의 EveningBackdrop(등잔 불빛)이 칠한다
   container: { paddingHorizontal: SCREEN_X, paddingTop: 16, paddingBottom: 24, gap: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   headerText: { flexShrink: 1, gap: 2 },

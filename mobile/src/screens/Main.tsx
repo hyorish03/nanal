@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, AppState, BackHandler, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import type { Db } from '../db/types';
 import { type CoverOpening, markCoverOpened, readCoverOpening } from '../lib/coverOpening';
 import { consumeInitialUrl, type LinkAction, parseDeepLink } from '../lib/deepLink';
@@ -15,6 +16,7 @@ import { createSupabaseRemote } from '../sync/supabaseRemote';
 import { useSync } from '../sync/useSync';
 import { Cover } from '../ui/Cover';
 import { FadeIn } from '../ui/FadeIn';
+import { LAMP_PAPER, LAMP_SHADE } from '../ui/lamp';
 import { EASE_OUT } from '../ui/motion';
 import { dimPressed } from '../ui/press';
 import { colors } from '../ui/theme';
@@ -311,7 +313,7 @@ function SyncBar({ pending, error }: { pending: number; error: string | null }) 
   );
 }
 
-// 하루 마무리에서는 바탕(안전 영역 포함)이 저녁 종이색으로 천천히 바뀐다.
+// 하루 마무리에서는 바탕(안전 영역 포함)이 등잔 불빛 아래 종이처럼 바뀐다. 가운데는 밝고 가장자리는 옅게 그늘진다.
 function EveningBackdrop({ on }: { on: boolean }) {
   const opacity = useRef(new Animated.Value(on ? 1 : 0)).current;
   useEffect(() => {
@@ -319,13 +321,25 @@ function EveningBackdrop({ on }: { on: boolean }) {
     anim.start();
     return () => anim.stop();
   }, [on, opacity]);
-  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.evening, { opacity }]} />;
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.evening, { opacity }]}>
+      <Svg width="100%" height="100%" accessible={false}>
+        <Defs>
+          <RadialGradient id="lamp" cx="50%" cy="42%" rx="75%" ry="65%">
+            <Stop offset="0.5" stopColor={LAMP_SHADE} stopOpacity={0} />
+            <Stop offset="1" stopColor={LAMP_SHADE} stopOpacity={0.04} />
+          </RadialGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#lamp)" />
+      </Svg>
+    </Animated.View>
+  );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
-  evening: { backgroundColor: colors.paperEvening },
-  container: { flex: 1 }, // 배경은 root와 각 화면이 칠한다(저녁은 paperEvening)
+  evening: { backgroundColor: LAMP_PAPER },
+  container: { flex: 1 }, // 배경은 root와 각 화면이 칠한다(저녁은 EveningBackdrop이 칠한다)
   page: { backgroundColor: colors.paper },
   blocked: { padding: 24, fontSize: 16, lineHeight: 24, color: colors.ink },
   syncBar: { position: 'absolute', left: 0, right: 0, backgroundColor: colors.postit, paddingVertical: 6, paddingHorizontal: 16 },
