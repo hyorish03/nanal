@@ -7,6 +7,7 @@ import { EASE_OUT } from '../../ui/motion';
 import { colors } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { useReduceMotion } from '../../ui/useReduceMotion';
+import { dimPressed } from '../../ui/press';
 
 export type SettleHow = 'today' | 'tomorrow' | 'delete';
 
@@ -73,7 +74,7 @@ function CandidateRow({ item, onSettle }: { item: Item; onSettle: (item: Item, h
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${item.text} 오늘 하기`}
-          style={styles.action}
+          style={dimPressed(styles.action)}
           onPress={() => onSettle(item, 'today', row)}
         >
           <Txt variant="medium" style={styles.today}>
@@ -83,7 +84,7 @@ function CandidateRow({ item, onSettle }: { item: Item; onSettle: (item: Item, h
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${item.text} 내일로`}
-          style={styles.action}
+          style={dimPressed(styles.action)}
           onPress={() => onSettle(item, 'tomorrow', row)}
         >
           <Txt style={styles.tomorrow}>내일로</Txt>
@@ -91,7 +92,7 @@ function CandidateRow({ item, onSettle }: { item: Item; onSettle: (item: Item, h
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${item.text} 지우기`}
-          style={styles.remove}
+          style={dimPressed(styles.remove)}
           onPress={() => confirmDelete('항목 지우기', `"${item.text}"을(를) 지울까요?`, () => onSettle(item, 'delete', row))}
         >
           <Txt style={styles.removeText}>×</Txt>

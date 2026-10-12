@@ -8,6 +8,7 @@ import { StatusSymbol } from '../../ui/StatusSymbol';
 import { canAdvance, itemA11yLabel, symbolKind } from '../../ui/symbols';
 import { colors, fonts } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
+import { dimPressed, tintPressed } from '../../ui/press';
 
 type Props = {
   item: Item;
@@ -28,7 +29,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
   return (
     <View style={styles.row}>
       <Pressable
-        style={styles.main}
+        style={tintPressed(styles.main)}
         disabled={!advance}
         accessibilityRole={advance ? 'button' : 'text'}
         accessibilityLabel={itemA11yLabel(item)}
@@ -51,7 +52,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
         accessibilityRole="button"
         accessibilityLabel={`${item.text} 더보기`}
         accessibilityState={{ expanded: menu.anchor !== null }}
-        style={styles.more}
+        style={dimPressed(styles.more)}
         onPress={menu.open}
       >
         <Txt style={styles.moreText}>⋯</Txt>
@@ -62,7 +63,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
             accessibilityRole="menuitem"
             disabled={markDisabled}
             accessibilityState={{ disabled: markDisabled }}
-            style={styles.menuItem}
+            style={dimPressed(styles.menuItem)}
             onPress={() => {
               menu.close();
               setMarked(!item.priority);
@@ -77,7 +78,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
         )}
         <Pressable
           accessibilityRole="menuitem"
-          style={styles.menuItem}
+          style={dimPressed(styles.menuItem)}
           onPress={() => {
             menu.close();
             confirmDelete('항목 지우기', `"${item.text}"을(를) 지울까요?`, onDelete);

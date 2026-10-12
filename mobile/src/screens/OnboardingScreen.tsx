@@ -8,6 +8,7 @@ import { StatusSymbol } from '../ui/StatusSymbol';
 import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { useReduceMotion } from '../ui/useReduceMotion';
+import { dimPressed } from '../ui/press';
 
 const STEPS = 4;
 const BOOK_W = 164;
@@ -81,7 +82,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
             <View key={i} style={[styles.dot, i === step && styles.dotOn]} />
           ))}
         </View>
-        <Pressable accessibilityRole="button" style={styles.skip} onPress={onDone}>
+        <Pressable accessibilityRole="button" style={dimPressed(styles.skip)} onPress={onDone}>
           <Txt style={styles.skipText}>건너뛰기</Txt>
         </Pressable>
       </View>
@@ -219,11 +220,11 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
       <View style={styles.actions}>
         {step > 0 && (
-          <Pressable accessibilityRole="button" style={styles.back} onPress={() => goTo(step - 1)}>
+          <Pressable accessibilityRole="button" style={dimPressed(styles.back)} onPress={() => goTo(step - 1)}>
             <Txt>이전</Txt>
           </Pressable>
         )}
-        <Pressable accessibilityRole="button" style={styles.primary} onPress={step === STEPS - 1 ? onDone : next}>
+        <Pressable accessibilityRole="button" style={dimPressed(styles.primary)} onPress={step === STEPS - 1 ? onDone : next}>
           <Txt variant="medium" style={styles.primaryText}>
             {step === 0 ? '시작하기' : step === STEPS - 1 ? '첫 줄 쓰기' : '다음'}
           </Txt>

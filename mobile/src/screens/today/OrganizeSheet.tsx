@@ -9,6 +9,7 @@ import { supabase } from '../../supabase';
 import { StatusSymbol } from '../../ui/StatusSymbol';
 import { colors, fonts, HIT, SCREEN_X } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
+import { dimPressed } from '../../ui/press';
 
 type Props = {
   db: Db;
@@ -119,7 +120,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Pressable accessibilityRole="button" accessibilityLabel="닫기" style={styles.headerButton} onPress={onClose}>
+            <Pressable accessibilityRole="button" accessibilityLabel="닫기" style={dimPressed(styles.headerButton)} onPress={onClose}>
               <Txt>닫기</Txt>
             </Pressable>
             <Txt variant="medium" accessibilityRole="header">
@@ -155,7 +156,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
                 accessibilityRole="button"
                 accessibilityState={{ disabled: !canOrganize, busy: loading }}
                 disabled={!canOrganize}
-                style={[styles.primary, !canOrganize && styles.disabled]}
+                style={dimPressed([styles.primary, !canOrganize && styles.disabled])}
                 onPress={() => organize()}
               >
                 {loading ? (
@@ -180,7 +181,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
                     disabled={saving}
                     accessibilityState={{ checked: d.picked }}
                     accessibilityLabel={`${d.kind === 'task' ? '할 일' : '메모'} ${d.text}${when ? `, ${when}` : ''}`}
-                    style={styles.row}
+                    style={dimPressed(styles.row)}
                     onPress={() => toggle(d.id)}
                   >
                     <View style={[styles.check, d.picked && styles.checkOn]}>
@@ -202,14 +203,14 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
                 </Txt>
               )}
               <View style={styles.actions}>
-                <Pressable accessibilityRole="button" disabled={saving} style={styles.secondary} onPress={() => setStep('write')}>
+                <Pressable accessibilityRole="button" disabled={saving} style={dimPressed(styles.secondary)} onPress={() => setStep('write')}>
                   <Txt>다시 쓰기</Txt>
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{ disabled: picked.length === 0 || saving, busy: saving }}
                   disabled={picked.length === 0 || saving}
-                  style={[styles.primary, styles.grow, (picked.length === 0 || saving) && styles.disabled]}
+                  style={dimPressed([styles.primary, styles.grow, (picked.length === 0 || saving) && styles.disabled])}
                   onPress={add}
                 >
                   {saving ? <ActivityIndicator color={colors.onDark} accessibilityLabel="넣는 중" /> : <Txt style={styles.primaryText}>{picked.length}개 넣기</Txt>}

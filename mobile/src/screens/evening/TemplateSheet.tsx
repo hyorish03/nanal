@@ -6,6 +6,7 @@ import { MAX_TEMPLATE_QUESTIONS, type TemplateDef } from '../../reflections/temp
 import { RuledPaper } from '../../ui/RuledPaper';
 import { colors, fonts } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
+import { dimPressed } from '../../ui/press';
 
 type Props = {
   db: Db;
@@ -57,7 +58,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Pressable accessibilityRole="button" style={styles.headerButton} onPress={onClose}>
+            <Pressable accessibilityRole="button" style={dimPressed(styles.headerButton)} onPress={onClose}>
               <Txt style={styles.headerText}>취소</Txt>
             </Pressable>
             <Txt variant="medium" accessibilityRole="header">
@@ -67,7 +68,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
               accessibilityRole="button"
               accessibilityState={{ disabled: !valid || saving }}
               disabled={!valid || saving}
-              style={styles.headerButton}
+              style={dimPressed(styles.headerButton)}
               onPress={save}
             >
               <Txt variant="medium" style={[styles.headerText, { color: valid ? colors.navy : colors.faint }]}>
@@ -111,7 +112,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`질문 ${i + 1} 빼기`}
-                    style={styles.removeQ}
+                    style={dimPressed(styles.removeQ)}
                     onPress={() => setQuestions(questions.filter((_, j) => j !== i))}
                   >
                     <Txt style={styles.removeText}>×</Txt>
@@ -120,7 +121,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
               </View>
             ))}
             {questions.length < MAX_TEMPLATE_QUESTIONS && (
-              <Pressable accessibilityRole="button" style={styles.add} onPress={() => setQuestions([...questions, ''])}>
+              <Pressable accessibilityRole="button" style={dimPressed(styles.add)} onPress={() => setQuestions([...questions, ''])}>
                 <Txt style={styles.addText}>+ 질문 추가</Txt>
               </Pressable>
             )}
@@ -147,7 +148,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
           )}
 
           {editing ? (
-            <Pressable accessibilityRole="button" style={styles.delete} onPress={() => onDelete(editing)}>
+            <Pressable accessibilityRole="button" style={dimPressed(styles.delete)} onPress={() => onDelete(editing)}>
               <Txt style={styles.deleteText}>템플릿 삭제</Txt>
             </Pressable>
           ) : (

@@ -10,6 +10,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.hyorish03.nanal",
+      "infoPlist": {
+        "CADisableMinimumFrameDurationOnPhone": true
+      },
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.hyorish03.nanal"

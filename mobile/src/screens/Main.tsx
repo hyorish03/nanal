@@ -13,6 +13,7 @@ import { useSync } from '../sync/useSync';
 import { Cover } from '../ui/Cover';
 import { FadeIn } from '../ui/FadeIn';
 import { EASE_OUT } from '../ui/motion';
+import { dimPressed } from '../ui/press';
 import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { useReduceMotion } from '../ui/useReduceMotion';
@@ -240,7 +241,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
       >
         {dayClosed && closedShown && (
           <FadeIn delay={80} duration={240} rise={reduce ? 0 : 6}>
-            <Pressable accessibilityRole="button" style={({ pressed }) => [styles.reopen, pressed && styles.reopenPressed]} onPress={reopen}>
+            <Pressable accessibilityRole="button" style={dimPressed(styles.reopen)} onPress={reopen}>
               <Txt style={styles.reopenText}>내일 다시 펼치기</Txt>
             </Pressable>
           </FadeIn>
@@ -286,6 +287,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  reopenPressed: { opacity: 0.6 },
   reopenText: { color: colors.coverText, fontSize: 15 },
 });

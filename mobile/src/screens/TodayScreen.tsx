@@ -27,6 +27,7 @@ import { OrganizeSheet } from './today/OrganizeSheet';
 import { PostIt, type SettleHow } from './today/PostIt';
 import { SymbolLegend } from './today/SymbolLegend';
 import { voiceAvailable } from '../voice/available';
+import { dimPressed } from '../ui/press';
 
 // 개발용·출시 빌드에서만 말로 적기 시트를 불러온다(Expo Go에서는 네이티브 모듈이 없어 import 시 오류).
 const VoiceSheet: typeof import('./today/VoiceSheet').VoiceSheet | null = voiceAvailable
@@ -165,7 +166,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
             accessibilityRole="button"
             accessibilityLabel={VoiceSheet ? '말로 적기' : '정리해서 넣기'}
             accessibilityHint={VoiceSheet ? '말한 내용을 할 일과 메모로 정리해요' : '두서없이 쓴 글을 할 일과 메모로 정리해요'}
-            style={styles.organize}
+            style={dimPressed(styles.organize)}
             onPress={openCapture}
           >
             {VoiceSheet ? (
@@ -190,7 +191,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
                 accessibilityRole="button"
                 accessibilityLabel={k.label}
                 accessibilityState={{ selected }}
-                style={[styles.kind, selected && styles.kindSelected]}
+                style={dimPressed([styles.kind, selected && styles.kindSelected])}
                 onPress={() => setKind(k.kind)}
               >
                 <Txt style={styles.kindText}>
@@ -204,7 +205,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
             accessibilityRole="button"
             accessibilityLabel="기호 설명"
             accessibilityState={{ expanded: info.anchor !== null }}
-            style={styles.info}
+            style={dimPressed(styles.info)}
             onPress={info.open}
           >
             <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
@@ -236,14 +237,14 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         </View>
         <View style={styles.headerActions}>
           {onOpenArchive && (
-            <Pressable accessibilityRole="button" accessibilityLabel="지난 기록" style={styles.iconButton} onPress={onOpenArchive}>
+            <Pressable accessibilityRole="button" accessibilityLabel="지난 기록" style={dimPressed(styles.iconButton)} onPress={onOpenArchive}>
               <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
                 <Path d="M3 2.5h9.5a2 2 0 0 1 2 2v11H5a2 2 0 0 1-2-2v-11Z" stroke={colors.ink} strokeWidth={1.3} strokeLinejoin="round" />
                 <Path d="M3 13.5a2 2 0 0 1 2-2h9.5M6.5 6h5M6.5 8.5h3.5" stroke={colors.ink} strokeWidth={1.3} strokeLinecap="round" />
               </Svg>
             </Pressable>
           )}
-          <Pressable accessibilityRole="button" style={styles.evening} onPress={onOpenEvening}>
+          <Pressable accessibilityRole="button" style={dimPressed(styles.evening)} onPress={onOpenEvening}>
             <Txt variant="medium" style={styles.eveningText}>
               저녁 마무리
             </Txt>

@@ -15,6 +15,7 @@ import { RuledPaper } from '../ui/RuledPaper';
 import { colors, fonts, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { TemplateSheet } from './evening/TemplateSheet';
+import { dimPressed } from '../ui/press';
 
 type Props = { db: Db; version: number; onChanged: () => void; onClose: () => void };
 
@@ -122,7 +123,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
             </Txt>
             <Txt style={styles.sub}>{formatLongDate(today)}</Txt>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="저녁 마무리 닫기" style={styles.close} onPress={onClose}>
+          <Pressable accessibilityRole="button" accessibilityLabel="저녁 마무리 닫기" style={dimPressed(styles.close)} onPress={onClose}>
             <Txt style={styles.closeText}>닫기</Txt>
           </Pressable>
         </View>
@@ -140,7 +141,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                   accessibilityRole="button"
                   accessibilityLabel={`기분 ${m}점, ${moodWord(m)}`}
                   accessibilityState={{ selected }}
-                  style={styles.mood}
+                  style={dimPressed(styles.mood)}
                   onPress={() => pickMood(m)}
                 >
                   <MoodWell selected={selected} animate={moodPicked}>
@@ -187,7 +188,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                           else if (e.nativeEvent.actionName === 'delete') askDelete(t);
                         }
                   }
-                  style={[styles.chip, selected && styles.chipOn]}
+                  style={dimPressed([styles.chip, selected && styles.chipOn])}
                   onPress={() => setTemplate(selected ? null : t.id)}
                   onLongPress={t.builtin ? undefined : () => templateActions(t)}
                 >
@@ -197,7 +198,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                 </Pressable>
               );
             })}
-            <Pressable accessibilityRole="button" style={styles.newChip} onPress={() => openSheet(null)}>
+            <Pressable accessibilityRole="button" style={dimPressed(styles.newChip)} onPress={() => openSheet(null)}>
               <Txt style={styles.newChipText}>+ 새 템플릿</Txt>
             </Pressable>
           </View>
@@ -224,7 +225,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                   />
                 </View>
               ))}
-              <Pressable accessibilityRole="button" style={styles.save} onPress={save}>
+              <Pressable accessibilityRole="button" style={dimPressed(styles.save)} onPress={save}>
                 <Txt variant="medium" style={styles.saveText}>
                   남겨두기
                 </Txt>

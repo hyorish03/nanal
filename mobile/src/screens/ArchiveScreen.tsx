@@ -13,6 +13,7 @@ import { Inkwell } from '../ui/Inkwell';
 import { RuledPaper } from '../ui/RuledPaper';
 import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { dimPressed } from '../ui/press';
 
 type Props = { db: Db; version: number; onClose: () => void; onOpenReview?: (month: string) => void };
 type Tab = 'calendar' | 'collection';
@@ -93,7 +94,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
       <View style={styles.top}>
-        <Pressable accessibilityRole="button" style={styles.back} onPress={onClose}>
+        <Pressable accessibilityRole="button" style={dimPressed(styles.back)} onPress={onClose}>
           <Txt style={styles.backText}>오늘로</Txt>
         </Pressable>
         <Txt variant="title" accessibilityRole="header" style={styles.title}>
@@ -115,7 +116,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
               key={key}
               accessibilityRole="tab"
               accessibilityState={{ selected: on }}
-              style={[styles.tab, on && styles.tabOn]}
+              style={dimPressed([styles.tab, on && styles.tabOn])}
               onPress={() => setTab(key)}
             >
               <Txt variant={on ? 'medium' : 'body'} style={[styles.tabText, !on && styles.tabTextOff]}>
@@ -133,7 +134,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
           {onOpenReview && (
             <Pressable
               accessibilityRole="button"
-              style={styles.reviewBanner}
+              style={dimPressed(styles.reviewBanner)}
               onPress={() => onOpenReview(reviewMonth)}
             >
               <Txt variant="medium" style={styles.reviewBannerTitle}>
@@ -145,7 +146,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
             </Pressable>
           )}
           <View style={styles.monthRow}>
-            <Pressable accessibilityRole="button" accessibilityLabel="이전 달" style={styles.arrow} onPress={() => changeMonth(addMonths(month, -1))}>
+            <Pressable accessibilityRole="button" accessibilityLabel="이전 달" style={dimPressed(styles.arrow)} onPress={() => changeMonth(addMonths(month, -1))}>
               <Txt style={styles.arrowText}>‹</Txt>
             </Pressable>
             <Txt variant="title" style={styles.monthText}>
@@ -156,7 +157,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
               accessibilityLabel="다음 달"
               accessibilityState={{ disabled: isCurrentMonth }}
               disabled={isCurrentMonth}
-              style={styles.arrow}
+              style={dimPressed(styles.arrow)}
               onPress={() => changeMonth(addMonths(month, 1))}
             >
               <Txt style={[styles.arrowText, isCurrentMonth && styles.arrowOff]}>›</Txt>
@@ -182,7 +183,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
                   accessibilityLabel={`${Number(date.slice(5, 7))}월 ${d}일${word ? `, 기분 ${word}` : ''}${s?.hasReflection ? ', 회고 있음' : ''}`}
                   accessibilityState={{ selected: on, disabled: future }}
                   disabled={future}
-                  style={[styles.cell, styles.dayCell, on && styles.dayOn]}
+                  style={dimPressed([styles.cell, styles.dayCell, on && styles.dayOn])}
                   onPress={() => setSelected(date)}
                 >
                   <Txt
@@ -243,7 +244,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
                   key={f.id ?? 'all'}
                   accessibilityRole="button"
                   accessibilityState={{ selected: on }}
-                  style={[styles.filter, on && styles.filterOn]}
+                  style={dimPressed([styles.filter, on && styles.filterOn])}
                   onPress={() => setFilter(f.id)}
                 >
                   <Txt style={styles.filterText}>{f.name}</Txt>

@@ -5,6 +5,7 @@ import { StatusSymbol } from '../../ui/StatusSymbol';
 import { LEGEND, type LegendEntry } from '../../ui/symbols';
 import { colors } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
+import { dimPressed } from '../../ui/press';
 
 function Glyph({ symbol }: { symbol: LegendEntry['symbol'] }) {
   if (symbol === 'highlight') {
@@ -36,7 +37,7 @@ export function SymbolLegend({ kind, onClose }: { kind: ItemKind; onClose: () =>
           </View>
         </View>
       ))}
-      <Pressable accessibilityRole="button" style={styles.ok} onPress={onClose}>
+      <Pressable accessibilityRole="button" style={dimPressed(styles.ok)} onPress={onClose}>
         <Txt variant="medium" style={styles.okText}>
           알겠어요
         </Txt>

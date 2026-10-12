@@ -8,6 +8,7 @@ import { Txt } from '../../ui/Txt';
 import { useReduceMotion } from '../../ui/useReduceMotion';
 import { voiceErrorMessage } from '../../voice/errors';
 import { initialVoiceState, voiceReducer } from '../../voice/machine';
+import { dimPressed } from '../../ui/press';
 
 type Props = {
   visible: boolean;
@@ -118,7 +119,7 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} onDismiss={onDismissed}>
       <View style={styles.sheet}>
         <View style={styles.header}>
-          <Pressable accessibilityRole="button" accessibilityLabel="닫기" style={styles.headerButton} onPress={onClose}>
+          <Pressable accessibilityRole="button" accessibilityLabel="닫기" style={dimPressed(styles.headerButton)} onPress={onClose}>
             <Txt>닫기</Txt>
           </Pressable>
           <Txt variant="medium" accessibilityRole="header">
@@ -143,10 +144,10 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
             <Txt style={styles.error} accessibilityRole="alert">
               {voiceErrorMessage(failed.code)}
             </Txt>
-            <Pressable accessibilityRole="button" style={styles.secondary} onPress={() => start().catch(() => dispatch({ type: 'error', code: 'client' }))}>
+            <Pressable accessibilityRole="button" style={dimPressed(styles.secondary)} onPress={() => start().catch(() => dispatch({ type: 'error', code: 'client' }))}>
               <Txt>다시 말하기</Txt>
             </Pressable>
-            <Pressable accessibilityRole="button" style={styles.primary} onPress={() => onTypeInstead(failed.text)}>
+            <Pressable accessibilityRole="button" style={dimPressed(styles.primary)} onPress={() => onTypeInstead(failed.text)}>
               <Txt style={styles.primaryText}>글로 적기</Txt>
             </Pressable>
           </View>
@@ -164,7 +165,7 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
                 accessibilityLabel={listening ? '다 말했어요' : '받아 적는 중'}
                 accessibilityState={{ disabled: !listening }}
                 disabled={!listening}
-                style={[styles.mic, !listening && styles.micBusy]}
+                style={dimPressed([styles.mic, !listening && styles.micBusy])}
                 onPress={() => {
                   dispatch({ type: 'stop' });
                   ExpoSpeechRecognitionModule.stop();

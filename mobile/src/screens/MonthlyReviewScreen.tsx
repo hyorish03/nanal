@@ -15,6 +15,7 @@ import { Inkwell } from '../ui/Inkwell';
 import { colors, HIT, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { useReduceMotion } from '../ui/useReduceMotion';
+import { dimPressed } from '../ui/press';
 
 type Props = { db: Db; month: string; version: number; onChanged: () => void; onClose: () => void };
 type Step = 'loading' | 'consent' | 'making' | 'result';
@@ -97,7 +98,7 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
       <View style={styles.top}>
-        <Pressable accessibilityRole="button" accessibilityLabel="지난 기록으로 돌아가기" style={styles.back} onPress={onClose}>
+        <Pressable accessibilityRole="button" accessibilityLabel="지난 기록으로 돌아가기" style={dimPressed(styles.back)} onPress={onClose}>
           <Txt style={styles.backText}>지난 기록</Txt>
         </Pressable>
         <Txt variant="title" accessibilityRole="header" style={styles.title}>
@@ -130,7 +131,7 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
             </Txt>
           </View>
           <Txt style={styles.muted}>한 달에 한 번 무료로 만들 수 있어요.</Txt>
-          <Pressable accessibilityRole="button" style={styles.primary} onPress={make}>
+          <Pressable accessibilityRole="button" style={dimPressed(styles.primary)} onPress={make}>
             <Txt style={styles.primaryText}>{label} 돌아보기 만들기</Txt>
           </Pressable>
         </View>
@@ -272,7 +273,7 @@ function ReviewResult({
       <Pressable
         accessibilityRole="button"
         accessibilityHint="유료 이용이 필요해요. 지금은 준비 중이에요"
-        style={styles.secondary}
+        style={dimPressed(styles.secondary)}
         onPress={onRemake}
       >
         <Txt>다시 만들기 · 유료(준비 중)</Txt>

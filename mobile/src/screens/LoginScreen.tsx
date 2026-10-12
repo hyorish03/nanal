@@ -6,6 +6,7 @@ import { supabase } from '../supabase';
 import { BookCover } from '../ui/BookCover';
 import { colors, fonts } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { dimPressed } from '../ui/press';
 
 function authErrorMessage(e: AuthError): string {
   if (isAuthRetryableFetchError(e)) return '네트워크에 연결할 수 없습니다. 연결을 확인한 뒤 다시 시도하세요';
@@ -88,7 +89,7 @@ export function LoginScreen() {
               </Txt>
             )}
             <Pressable
-              style={[styles.button, disabled && styles.disabled]}
+              style={dimPressed([styles.button, disabled && styles.disabled])}
               accessibilityRole="button"
               accessibilityState={{ disabled, busy }}
               disabled={disabled}
