@@ -35,16 +35,23 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
 
   return (
     <View style={[styles.row, menu.anchor !== null && styles.rowOpen]}>
-      <Pressable
-        style={tintPressed(styles.main)}
-        disabled={!advance}
-        accessibilityRole={advance ? 'button' : 'text'}
-        accessibilityLabel={itemA11yLabel(item)}
-        onPress={() => onAdvance(id)}
-      >
-        <View style={styles.symbol}>
-          <StatusSymbol kind={kind} />
-        </View>
+      <View style={styles.main}>
+        {/* 상태는 기호만 눌러 바꾼다. 글 자리는 비워 둔다(나중에 눌러서 고치기) */}
+        {advance ? (
+          <Pressable
+            style={tintPressed(styles.symbol)}
+            hitSlop={SYMBOL_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel={itemA11yLabel(item)}
+            onPress={() => onAdvance(id)}
+          >
+            <StatusSymbol kind={kind} />
+          </Pressable>
+        ) : (
+          <View style={styles.symbol} accessible accessibilityLabel={itemA11yLabel(item)}>
+            <StatusSymbol kind={kind} />
+          </View>
+        )}
         <Highlight on={item.priority && !done} animate={marked}>
           <Txt
             variant={kind === 'note' ? 'hand' : 'body'}
@@ -53,7 +60,7 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
             {item.text}
           </Txt>
         </Highlight>
-      </Pressable>
+      </View>
       <Pressable
         ref={menu.ref}
         accessibilityRole="button"
@@ -99,12 +106,15 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
   );
 });
 
+// 기호는 18pt지만 누르는 영역은 줄 높이(50)와 왼쪽 여백까지 넓혀 44pt를 넘긴다
+const SYMBOL_SLOP = { top: 13, bottom: 13, left: 14, right: 8 };
+
 const styles = StyleSheet.create({
   // 줄 노트처럼 줄마다 옅은 선을 긋는다. 여러 줄이면 첫 줄에 맞춰 위로 붙인다
   row: { flexDirection: 'row', alignItems: 'flex-start', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.ruled },
   rowOpen: { backgroundColor: '#EDE4D2' }, // 메뉴가 열린 줄
   main: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 13 },
-  symbol: { width: 18, height: 24, alignItems: 'center', justifyContent: 'center' },
+  symbol: { width: 18, height: 24, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   text: { fontSize: 16, lineHeight: 24, flexShrink: 1 },
   note: { fontFamily: fonts.hand, fontSize: 22, lineHeight: 28, flexShrink: 1 },
   done: { color: colors.faint, textDecorationLine: 'line-through' },

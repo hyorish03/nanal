@@ -51,7 +51,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const afterVoice = useRef<{ text: string; auto: boolean } | null>(null); // 말로 적기 시트가 내려간 뒤 열 정리 시트
   const [notice, setNotice] = useState<string | null>(null);
   const busy = useRef(false);
-  const settling = useRef(false); // 포스트잇 줄을 정리했다: 다음에 불러온 목록을 넣을 때만 자리 이동을 애니메이션한다
+  const reorder = useRef(false); // 상태·중요를 바꿨거나 포스트잇을 정리했다: 다음에 불러온 목록을 넣을 때만 자리 이동을 애니메이션한다
   const reduce = useReduceMotion();
   const inputRef = useRef<TextInput>(null);
   const scrollY = useRef(new Animated.Value(0)).current; // 여백선이 목록 머리를 따라 움직이게
@@ -102,9 +102,10 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     Promise.all([listItemsForDate(db, today), listMigrationCandidates(db, today), countRecordedDays(db)])
       .then(([i, c, n]) => {
         if (cancelled) return;
-        if (settling.current) {
-          settling.current = false;
-          if (!reduce) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        if (reorder.current) {
+          reorder.current = false;
+          // 줄이 순간이동하지 않고 새 자리로 미끄러진다. 동작 줄이기면 그냥 바뀐다
+          if (!reduce) LayoutAnimation.configureNext(REORDER);
         }
         setItems(i);
         setCandidates(c);
@@ -136,19 +137,22 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
   // 아래 함수들은 늘 같은 참조라 입력칸·목록 줄이 화면이 다시 그려질 때 따라 그려지지 않는다
   const submit = useEvent((kind: ItemKind, text: string) => run(() => addItem(db, { kind, text })));
-  const onAdvance = useEvent((id: string) => run(() => advanceStatus(db, id)));
-  const onTogglePriority = useEvent((id: string, on: boolean) => run(() => setPriority(db, id, on)));
+  // 실패하면 다음 불러오기(다른 이유로 일어날 수 있다)에 애니메이션이 묻어가지 않게 끈다
+  const reordering = async (action: () => Promise<unknown>) => {
+    reorder.current = true;
+    const ok = await run(action);
+    if (!ok) reorder.current = false;
+    return ok;
+  };
+  const onAdvance = useEvent((id: string) => reordering(() => advanceStatus(db, id)));
+  const onTogglePriority = useEvent((id: string, on: boolean) => reordering(() => setPriority(db, id, on)));
   const onDelete = useEvent((id: string) => run(() => deleteItem(db, id)));
   const onCapture = useEvent(() => openCapture());
 
-  const settle = async (item: Item, how: SettleHow) => {
-    settling.current = true;
-    const ok = await run(() =>
+  const settle = (item: Item, how: SettleHow) =>
+    reordering(() =>
       how === 'today' ? migrateToToday(db, item.id) : how === 'tomorrow' ? migrateToTomorrow(db, item.id) : deleteItem(db, item.id),
     );
-    if (!ok) settling.current = false;
-    return ok;
-  };
 
   const priorityCount = items.filter((i) => i.priority && (i.status === 'open' || i.status === 'doing')).length;
   const priorityFull = priorityCount >= MAX_PRIORITY_PER_DAY;
@@ -295,7 +299,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
 // 머리 버튼도 칩처럼 보이는 높이만 낮추고, 누르는 영역은 hitSlop으로 44pt를 지킨다
 const CHIP_SLOP = { top: 5, bottom: 5 };
-const RIBBON_GAP = 16; // 끈의 44pt 누르는 영역이 하루 마무리 버튼에 겹치지 않게
+const RIBBON_GAP = 16;
+const REORDER = LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity); // 끈의 44pt 누르는 영역이 하루 마무리 버튼에 겹치지 않게
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingTop: 12, gap: 24 },
