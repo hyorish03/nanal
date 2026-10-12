@@ -3,7 +3,7 @@ import { DefaultTheme, NavigationContainer, StackActions, type Theme, useNavigat
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, AppState, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, AppState, Keyboard, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import type { Db } from '../db/types';
@@ -33,6 +33,7 @@ import { TodayScreen } from './TodayScreen';
 
 export function Main({ db, userId }: { db: Db; userId: string }) {
   const [claim, setClaim] = useState<'pending' | 'ok' | 'mismatch' | 'error'>('pending');
+  const [attempt, setAttempt] = useState(0); // 다시 시도를 누를 때마다 하나씩 늘린다
 
   useEffect(() => {
     let alive = true;
@@ -48,17 +49,39 @@ export function Main({ db, userId }: { db: Db; userId: string }) {
     return () => {
       alive = false;
     };
-  }, [db, userId]);
+  }, [db, userId, attempt]);
 
-  if (claim === 'pending') return <SafeAreaView style={styles.container} />;
+  if (claim === 'pending')
+    return (
+      <SafeAreaView style={[styles.container, styles.center]}>
+        <ActivityIndicator accessibilityLabel="불러오는 중" color={colors.navy} />
+      </SafeAreaView>
+    );
   if (claim === 'mismatch' || claim === 'error') {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.blocked} accessibilityRole="alert">
-          {claim === 'mismatch'
-            ? '이 기기에는 다른 계정의 기록이 있습니다. 같은 계정으로 로그인하세요.'
-            : '기기 데이터를 확인하지 못했습니다. 앱을 다시 실행하세요.'}
-        </Text>
+        <View style={styles.blocked}>
+          <Txt style={styles.blockedText} accessibilityRole="alert">
+            {claim === 'mismatch'
+              ? '이 기기에는 다른 계정의 기록이 있어요. 그 계정으로 다시 로그인해 주세요.'
+              : '이 기기의 기록을 확인하지 못했어요. 잠시 뒤에 다시 시도해 주세요.'}
+          </Txt>
+          <View style={styles.blockedActions}>
+            <Pressable accessibilityRole="button" style={dimPressed(styles.blockedPrimary)} onPress={() => setAttempt((n) => n + 1)}>
+              <Txt variant="medium" style={styles.blockedPrimaryText}>
+                다시 시도
+              </Txt>
+            </Pressable>
+            {/* 이 기기에서만 로그아웃한다(오프라인이어도 로그인 화면으로 돌아가게) */}
+            <Pressable
+              accessibilityRole="button"
+              style={dimPressed(styles.blockedSecondary)}
+              onPress={() => supabase.auth.signOut({ scope: 'local' }).catch(() => {})}
+            >
+              <Txt>로그아웃</Txt>
+            </Pressable>
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
@@ -307,11 +330,7 @@ function SyncBar({ pending, error }: { pending: number; error: string | null }) 
   return (
     <View pointerEvents="none" style={[styles.syncBar, { top: insets.top }]}>
       <Txt style={styles.syncText} accessibilityLiveRegion="polite">
-        {error
-          ? pending > 0
-            ? `동기화 실패, 자동으로 다시 시도합니다 (${pending}건 대기)`
-            : '동기화 실패, 자동으로 다시 시도합니다'
-          : `동기화 대기 ${pending}건`}
+        {error ? '아직 올리지 못했어요. 자동으로 다시 시도할게요 (기록은 이 기기에 안전해요)' : `${pending}개를 올리는 중이에요`}
       </Txt>
     </View>
   );
@@ -352,9 +371,15 @@ function LampShade() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   evening: { backgroundColor: LAMP_PAPER },
-  container: { flex: 1 }, // 배경은 root와 각 화면이 칠한다(저녁은 EveningBackdrop이 칠한다)
+  container: { flex: 1 }, // 배경은 root와 각 화면이 칠한다(저녁은 EveningBackdrop과 하루 마무리 화면이 칠한다)
   page: { backgroundColor: colors.paper },
-  blocked: { padding: 24, fontSize: 16, lineHeight: 24, color: colors.ink },
+  center: { justifyContent: 'center', alignItems: 'center' },
+  blocked: { padding: 24, gap: 20 },
+  blockedText: { fontSize: 16, lineHeight: 24 },
+  blockedActions: { gap: 10 },
+  blockedPrimary: { minHeight: 52, borderRadius: 26, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  blockedPrimaryText: { color: colors.onDark },
+  blockedSecondary: { minHeight: 48, borderRadius: 24, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   syncBar: { position: 'absolute', left: 0, right: 0, backgroundColor: colors.postit, paddingVertical: 6, paddingHorizontal: 16 },
   syncText: { color: colors.postitText, fontSize: 13 },
 });
