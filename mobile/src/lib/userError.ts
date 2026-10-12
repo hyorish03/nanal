@@ -1,7 +1,7 @@
 import { AiError } from '../ai/errors';
 
 export const DEFAULT_ERROR_MESSAGE = '저장하지 못했어요. 잠시 뒤에 다시 해 주세요';
-export const OFFLINE_MESSAGE = '인터넷에 연결되지 않았어요. 연결을 확인하고 다시 시도해 주세요';
+export const OFFLINE_MESSAGE = '인터넷에 연결되지 않았어요. 연결하고 다시 해 주세요';
 
 // fetch·Supabase가 서버에 닿지 못했을 때 내는 오류들. 문구는 플랫폼마다 달라 이름과 문구를 함께 본다.
 const NETWORK_NAMES = new Set(['AuthRetryableFetchError', 'FunctionsFetchError', 'NetworkError', 'AbortError', 'TimeoutError']);

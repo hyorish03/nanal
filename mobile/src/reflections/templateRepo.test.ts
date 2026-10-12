@@ -48,7 +48,7 @@ test('질문 목록이 깨져 있어도 자유 질문 하나로 연다', async (
   const odd = await createTemplate(db, { name: '이상한 것', questions: ['a'] }, NOW);
   await db.runAsync('UPDATE templates SET questions = ? WHERE id = ?', ['{not json', bad.id]);
   await db.runAsync('UPDATE templates SET questions = ? WHERE id = ?', ['[{"key":"q1"},{"key":"q2","text":"남은 질문"}]', odd.id]);
-  expect((await findTemplate(db, bad.id))?.questions).toEqual([{ key: 'q1', text: '자유롭게 쓰기' }]);
+  expect((await findTemplate(db, bad.id))?.questions).toEqual([{ key: 'q1', text: '오늘을 자유롭게 적어 보세요' }]);
   expect((await findTemplate(db, odd.id))?.questions).toEqual([{ key: 'q2', text: '남은 질문' }]);
   expect((await listTemplates(db)).map((x) => x.name)).toEqual(expect.arrayContaining(['깨진 것', '이상한 것']));
 });

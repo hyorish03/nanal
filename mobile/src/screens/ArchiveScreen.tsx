@@ -439,9 +439,9 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
               ? '기록이 없는 날이에요'
               : day.tasksTotal === 0
                 ? day.tasksMigrated > 0
-                  ? '다른 날로 옮긴 일만 있어요'
+                  ? '다른 날로 넘긴 일만 있어요'
                   : '이 날은 할 일을 적지 않았어요'
-                : `할 일 ${day.tasksTotal}개 중 ${day.tasksDone}개 끝냄${day.tasksMigrated > 0 ? `, ${day.tasksMigrated}개는 다른 날로` : ''}`}
+                : `할 일 ${day.tasksTotal}개 중 ${day.tasksDone}개를 끝냈어요${day.tasksMigrated > 0 ? `, ${day.tasksMigrated}개는 다른 날로 넘겼어요` : ''}`}
           </Txt>
           {shownItems.length > 0 && (
             <View style={styles.items}>

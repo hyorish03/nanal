@@ -273,6 +273,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                       version={version}
                       onClose={() => navigation.goBack()}
                       onOpenReview={(month) => navigation.navigate('review', { month })}
+                      onChanged={onChanged}
                     />
                   )}
                 </Stack.Screen>

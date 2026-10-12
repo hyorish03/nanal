@@ -23,7 +23,7 @@ function normalize(input: TemplateInput): { name: string; questions: TemplateQue
 }
 
 // 동기화로 깨진 값이 들어와도 화면이 멈추지 않게, 읽을 수 없는 질문 목록은 자유 질문 하나로 대신한다.
-const FALLBACK_QUESTIONS: TemplateQuestion[] = [{ key: 'q1', text: '자유롭게 쓰기' }];
+const FALLBACK_QUESTIONS: TemplateQuestion[] = [{ key: 'q1', text: '오늘을 자유롭게 적어 보세요' }];
 
 function parseQuestions(raw: string): TemplateQuestion[] {
   try {
