@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, AppState, BackHandler, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -183,6 +184,8 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
 
   return (
     <View style={styles.root}>
+      {/* 남색 표지가 보이는 동안은 밝은 상태 막대 */}
+      <StatusBar style={coverSettled ? 'dark' : 'light'} animated />
       <EveningBackdrop on={screen === 'evening'} />
       <SafeAreaView style={styles.container}>
         {(pending > 0 || error) && (
