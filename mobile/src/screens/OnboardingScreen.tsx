@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { BookCover } from '../ui/BookCover';
 import { Highlight } from '../ui/Highlight';
 import { Inkwell } from '../ui/Inkwell';
+import { EASE_OUT } from '../ui/motion';
 import { StatusSymbol } from '../ui/StatusSymbol';
 import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
@@ -16,41 +17,57 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const reduce = useReduceMotion();
   const book = useRef(new Animated.Value(0)).current;
   const fade = useRef(new Animated.Value(1)).current;
-  const opening = useRef(false);
+  const slide = useRef(new Animated.Value(0)).current;
+  const moving = useRef(false); // 단계가 바뀌거나 표지를 넘기는 동안에는 누름을 무시한다
 
-  // 단계가 바뀔 때 본문을 살짝 흐렸다가 새 단계로 바꾼다.
+  useEffect(
+    () => () => {
+      book.stopAnimation();
+      fade.stopAnimation();
+      slide.stopAnimation();
+    },
+    [book, fade, slide],
+  );
+
+  // 단계가 바뀔 때 본문을 흐렸다가, 새 단계를 가는 쪽에서 살짝 밀어 넣는다(동작 줄이기면 흐리기만).
   const goTo = (target: number) => {
-    if (reduce) {
-      setStep(target);
-      return;
-    }
-    Animated.timing(fade, { toValue: 0, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(() => {
+    if (moving.current) return;
+    moving.current = true;
+    const from = reduce ? 0 : target > step ? 12 : -12;
+    Animated.timing(fade, { toValue: 0, duration: 120, easing: EASE_OUT, useNativeDriver: true }).start(({ finished }) => {
+      if (!finished) {
+        moving.current = false;
+        return;
+      }
       setStep(target);
       book.setValue(0);
-      Animated.timing(fade, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+      slide.setValue(from);
+      Animated.parallel([
+        Animated.timing(fade, { toValue: 1, duration: reduce ? 200 : 240, easing: EASE_OUT, useNativeDriver: true }),
+        Animated.timing(slide, { toValue: 0, duration: 240, easing: EASE_OUT, useNativeDriver: true }),
+      ]).start(() => {
+        moving.current = false;
+      });
     });
   };
 
   // 첫 단계의 "시작하기"는 작은 다이어리의 표지를 책등 쪽으로 넘겨 펼친 뒤 다음 단계로 간다.
+  // 동작 줄이기면 표지는 넘기지 않고 다음 단계로 흐려지며 바뀐다.
   const next = () => {
-    if (step > 0) {
+    if (step > 0 || reduce) {
       goTo(Math.min(step + 1, STEPS - 1));
       return;
     }
-    if (opening.current) return;
-    if (reduce) {
-      setStep(1);
-      return;
-    }
-    opening.current = true;
+    if (moving.current) return;
+    moving.current = true;
     Animated.timing(book, {
       toValue: 1,
       duration: 900,
       easing: Easing.inOut(Easing.cubic),
       useNativeDriver: true,
-    }).start(() => {
-      opening.current = false;
-      goTo(1);
+    }).start(({ finished }) => {
+      moving.current = false;
+      if (finished) goTo(1);
     });
   };
   // 표지가 왼쪽으로 넘어가면 펼친 두 쪽이 가운데 오도록 책을 오른쪽으로 반 권 옮긴다.
@@ -69,7 +86,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
         </Pressable>
       </View>
 
-      <Animated.View style={[styles.flex, { opacity: fade }]}>
+      <Animated.View style={[styles.flex, { opacity: fade, transform: [{ translateX: slide }] }]}>
       <ScrollView contentContainerStyle={styles.body}>
         {step === 0 && (
           <View style={styles.centered}>

@@ -1,6 +1,8 @@
-import { type ReactNode, useCallback, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { EASE_OUT } from './motion';
 import { colors } from './theme';
+import { useReduceMotion } from './useReduceMotion';
 
 export type Anchor = { x: number; y: number; width: number; height: number };
 
@@ -26,21 +28,46 @@ type Props = {
 
 export function Popover({ anchor, align, width, label, onClose, children }: Props) {
   const screen = useWindowDimensions();
+  const reduce = useReduceMotion();
+  const appear = useRef(new Animated.Value(0)).current;
+  const shown = anchor !== null;
+
+  // 버튼 쪽 모서리에서 살짝 커지며 나타난다. 닫을 때는 바로 사라진다(뒤이은 Alert은 따로 창을 띄우니 기다릴 필요가 없다).
+  useEffect(() => {
+    if (!shown) return;
+    const anim = Animated.timing(appear, { toValue: 1, duration: 150, easing: EASE_OUT, useNativeDriver: true });
+    anim.start();
+    return () => {
+      anim.stop();
+      appear.setValue(0); // 다음에 열 때 첫 프레임부터 투명하게
+    };
+  }, [shown, appear]);
+
   if (!anchor) return null;
   const left =
     align === 'left'
       ? Math.max(12, Math.min(anchor.x - 4, screen.width - width - 12))
       : Math.max(12, anchor.x + anchor.width - width + 6);
   return (
-    <Modal transparent visible animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+    <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="닫기" onPress={onClose} />
-      <View
+      <Animated.View
         accessibilityViewIsModal
         accessibilityLabel={label}
-        style={[styles.box, { top: anchor.y + anchor.height + 4, left, width }]}
+        style={[
+          styles.box,
+          {
+            top: anchor.y + anchor.height + 4,
+            left,
+            width,
+            opacity: appear,
+            transformOrigin: align === 'right' ? 'top right' : 'top left',
+            transform: reduce ? [] : [{ scale: appear.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }],
+          },
+        ]}
       >
         {children}
-      </View>
+      </Animated.View>
     </Modal>
   );
 }

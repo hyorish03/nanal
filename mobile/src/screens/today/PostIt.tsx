@@ -1,8 +1,9 @@
 import { useRef } from 'react';
-import { Animated, Easing, LayoutAnimation, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import type { Item } from '../../items/repo';
 import { formatShortDate } from '../../lib/date';
 import { confirmDelete } from '../../ui/dialogs';
+import { EASE_OUT } from '../../ui/motion';
 import { colors } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { useReduceMotion } from '../../ui/useReduceMotion';
@@ -25,13 +26,15 @@ export function PostIt({ candidates, onSettle }: Props) {
     leaving.add(item.id);
     const last = candidates.filter((c) => !leaving.has(c.id)).length === 0;
     if (!reduce) {
-      const anims = [
-        Animated.timing(row, { toValue: 1, duration: 260, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      ];
-      if (last) anims.push(Animated.timing(peel, { toValue: 1, duration: 500, easing: Easing.bezier(0.4, 0, 0.6, 1), useNativeDriver: true }));
+      const anims = [Animated.timing(row, { toValue: 1, duration: 220, easing: EASE_OUT, useNativeDriver: true })];
+      // 마지막 줄이면 줄이 빠지기 시작한 뒤에 포스트잇을 뗀다
+      if (last) {
+        const lift = Animated.timing(peel, { toValue: 1, duration: 500, easing: Easing.bezier(0.4, 0, 0.6, 1), useNativeDriver: true });
+        anims.push(Animated.sequence([Animated.delay(120), lift]));
+      }
       await new Promise<void>((resolve) => Animated.parallel(anims).start(() => resolve()));
     }
-    if (!reduce) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    // 목록이 당겨지는 레이아웃 애니메이션은 화면이 다시 불러온 목록을 넣기 직전에 건다(TodayScreen)
     const ok = await onSettle(item, how);
     leaving.delete(item.id);
     if (!ok) {

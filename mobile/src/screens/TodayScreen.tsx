@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, LayoutAnimation, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import type { Db } from '../db/types';
 import {
@@ -20,6 +20,7 @@ import { countRecordedDays } from '../stats/recordedDays';
 import { Popover, useAnchor } from '../ui/Popover';
 import { colors, fonts, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { useReduceMotion } from '../ui/useReduceMotion';
 import { ItemRow } from './today/ItemRow';
 import type { LinkAction } from '../lib/deepLink';
 import { OrganizeSheet } from './today/OrganizeSheet';
@@ -39,9 +40,6 @@ const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
   { kind: 'note', symbol: '–', label: '메모' },
 ];
 
-// 표지가 펼쳐지는 동안(약 950ms) 키보드가 올라오지 않도록 입력칸 포커스를 표지가 열린 뒤로 미룬다.
-const FOCUS_DELAY_MS = 1000;
-
 export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchive, focusReady = true, onFocused, pendingAction = null, onActionHandled }: Props) {
   const today = logicalDate(new Date());
   const [items, setItems] = useState<Item[]>([]);
@@ -56,16 +54,16 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const afterVoice = useRef<{ text: string; auto: boolean } | null>(null); // 말로 적기 시트가 내려간 뒤 열 정리 시트
   const [notice, setNotice] = useState<string | null>(null);
   const busy = useRef(false);
+  const settling = useRef(false); // 포스트잇 줄을 정리했다: 다음에 불러온 목록을 넣을 때만 자리 이동을 애니메이션한다
+  const reduce = useReduceMotion();
   const info = useAnchor();
   const inputRef = useRef<TextInput>(null);
 
+  // 표지가 다 펼쳐진 뒤에만 true가 된다(Main이 Cover의 onOpened로 알려 준다). 그래서 기다리지 않고 바로 포커스한다.
   useEffect(() => {
     if (!focusReady) return;
-    const t = setTimeout(() => {
-      inputRef.current?.focus();
-      onFocused?.();
-    }, FOCUS_DELAY_MS);
-    return () => clearTimeout(t);
+    inputRef.current?.focus();
+    onFocused?.();
     // onFocused는 매 렌더 새 함수라 의존성에서 뺀다
   }, [focusReady]);
 
@@ -81,15 +79,12 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     } else openOrganize();
   };
 
-  // 위젯·컨트롤에서 온 동작. 표지가 펼쳐지는 시간만큼 기다린 뒤 실행한다.
+  // 위젯·컨트롤에서 온 동작. 표지가 다 펼쳐진 뒤에만 넘어온다(이미 펼쳐져 있으면 바로).
   useEffect(() => {
     if (!pendingAction) return;
-    const t = setTimeout(() => {
-      if (pendingAction === 'focus') inputRef.current?.focus();
-      else openCapture();
-      onActionHandled?.();
-    }, FOCUS_DELAY_MS);
-    return () => clearTimeout(t);
+    if (pendingAction === 'focus') inputRef.current?.focus();
+    else openCapture();
+    onActionHandled?.();
     // onActionHandled는 매 렌더 새 함수라 의존성에서 뺀다
   }, [pendingAction]);
 
@@ -98,6 +93,10 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     Promise.all([listItemsForDate(db, today), listMigrationCandidates(db, today), countRecordedDays(db)])
       .then(([i, c, n]) => {
         if (cancelled) return;
+        if (settling.current) {
+          settling.current = false;
+          if (!reduce) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        }
         setItems(i);
         setCandidates(c);
         setRecordedDays(n);
@@ -132,10 +131,14 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       setText('');
     });
 
-  const settle = (item: Item, how: SettleHow) =>
-    run(() =>
+  const settle = async (item: Item, how: SettleHow) => {
+    settling.current = true;
+    const ok = await run(() =>
       how === 'today' ? migrateToToday(db, item.id) : how === 'tomorrow' ? migrateToTomorrow(db, item.id) : deleteItem(db, item.id),
     );
+    if (!ok) settling.current = false;
+    return ok;
+  };
 
   const priorityCount = items.filter((i) => i.priority && (i.status === 'open' || i.status === 'doing')).length;
 

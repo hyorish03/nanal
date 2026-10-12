@@ -67,6 +67,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const [screen, setScreen] = useState<Screen | null>(null);
   const [reviewMonth, setReviewMonth] = useState<string | null>(null);
   const [coverOpen, setCoverOpen] = useState(false);
+  const [coverSettled, setCoverSettled] = useState(false); // 표지가 다 펼쳐졌다(포커스, 링크 동작은 이때부터)
   const [dayClosed, setDayClosed] = useState(false); // 저녁 마무리에서 "닫기"를 눌렀다
   const [closedShown, setClosedShown] = useState(false); // 덮기 애니메이션이 끝났다
   const [focusPending, setFocusPending] = useState(true); // 표지가 열린 뒤 입력칸 포커스는 한 번만
@@ -146,6 +147,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     Keyboard.dismiss();
     setDayClosed(true);
     setCoverOpen(false);
+    setCoverSettled(false);
   }, []);
 
   const reopen = useCallback(() => {
@@ -177,9 +179,9 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
             onChanged={onChanged}
             onOpenEvening={() => setScreen('evening')}
             onOpenArchive={() => setScreen('archive')}
-            focusReady={coverOpen && focusPending}
+            focusReady={coverSettled && focusPending}
             onFocused={() => setFocusPending(false)}
-            pendingAction={coverOpen ? linkAction : null}
+            pendingAction={coverSettled ? linkAction : null}
             onActionHandled={() => setLinkAction(null)}
           />
         )}
@@ -209,6 +211,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
         open={coverOpen}
         line={dayClosed ? '오늘도 수고했어요' : '오늘도 한 줄씩'}
         onClosed={() => setClosedShown(true)}
+        onOpened={() => setCoverSettled(true)}
       >
         {dayClosed && closedShown && (
           <Pressable accessibilityRole="button" style={styles.reopen} onPress={reopen}>

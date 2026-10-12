@@ -8,21 +8,23 @@ type Props = {
   open: boolean; // true면 펼쳐져 사라지고, false면 덮인다
   line: string; // 표지 아래 문구
   onClosed?: () => void; // 덮기가 끝났을 때
+  onOpened?: () => void; // 펼치기가 끝났을 때(동작 줄이기면 바로)
   children?: ReactNode; // 덮인 표지 위에 올릴 버튼 등
 };
 
 const DURATION = 820;
 
-export function Cover({ open, line, onClosed, children }: Props) {
+export function Cover({ open, line, onClosed, onOpened, children }: Props) {
   const reduce = useReduceMotion();
   const { width } = useWindowDimensions();
   const progress = useRef(new Animated.Value(open ? 1 : 0)).current;
   const [visible, setVisible] = useState(!open);
   const onClosedRef = useRef(onClosed);
   onClosedRef.current = onClosed;
+  const onOpenedRef = useRef(onOpened);
+  onOpenedRef.current = onOpened;
   const prevOpen = useRef(open);
   const closePending = useRef(false); // 열려 있다가 실제로 덮기 시작했을 때만 true
-
 
   useEffect(() => {
     if (!open) setVisible(true);
@@ -30,8 +32,10 @@ export function Cover({ open, line, onClosed, children }: Props) {
     else if (prevOpen.current) closePending.current = true;
     prevOpen.current = open;
     const finish = () => {
-      if (open) setVisible(false);
-      else if (closePending.current) {
+      if (open) {
+        setVisible(false);
+        onOpenedRef.current?.();
+      } else if (closePending.current) {
         closePending.current = false;
         onClosedRef.current?.();
       }
