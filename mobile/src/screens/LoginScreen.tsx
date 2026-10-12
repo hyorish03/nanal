@@ -1,5 +1,5 @@
 import { isAuthRetryableFetchError, type AuthError } from '@supabase/supabase-js';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../supabase';
@@ -9,15 +9,19 @@ import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
 import { dimPressed } from '../ui/press';
 
+const UNKNOWN_ERROR = '로그인하지 못했어요. 잠시 뒤에 다시 해 주세요';
+
+// 서버의 영어 문구는 그대로 보여주지 않는다
 function authErrorMessage(e: AuthError): string {
-  if (isAuthRetryableFetchError(e)) return '네트워크에 연결할 수 없습니다. 연결을 확인한 뒤 다시 시도하세요';
+  if (isAuthRetryableFetchError(e)) return '인터넷에 연결되지 않았어요. 연결을 확인하고 다시 해 주세요';
   if (e.code === 'invalid_credentials' || e.message.includes('Invalid login credentials')) {
-    return '이메일 또는 비밀번호가 올바르지 않습니다';
+    return '이메일이나 비밀번호가 맞지 않아요. 다시 확인해 주세요';
   }
   if (e.code === 'email_not_confirmed' || e.message.includes('Email not confirmed')) {
-    return '이메일 인증이 필요합니다';
+    return '아직 이메일 인증을 하지 않았어요. 받은 메일함에서 인증해 주세요';
   }
-  return e.message;
+  if (e.code === 'over_request_rate_limit' || e.status === 429) return '시도가 너무 잦았어요. 잠시 뒤에 다시 해 주세요';
+  return UNKNOWN_ERROR;
 }
 
 export function LoginScreen() {
@@ -25,6 +29,7 @@ export function LoginScreen() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const signIn = async () => {
     if (busy || !email || !password) return;
@@ -33,8 +38,8 @@ export function LoginScreen() {
     try {
       const { error: e } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (e) setError(authErrorMessage(e));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+    } catch {
+      setError(UNKNOWN_ERROR);
     } finally {
       setBusy(false);
     }
@@ -65,6 +70,9 @@ export function LoginScreen() {
                 autoComplete="email"
                 keyboardType="email-address"
                 textContentType="emailAddress"
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => passwordRef.current?.focus()}
                 value={email}
                 onChangeText={setEmail}
               />
@@ -72,6 +80,7 @@ export function LoginScreen() {
             <View style={styles.field}>
               <Txt style={styles.label}>비밀번호</Txt>
               <TextInput
+                ref={passwordRef}
                 style={styles.input}
                 placeholder="비밀번호"
                 placeholderTextColor={colors.faint}
@@ -80,6 +89,7 @@ export function LoginScreen() {
                 autoCorrect={false}
                 autoComplete="current-password"
                 textContentType="password"
+                returnKeyType="go"
                 value={password}
                 onChangeText={setPassword}
                 onSubmitEditing={signIn}
@@ -98,7 +108,7 @@ export function LoginScreen() {
               onPress={signIn}
             >
               <Txt variant="medium" style={styles.buttonText}>
-                {busy ? '펼치는 중…' : '노트 펼치기'}
+                {busy ? '로그인하는 중…' : '로그인'}
               </Txt>
             </Pressable>
           </View>
