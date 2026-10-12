@@ -91,3 +91,41 @@ test('끝난 트랜잭션의 tx는 쓸 수 없다', async () => {
   ).rejects.toThrow('boom');
   await expect(captured2.getAllAsync('x', [])).rejects.toThrow('트랜잭션이 이미 끝났습니다');
 });
+
+test('잠금(busy)으로 실패한 트랜잭션은 통째로 한 번 다시 한다', async () => {
+  const events: string[] = [];
+  const raw = fakeRaw(events);
+  const inner = raw.withTransactionAsync.bind(raw);
+  let calls = 0;
+  raw.withTransactionAsync = async (task) => {
+    calls++;
+    if (calls === 1) throw new Error('database is locked');
+    return inner(task);
+  };
+  const db = serialize(raw);
+  const ran = jest.fn(async (tx: Tx) => {
+    await tx.runAsync('a', []);
+    return 'ok';
+  });
+  expect(await db.transaction(ran)).toBe('ok');
+  expect(calls).toBe(2);
+  expect(ran).toHaveBeenCalledTimes(1);
+});
+
+test('busy가 두 번 계속되거나 다른 오류면 다시 하지 않고 던진다', async () => {
+  const raw = fakeRaw([]);
+  let calls = 0;
+  raw.withTransactionAsync = async () => {
+    calls++;
+    throw new Error('database is locked');
+  };
+  await expect(serialize(raw).transaction(async () => 1)).rejects.toThrow('database is locked');
+  expect(calls).toBe(2);
+  let other = 0;
+  raw.withTransactionAsync = async () => {
+    other++;
+    throw new Error('boom');
+  };
+  await expect(serialize(raw).transaction(async () => 1)).rejects.toThrow('boom');
+  expect(other).toBe(1);
+});

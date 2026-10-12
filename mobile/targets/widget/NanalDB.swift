@@ -103,16 +103,17 @@ enum NanalDB {
     return WidgetSnapshot(available: true, items: items, carried: carried, mood: mood, recordedDays: recorded)
   }
 
-  // 앱의 advanceStatus와 같은 규칙(widgetAdvance). 바뀐 행이 있을 때만 outbox에 남긴다. 동기화는 앱이 열릴 때 한다.
+  // 앱의 advanceStatus와 같은 규칙(widgetAdvance). 보여 준 상태와 같을 때만 바꾸고, 바뀐 행이 있을 때만 outbox에 남긴다. 동기화는 앱이 열릴 때 한다.
   @discardableResult
-  static func advance(id: String, now: Date = Date()) -> Bool {
+  static func advance(id: String, from status: String, now: Date = Date()) -> Bool {
     guard let db = open() else { return false }
     defer { sqlite3_close(db) }
     guard sqlite3_exec(db, "BEGIN IMMEDIATE", nil, nil, nil) == SQLITE_OK else { return false }
-    var ok = run(db, SharedSQL.advance, [isoTimestamp(now), id])
+    var ok = run(db, SharedSQL.advance, [isoTimestamp(now), id, status])
     let changed = ok && sqlite3_changes(db) > 0
     if changed { ok = run(db, SharedSQL.markDirty, [id]) }
-    sqlite3_exec(db, ok ? "COMMIT" : "ROLLBACK", nil, nil, nil)
-    return ok && changed
+    if ok && changed && sqlite3_exec(db, "COMMIT", nil, nil, nil) == SQLITE_OK { return true }
+    sqlite3_exec(db, "ROLLBACK", nil, nil, nil)
+    return false
   }
 }

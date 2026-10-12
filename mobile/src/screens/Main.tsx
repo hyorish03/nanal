@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, BackHandler, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Db } from '../db/types';
-import { type LinkAction, parseDeepLink } from '../lib/deepLink';
+import { consumeInitialUrl, type LinkAction, parseDeepLink } from '../lib/deepLink';
 import { hasSeenOnboarding, markOnboardingSeen } from '../lib/onboarding';
 import { supabase } from '../supabase';
 import { claimOwner } from '../sync/owner';
@@ -71,11 +71,15 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const [closedShown, setClosedShown] = useState(false); // 덮기 애니메이션이 끝났다
   const [focusPending, setFocusPending] = useState(true); // 표지가 열린 뒤 입력칸 포커스는 한 번만
   const [linkAction, setLinkAction] = useState<LinkAction | null>(null);
+  const screenRef = useRef<Screen | null>(null);
+  screenRef.current = screen;
 
   // 위젯·컨트롤에서 연 주소: 오늘 화면으로 가서(덮여 있으면 펼친 뒤) 동작을 넘긴다. 온보딩 중이면 화면은 그대로 둔다.
   const handleLink = useCallback((url: string | null) => {
     const link = parseDeepLink(url);
     if (!link) return;
+    // 온보딩 중에 온 동작은 버린다(끝난 뒤 말로 적기가 갑자기 뜨지 않게).
+    if (screenRef.current === 'onboarding') return;
     setScreen((s) => (s === null || s === 'onboarding' ? s : 'today'));
     setDayClosed(false);
     setClosedShown(false);
@@ -84,13 +88,16 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   }, []);
 
   useEffect(() => {
-    Linking.getInitialURL().then(handleLink, () => {});
+    if (consumeInitialUrl()) Linking.getInitialURL().then(handleLink, () => {});
     const sub = Linking.addEventListener('url', (e) => handleLink(e.url));
     return () => sub.remove();
   }, [handleLink]);
 
   useEffect(() => {
-    hasSeenOnboarding(AsyncStorage).then((seen) => setScreen(seen ? 'today' : 'onboarding'));
+    hasSeenOnboarding(AsyncStorage).then((seen) => {
+      if (!seen) setLinkAction(null); // 온보딩보다 먼저 도착한 링크 동작은 버린다
+      setScreen(seen ? 'today' : 'onboarding');
+    });
   }, []);
 
   // 첫 화면이 정해지면 잠깐 표지를 보여준 뒤 펼친다(스펙 11.1).

@@ -1,5 +1,9 @@
 import type { Db, RawDb, SqlParam, Tx } from './types';
 
+// 위젯이 같은 DB를 쓰는 중이면 expo-sqlite가 SQLite의 "database is locked"(SQLITE_BUSY)를 그대로 던진다.
+const isBusy = (e: unknown) => /database is locked|SQLITE_BUSY|SQLITE_LOCKED/i.test(e instanceof Error ? e.message : String(e));
+const BUSY_RETRY_MS = 100;
+
 export function serialize(raw: RawDb): Db {
   let tail: Promise<unknown> = Promise.resolve();
   const enqueue = <T>(op: () => Promise<T>): Promise<T> => {
@@ -24,17 +28,26 @@ export function serialize(raw: RawDb): Db {
     getFirstAsync: <T>(sql: string, params: SqlParam[]) => enqueue(() => raw.getFirstAsync<T>(sql, params)),
     transaction: <T>(task: (tx: Tx) => Promise<T>) =>
       enqueue(async () => {
-        let active = true;
-        const tx = makeTx(() => active);
-        let result!: T;
+        const attempt = async (): Promise<T> => {
+          let active = true;
+          const tx = makeTx(() => active);
+          let result!: T;
+          try {
+            await raw.withTransactionAsync(async () => {
+              result = await task(tx);
+            });
+          } finally {
+            active = false;
+          }
+          return result;
+        };
         try {
-          await raw.withTransactionAsync(async () => {
-            result = await task(tx);
-          });
-        } finally {
-          active = false;
+          return await attempt();
+        } catch (e) {
+          if (!isBusy(e)) throw e;
+          await new Promise((r) => setTimeout(r, BUSY_RETRY_MS));
+          return attempt(); // 롤백된 트랜잭션 전체를 한 번만 다시 한다
         }
-        return result;
       }),
   };
 }

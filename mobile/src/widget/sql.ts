@@ -17,10 +17,10 @@ SELECT date FROM items WHERE deleted_at IS NULL
 UNION SELECT date FROM days WHERE deleted_at IS NULL AND mood IS NOT NULL
 UNION SELECT date FROM reflections WHERE deleted_at IS NULL
 )`,
-  // advanceStatus와 같은 순서(open → doing → done → open). 바뀐 행이 있을 때만 markDirty를 실행한다.
+  // advanceStatus와 같은 순서(open → doing → done → open). 위젯이 보여 준 상태(마지막 ?)와 같을 때만 바꾼다. 바뀐 행이 있을 때만 markDirty를 실행한다.
   advance: `UPDATE items
 SET status = CASE status WHEN 'open' THEN 'doing' WHEN 'doing' THEN 'done' ELSE 'open' END, updated_at = ?
-WHERE id = ? AND kind = 'task' AND deleted_at IS NULL AND status IN ('open', 'doing', 'done')`,
+WHERE id = ? AND kind = 'task' AND deleted_at IS NULL AND status IN ('open', 'doing', 'done') AND status = ?`,
   markDirty: `INSERT INTO outbox (table_name, row_key) VALUES ('items', ?)
 ON CONFLICT (table_name, row_key) DO UPDATE SET version = version + 1`,
 } as const;
@@ -46,9 +46,9 @@ export function pickNext(items: WidgetItem[]): WidgetItem | null {
   return items.find((i) => i.status !== 'done') ?? null;
 }
 
-export async function widgetAdvance(db: Db, id: string, now = new Date()): Promise<boolean> {
+export async function widgetAdvance(db: Db, id: string, expected: WidgetItem['status'], now = new Date()): Promise<boolean> {
   return db.transaction(async (tx) => {
-    const r = await tx.runAsync(WIDGET_SQL.advance, [now.toISOString(), id]);
+    const r = await tx.runAsync(WIDGET_SQL.advance, [now.toISOString(), id, expected]);
     if (r.changes === 0) return false;
     await tx.runAsync(WIDGET_SQL.markDirty, [id]);
     return true;

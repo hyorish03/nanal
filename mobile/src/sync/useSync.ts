@@ -20,6 +20,8 @@ export function useSync(db: Db, remote: Remote, onPulled: () => void) {
   const alive = useRef(false);
 
   const runSync = useCallback(async () => {
+    // 백그라운드에서 공유 DB의 쓰기 트랜잭션을 쥔 채 iOS가 앱을 멈추면 0xdead10cc로 죽는다. 다음 foreground에서 다시 돈다.
+    if (AppState.currentState !== 'active') return;
     try {
       await engine.sync();
       if (alive.current) setError(null);

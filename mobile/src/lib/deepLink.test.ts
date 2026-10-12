@@ -1,4 +1,4 @@
-import { parseDeepLink } from './deepLink';
+import { consumeInitialUrl, parseDeepLink, resetInitialUrlForTest } from './deepLink';
 
 describe('parseDeepLink', () => {
   it('말로 적기를 연다', () => {
@@ -18,5 +18,14 @@ describe('parseDeepLink', () => {
     expect(parseDeepLink('https://example.com/voice')).toBeNull();
     expect(parseDeepLink('nanal://settings')).toBeNull();
     expect(parseDeepLink('nanal://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081')).toBeNull();
+  });
+});
+
+describe('consumeInitialUrl', () => {
+  it('프로세스당 한 번만 true', () => {
+    resetInitialUrlForTest();
+    expect(consumeInitialUrl()).toBe(true);
+    expect(consumeInitialUrl()).toBe(false);
+    expect(consumeInitialUrl()).toBe(false);
   });
 });

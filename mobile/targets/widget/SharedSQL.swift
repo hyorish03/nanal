@@ -26,7 +26,7 @@ enum SharedSQL {
   static let advance = """
     UPDATE items
     SET status = CASE status WHEN 'open' THEN 'doing' WHEN 'doing' THEN 'done' ELSE 'open' END, updated_at = ?
-    WHERE id = ? AND kind = 'task' AND deleted_at IS NULL AND status IN ('open', 'doing', 'done')
+    WHERE id = ? AND kind = 'task' AND deleted_at IS NULL AND status IN ('open', 'doing', 'done') AND status = ?
     """
 
   static let markDirty = """

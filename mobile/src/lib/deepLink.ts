@@ -12,3 +12,14 @@ export function parseDeepLink(url: string | null): DeepLink | null {
   if (host === 'today') return { action: query.split('&').includes('focus=1') ? 'focus' : null };
   return null;
 }
+
+// 콜드 스타트 주소는 프로세스당 한 번만 처리한다(로그인·로그아웃으로 화면이 다시 마운트돼도 되풀이하지 않는다).
+let initialUrlConsumed = false;
+export function consumeInitialUrl(): boolean {
+  if (initialUrlConsumed) return false;
+  initialUrlConsumed = true;
+  return true;
+}
+export function resetInitialUrlForTest() {
+  initialUrlConsumed = false;
+}

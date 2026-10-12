@@ -41,7 +41,7 @@ struct StatusButton: View {
   var size: CGFloat = 18
 
   var body: some View {
-    Button(intent: AdvanceItemIntent(itemID: item.id)) {
+    Button(intent: AdvanceItemIntent(itemID: item.id, status: item.status)) {
       Image(systemName: statusSymbol(item.status))
         .font(.system(size: size))
         .frame(width: 30, height: 30)
@@ -65,6 +65,7 @@ struct ItemLine: View {
         .padding(.horizontal, item.priority ? 3 : 0)
         .background(item.priority ? Color.highlight.opacity(0.8) : Color.clear)
         .lineLimit(1)
+        .privacySensitive()
       Spacer(minLength: 0)
     }
   }
@@ -86,7 +87,7 @@ struct LockRectView: View {
     HStack(spacing: 4) {
       VStack(alignment: .leading, spacing: 1) {
         Text("나날 · 오늘 \(s.doneCount)/\(s.items.count)").font(.caption2).opacity(0.85)
-        Text(s.next?.text ?? "오늘 할 일을 다 했어요").font(.headline).lineLimit(1)
+        Text(s.next?.text ?? "오늘 할 일을 다 했어요").font(.headline).lineLimit(1).privacySensitive()
         Text(s.next.map(nextHint) ?? "오늘도 한 줄씩").font(.caption2).opacity(0.75).lineLimit(1)
       }
       Spacer(minLength: 0)

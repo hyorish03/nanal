@@ -19,11 +19,29 @@ type Props = {
 export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDismissed }: Props) {
   const [state, dispatch] = useReducer(voiceReducer, initialVoiceState);
   const handedOff = useRef(false);
+  const triedOnDevice = useRef(false);
+  const retriedOnline = useRef(false);
 
   useSpeechRecognitionEvent('start', () => dispatch({ type: 'started' }));
   useSpeechRecognitionEvent('result', (e) => dispatch({ type: 'result', text: e.results[0]?.transcript ?? '' }));
   useSpeechRecognitionEvent('end', () => dispatch({ type: 'end' }));
-  useSpeechRecognitionEvent('error', (e) => dispatch({ type: 'error', code: e.error }));
+  useSpeechRecognitionEvent('error', (e) => {
+    // 기기 안 인식이 ko-KR을 못 하면 서버 인식으로 한 번만 다시 시도한다(음성 파일은 여전히 남기지 않는다).
+    if (e.error === 'language-not-supported' && triedOnDevice.current && !retriedOnline.current) {
+      retriedOnline.current = true;
+      triedOnDevice.current = false;
+      ExpoSpeechRecognitionModule.start({
+        lang: 'ko-KR',
+        interimResults: true,
+        continuous: true,
+        addsPunctuation: true,
+        requiresOnDeviceRecognition: false,
+        recordingOptions: { persist: false },
+      });
+      return;
+    }
+    dispatch({ type: 'error', code: e.error });
+  });
 
   const start = async () => {
     dispatch({ type: 'start' });
@@ -32,12 +50,15 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
       dispatch({ type: 'denied' });
       return;
     }
+    const onDevice = ExpoSpeechRecognitionModule.supportsOnDeviceRecognition();
+    triedOnDevice.current = onDevice;
+    retriedOnline.current = false;
     ExpoSpeechRecognitionModule.start({
       lang: 'ko-KR',
       interimResults: true,
       continuous: true,
       addsPunctuation: true,
-      requiresOnDeviceRecognition: ExpoSpeechRecognitionModule.supportsOnDeviceRecognition(),
+      requiresOnDeviceRecognition: onDevice,
       recordingOptions: { persist: false },
     });
   };
@@ -46,6 +67,7 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
   useEffect(() => {
     if (!visible) return;
     handedOff.current = false;
+    retriedOnline.current = false;
     dispatch({ type: 'reset' });
     start().catch(() => dispatch({ type: 'error', code: 'client' }));
     return () => ExpoSpeechRecognitionModule.abort();

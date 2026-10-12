@@ -69,7 +69,20 @@ describe('readWidgetSnapshot', () => {
   });
 });
 
+const STATUS_CYCLE = ['open', 'doing', 'done'] as const;
+
 describe('widgetAdvance', () => {
+  it('위젯이 보여 준 상태와 다르면 바꾸지 않는다', async () => {
+    const db = await setup();
+    const it1 = await addItem(db, { kind: 'task', text: '그 사이 바뀜' }, NOW);
+    await advanceStatus(db, it1.id, NOW); // 앱에서 진행 중으로
+    const before = await outboxVersion(db, it1.id);
+    expect(await widgetAdvance(db, it1.id, 'open', NOW)).toBe(false);
+    const row = await db.getFirstAsync<{ status: string }>('SELECT status FROM items WHERE id = ?', [it1.id]);
+    expect(row?.status).toBe('doing');
+    expect(await outboxVersion(db, it1.id)).toBe(before);
+  });
+
   it('앱의 advanceStatus와 같은 순서로 바꾸고 outbox에 남긴다', async () => {
     const db = await setup();
     const app = await addItem(db, { kind: 'task', text: '앱에서' }, NOW);
@@ -78,7 +91,7 @@ describe('widgetAdvance', () => {
     const seen: [string | null, string | null][] = [];
     for (let i = 0; i < 3; i++) {
       await advanceStatus(db, app.id, later);
-      expect(await widgetAdvance(db, widget.id, later)).toBe(true);
+      expect(await widgetAdvance(db, widget.id, STATUS_CYCLE[i], later)).toBe(true);
       const rows = await db.getAllAsync<{ id: string; status: string; updated_at: string }>(
         'SELECT id, status, updated_at FROM items WHERE id IN (?, ?) ORDER BY text',
         [app.id, widget.id],
@@ -104,7 +117,7 @@ describe('widgetAdvance', () => {
     await deleteItem(db, gone.id, NOW);
     for (const id of [note.id, old.id, gone.id, 'missing']) {
       const before = await outboxVersion(db, id);
-      expect(await widgetAdvance(db, id, NOW)).toBe(false);
+      expect(await widgetAdvance(db, id, 'open', NOW)).toBe(false);
       expect(await outboxVersion(db, id)).toBe(before);
     }
   });
