@@ -19,3 +19,7 @@ test('AiError는 한국어 문구를 담는다', () => {
   expect(e.message).toBe(AI_MESSAGES.not_enough_days);
   expect(e.code).toBe('not_enough_days');
 });
+
+test('문구는 마침표 없이 끝난다', () => {
+  for (const m of Object.values(AI_MESSAGES)) expect(m.endsWith('.')).toBe(false);
+});
