@@ -4,12 +4,15 @@ import { reflectionFilters } from '../archive/filters';
 import { type DaySummary, listMonthSummary } from '../archive/repo';
 import { moodWord } from '../days/moods';
 import type { Db } from '../db/types';
+import { listItemsForDate, type Item } from '../items/repo';
 import { monthWeeks } from '../lib/calendar';
 import { addMonths, formatLongDate, formatMonth, logicalDate, monthOf } from '../lib/date';
 import { listReflectionHistory, listReflections, type Reflection, type ReflectionEntry } from '../reflections/repo';
 import { monthLabel, reviewTargetMonth } from '../monthly/labels';
 import { getMonthlyReview } from '../monthly/repo';
 import { Inkwell } from '../ui/Inkwell';
+import { StatusSymbol } from '../ui/StatusSymbol';
+import { symbolKind } from '../ui/symbols';
 import { RuledPaper } from '../ui/RuledPaper';
 import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
@@ -36,6 +39,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
   const [selected, setSelected] = useState(today);
   const [summary, setSummary] = useState<DaySummary[]>([]);
   const [dayReflections, setDayReflections] = useState<Reflection[]>([]);
+  const [dayItems, setDayItems] = useState<Item[]>([]);
   const [history, setHistory] = useState<ReflectionEntry[]>([]);
   const [filter, setFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +75,16 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
     let cancelled = false;
     listReflections(db, selected)
       .then((r) => !cancelled && setDayReflections(r))
+      .catch((e) => setError(String(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [db, selected, version]);
+
+  useEffect(() => {
+    let cancelled = false;
+    listItemsForDate(db, selected)
+      .then((i) => !cancelled && setDayItems(i))
       .catch((e) => setError(String(e)));
     return () => {
       cancelled = true;
@@ -220,17 +234,15 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
                         style={dimPressed([styles.cell, styles.dayCell, on && styles.dayOn])}
                         onPress={() => pickDate(date)}
                       >
-                        <Txt
-                          variant={date === today ? 'medium' : 'body'}
-                          style={[styles.dayNum, date === today && styles.today, future && styles.future]}
-                        >
-                          {d}
-                        </Txt>
-                        {!future && (
-                          <View style={{ opacity: s?.mood ? 1 : 0.35 }}>
-                            <Inkwell id={`cal${date}`} mood={s?.mood ?? null} size="small" />
-                          </View>
-                        )}
+                        <View style={[styles.dayNumBox, date === today && styles.todayRing]}>
+                          <Txt
+                            variant={date === today ? 'medium' : 'body'}
+                            style={[styles.dayNum, date === today && styles.today, future && styles.future]}
+                          >
+                            {d}
+                          </Txt>
+                        </View>
+                        {s?.mood && <Inkwell id={`cal${date}`} mood={s.mood} size="small" />}
                         <View style={[styles.dot, s?.hasReflection && styles.dotOn]} />
                       </Pressable>
                     );
@@ -262,6 +274,21 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
                       : '이 날은 할 일을 적지 않았어요'
                     : `할 일 ${day.tasksTotal}개 중 ${day.tasksDone}개 끝냄${day.tasksMigrated > 0 ? `, ${day.tasksMigrated}개는 다른 날로` : ''}`}
               </Txt>
+              {dayItems.length > 0 && (
+                <View style={styles.items}>
+                  {dayItems.map((it) => {
+                    const k = symbolKind(it);
+                    const done = k === 'done';
+                    const moved = k === 'migrated';
+                    return (
+                      <View key={it.id} style={styles.itemRow}>
+                        <StatusSymbol kind={k} size={16} />
+                        <Txt style={[styles.itemText, done && styles.itemDone, moved && styles.itemMoved]}>{it.text}</Txt>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
               {dayReflections.length === 0 ? (
                 <Txt style={styles.muted}>이 날은 회고를 남기지 않았어요. 괜찮아요.</Txt>
               ) : (
@@ -341,8 +368,10 @@ const styles = StyleSheet.create({
   weekday: { fontSize: 12, color: colors.muted, textAlign: 'center', paddingBottom: 4 },
   dayCell: { minHeight: 52, paddingVertical: 4, borderRadius: 8, gap: 2 },
   dayOn: { backgroundColor: colors.chipSelected },
+  dayNumBox: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent' },
+  todayRing: { borderColor: colors.navy },
   dayNum: { fontSize: 13 },
-  today: { color: colors.navy, textDecorationLine: 'underline' },
+  today: { color: colors.navy },
   future: { color: colors.line },
   dot: { width: 4, height: 4, borderRadius: 2 },
   dotOn: { backgroundColor: colors.navy },
@@ -354,6 +383,11 @@ const styles = StyleSheet.create({
   detailHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   detailTitle: { fontSize: 20 },
   small: { fontSize: 13, color: colors.inkSoft },
+  items: { gap: 6 },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  itemText: { flex: 1, fontSize: 14, lineHeight: 20 },
+  itemDone: { textDecorationLine: 'line-through', color: colors.muted },
+  itemMoved: { color: colors.muted },
   muted: { fontSize: 14, color: colors.muted },
   card: { paddingHorizontal: 14, paddingVertical: 0, borderWidth: 1, borderColor: colors.lineFaint, borderRadius: 4 },
   cardTitle: { fontSize: 21, lineHeight: 30 },
