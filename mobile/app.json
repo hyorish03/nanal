@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "나날",
+    "slug": "nanal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "nanal",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hyorish03.nanal",
+      "infoPlist": {
+        "CADisableMinimumFrameDurationOnPhone": true
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.hyorish03.nanal"
+        ]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1E2F4D",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "말로 적기를 하려면 마이크가 필요해요. 음성은 저장하지 않아요.",
+          "speechRecognitionPermission": "말한 내용을 글로 받아 적어 할 일로 정리해요. 음성은 저장하지 않아요."
+        }
+      ],
+      "@bacons/apple-targets",
+      "./plugins/withSceneLifecycle",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#1E2F4D"
+        }
+      ]
+    ]
+  }
+}
