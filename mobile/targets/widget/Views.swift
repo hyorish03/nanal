@@ -11,6 +11,11 @@ extension Color {
   static let chip = Color(red: 0xED / 255, green: 0xE4 / 255, blue: 0xD2 / 255)
 }
 
+extension Font {
+  // 한국어에는 .serif 디자인이 적용되지 않아 앱과 같은 고운바탕을 번들에 넣어 쓴다(Info.plist UIAppFonts)
+  static func batang(_ size: CGFloat) -> Font { .custom("GowunBatang-Regular", size: size) }
+}
+
 let todayURL = URL(string: "nanal://today")!
 let newLineURL = URL(string: "nanal://today?focus=1")!
 
@@ -88,7 +93,7 @@ struct LockRectView: View {
       VStack(alignment: .leading, spacing: 1) {
         Text(s.items.isEmpty ? "나날 · 오늘" : "나날 · 오늘 \(s.doneCount)/\(s.items.count)").font(.caption2).opacity(0.85)
         // 아직 적은 일이 없는 날과 다 끝낸 날을 나눠 말한다
-        Text(s.next?.text ?? (s.items.isEmpty ? "오늘도 한 줄씩" : "다 했어요")).font(.headline).lineLimit(1).privacySensitive()
+        Text(s.next?.text ?? (s.items.isEmpty ? "오늘도 한 줄씩" : "다 했어요")).font(.batang(15)).lineLimit(1).privacySensitive()
         Text(s.next.map(nextHint) ?? (s.items.isEmpty ? "아직 적은 일이 없어요" : "오늘도 수고했어요")).font(.caption2).opacity(0.75).lineLimit(1)
       }
       Spacer(minLength: 0)
@@ -122,7 +127,12 @@ struct LockMoodView: View {
     ZStack {
       AccessoryWidgetBackground()
       VStack(spacing: 1) {
-        Image(systemName: s.mood == nil ? "drop" : "drop.fill").font(.system(size: 16))
+        // 앱의 잉크병(Inkwell.tsx) 모양 템플릿 이미지: 기분이 있으면 잉크가 찬 병
+        Image(s.mood == nil ? "InkwellEmpty" : "InkwellFilled")
+          .renderingMode(.template)
+          .resizable()
+          .scaledToFit()
+          .frame(width: 24, height: 18)
         Text(s.moodWord ?? "기분").font(.system(size: 10))
       }
     }
@@ -138,10 +148,10 @@ struct HomeSmallView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       Text("오늘 기분").font(.system(size: 12)).foregroundStyle(Color.inkMuted)
-      Text(s.moodWord ?? "—").font(.system(size: 22, design: .serif)).foregroundStyle(Color.navy)
+      Text(s.moodWord ?? "—").font(.batang(22)).foregroundStyle(Color.navy)
       Spacer(minLength: 0)
       Text("기록한 날").font(.system(size: 12)).foregroundStyle(Color.inkMuted)
-      Text("\(s.recordedDays)일째").font(.system(size: 18, design: .serif)).foregroundStyle(Color.ink)
+      Text("\(s.recordedDays)일째").font(.batang(18)).foregroundStyle(Color.ink)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .widgetURL(todayURL)
@@ -155,7 +165,7 @@ struct HomeMediumView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       HStack {
-        Text(longDateLabel()).font(.system(size: 15, design: .serif)).foregroundStyle(Color.ink)
+        Text(longDateLabel()).font(.batang(15)).foregroundStyle(Color.ink)
         Spacer()
         Text("\(s.doneCount)/\(s.items.count)").font(.system(size: 12)).foregroundStyle(Color.inkMuted)
       }
@@ -178,7 +188,7 @@ struct HomeLargeView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Text(longDateLabel()).font(.system(size: 17, design: .serif)).foregroundStyle(Color.ink)
+      Text(longDateLabel()).font(.batang(17)).foregroundStyle(Color.ink)
       HStack(spacing: 6) {
         chip("밀린 일", s.carried)
         chip("할 일", s.openCount)
