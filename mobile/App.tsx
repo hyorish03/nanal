@@ -5,6 +5,7 @@ import { NanumPenScript_400Regular } from '@expo-google-fonts/nanum-pen-script';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -18,6 +19,10 @@ import { supabase } from './src/supabase';
 import { colors } from './src/ui/theme';
 
 const LAST_USER_KEY = 'nanal.lastUserId';
+
+// 남색 시작 화면을 불러오기가 끝날 때까지 붙들어, 표지가 뜨기 전에 크림색 로딩 화면이 깜빡이지 않게 한다.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+SplashScreen.setOptions({ fade: true, duration: 200 });
 
 export default function App() {
   // 글꼴을 못 불러와도 시스템 글꼴로 계속 연다.
@@ -68,6 +73,11 @@ export default function App() {
     });
     return () => data.subscription.unsubscribe();
   }, []);
+
+  const loading = !fatal && (!db || !authReady || !fontsReady);
+  useEffect(() => {
+    if (!loading) SplashScreen.hideAsync().catch(() => {});
+  }, [loading]);
 
   let body: ReactNode;
   if (fatal)
