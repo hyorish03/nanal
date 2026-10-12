@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { createMonthlyReview } from '../ai/client';
 import { AiError } from '../ai/errors';
+import { userMessage } from '../lib/userError';
 import { listMonthSummary } from '../archive/repo';
 import type { Db } from '../db/types';
 import { monthWeeks } from '../lib/calendar';
@@ -32,10 +33,8 @@ const CELL_TOTAL_MS = 500;
 const MIN_DAYS = 7; // 서버(monthly-review)가 돌아보기를 만드는 최소 기록일과 같다
 const LOAD_ERROR = '돌아보기를 불러오지 못했어요. 잠시 뒤에 다시 해 주세요';
 
-// 서버가 알려 준 오류는 그 문구를, 그 밖의 오류(로컬 저장소 등)는 다정한 한 줄로 보여준다
-function messageOf(e: unknown): string {
-  return e instanceof AiError ? e.message : LOAD_ERROR;
-}
+// 서버가 알려 준 오류는 그 문구를, 연결이 끊겼으면 그렇다고, 그 밖의 오류(로컬 저장소 등)는 다정한 한 줄로 보여준다
+const messageOf = (e: unknown) => userMessage(e, LOAD_ERROR);
 
 export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: Props) {
   const [step, setStep] = useState<Step>('loading');
@@ -223,7 +222,7 @@ function ReviewResult({
               </View>
             ))}
           </View>
-          <Txt style={styles.legend}>진할수록 좋았던 날 · ● 무기력했던 날</Txt>
+          <Txt style={styles.legend}>진할수록 기분이 좋았던 날, ●는 무기력했던 날</Txt>
         </Section>
       </FadeIn>
 
@@ -277,7 +276,7 @@ function ReviewResult({
 
       <FadeIn {...section()}>
         <Txt style={styles.disclaimer}>
-          기록한 {stats.recordedDays}일을 읽고 정리했어요{written ? ` · ${written} 작성` : ''}. 기록에서 보이는 흐름일 뿐 진단이 아니에요. 마음이 오래 힘들면 주변이나 전문가와 이야기해 보세요.
+          기록한 {stats.recordedDays}일을 읽고 정리했어요{written ? ` · ${written} 작성` : ''}. 진단이 아니라 기록에서 보이는 흐름이에요. 마음이 오래 힘들면 주변이나 전문가와 이야기해 보세요.
         </Txt>
       </FadeIn>
 
