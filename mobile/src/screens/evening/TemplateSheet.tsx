@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import type { Db } from '../../db/types';
-import { createTemplate, updateTemplate } from '../../reflections/templateRepo';
+import { createTemplate, MAX_TEMPLATE_NAME, MAX_TEMPLATE_QUESTION, updateTemplate } from '../../reflections/templateRepo';
 import { MAX_TEMPLATE_QUESTIONS, type TemplateDef } from '../../reflections/templates';
+import { userMessage } from '../../lib/userError';
+import { useKeyboardResizePaused } from '../../ui/KeyboardResize';
 import { RuledPaper } from '../../ui/RuledPaper';
 import { colors, fonts, HIT } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
@@ -25,6 +27,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
   const [questions, setQuestions] = useState<string[]>(['']);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  useKeyboardResizePaused(visible);
 
   useEffect(() => {
     if (!visible) return;
@@ -62,7 +65,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
         onSaved(await createTemplate(db, input));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(userMessage(e));
     } finally {
       setSaving(false);
     }
@@ -78,7 +81,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
               <Txt style={styles.headerText}>취소</Txt>
             </Pressable>
             <Txt variant="medium" accessibilityRole="header">
-              {editing ? '템플릿 수정' : '새 템플릿'}
+              {editing ? '템플릿 고치기' : '새 템플릿'}
             </Txt>
             <Pressable
               accessibilityRole="button"
@@ -103,8 +106,9 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
                 setError(null);
               }}
               placeholder="예: 운동한 날"
-              placeholderTextColor={colors.faint}
+              placeholderTextColor={colors.muted}
               accessibilityLabel="템플릿 이름"
+              maxLength={MAX_TEMPLATE_NAME}
               textContentType="none"
               autoComplete="off"
             />
@@ -123,13 +127,14 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
                     setError(null);
                   }}
                   placeholder={PLACEHOLDERS[i]}
-                  placeholderTextColor={colors.faint}
+                  placeholderTextColor={colors.muted}
                   accessibilityLabel={`질문 ${i + 1}`}
+                  maxLength={MAX_TEMPLATE_QUESTION}
                 />
                 {questions.length > 1 && (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`질문 ${i + 1} 빼기`}
+                    accessibilityLabel={`질문 ${i + 1} 지우기`}
                     style={dimPressed(styles.removeQ)}
                     onPress={() => setQuestions(questions.filter((_, j) => j !== i))}
                   >
@@ -167,7 +172,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
 
           {editing ? (
             <Pressable accessibilityRole="button" style={dimPressed(styles.delete)} onPress={() => onDelete(editing)}>
-              <Txt style={styles.deleteText}>템플릿 삭제</Txt>
+              <Txt style={styles.deleteText}>템플릿 지우기</Txt>
             </Pressable>
           ) : (
             <Txt style={styles.hint}>만든 템플릿은 하루 마무리에서 길게 눌러 고치거나 지울 수 있어요.</Txt>
