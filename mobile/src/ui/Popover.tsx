@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Keyboard, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { EASE_OUT } from './motion';
 import { colors } from './theme';
 import { useReduceMotion } from './useReduceMotion';
@@ -11,6 +11,8 @@ export function useAnchor() {
   const ref = useRef<View>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const open = useCallback(() => {
+    // 입력칸 포커스를 먼저 푼다. 그대로 두면 팝오버(Modal)가 닫힐 때 iOS가 포커스를 되돌려 키보드가 다시 뜬다.
+    Keyboard.dismiss();
     ref.current?.measureInWindow((x, y, width, height) => setAnchor({ x, y, width, height }));
   }, []);
   const close = useCallback(() => setAnchor(null), []);

@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, AppState, BackHandler, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Db } from '../db/types';
 import { type CoverOpening, markCoverOpened, readCoverOpening } from '../lib/coverOpening';
 import { consumeInitialUrl, type LinkAction, parseDeepLink } from '../lib/deepLink';
@@ -221,15 +221,6 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
       <StatusBar style={coverSettled ? 'dark' : 'light'} animated />
       <EveningBackdrop on={screen === 'evening'} />
       <SafeAreaView style={styles.container}>
-        {(pending > 0 || error) && (
-          <Txt style={styles.syncBar} accessibilityLiveRegion="polite">
-            {error
-              ? pending > 0
-                ? `동기화 실패, 자동으로 다시 시도합니다 (${pending}건 대기)`
-                : '동기화 실패, 자동으로 다시 시도합니다'
-              : `동기화 대기 ${pending}건`}
-          </Txt>
-        )}
         <ScreenEnter key={screen ?? 'none'} reduce={reduce}>
           {screen === 'onboarding' && <OnboardingScreen onDone={finishOnboarding} />}
           {screen === 'today' && (
@@ -286,6 +277,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
           {screen === 'evening' && <EveningScreen db={db} version={version} onChanged={onChanged} onClose={closeDay} />}
         </ScreenEnter>
       </SafeAreaView>
+      <SyncBar pending={pending} error={error} />
       <Cover
         open={coverOpen}
         line={dayClosed ? '오늘도 수고했어요' : '오늘도 한 줄씩'}
@@ -314,6 +306,33 @@ function ScreenEnter({ reduce, children }: { reduce: boolean; children: ReactNod
   );
 }
 
+// 동기화 상태는 화면 위에 얹는다(나타나고 사라질 때 아래 글이 밀리지 않게).
+// 대기는 2초 넘게 이어질 때만 보이고(적자마자 깜빡이지 않게), 실패는 바로 보인다.
+const SYNC_LATE_MS = 2_000;
+function SyncBar({ pending, error }: { pending: number; error: string | null }) {
+  const insets = useSafeAreaInsets();
+  const waiting = pending > 0;
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    setLate(false);
+    if (!waiting) return;
+    const t = setTimeout(() => setLate(true), SYNC_LATE_MS);
+    return () => clearTimeout(t);
+  }, [waiting]);
+  if (!error && !(waiting && late)) return null;
+  return (
+    <View pointerEvents="none" style={[styles.syncBar, { top: insets.top }]}>
+      <Txt style={styles.syncText} accessibilityLiveRegion="polite">
+        {error
+          ? pending > 0
+            ? `동기화 실패, 자동으로 다시 시도합니다 (${pending}건 대기)`
+            : '동기화 실패, 자동으로 다시 시도합니다'
+          : `동기화 대기 ${pending}건`}
+      </Txt>
+    </View>
+  );
+}
+
 // 저녁 마무리에서는 바탕(안전 영역 포함)이 저녁 종이색으로 천천히 바뀐다.
 function EveningBackdrop({ on }: { on: boolean }) {
   const opacity = useRef(new Animated.Value(on ? 1 : 0)).current;
@@ -331,7 +350,8 @@ const styles = StyleSheet.create({
   container: { flex: 1 }, // 배경은 root와 각 화면이 칠한다(저녁은 paperEvening)
   page: { backgroundColor: colors.paper },
   blocked: { padding: 24, fontSize: 16, lineHeight: 24, color: colors.ink },
-  syncBar: { backgroundColor: colors.postit, color: colors.postitText, paddingVertical: 6, paddingHorizontal: 16, fontSize: 13 },
+  syncBar: { position: 'absolute', left: 0, right: 0, backgroundColor: colors.postit, paddingVertical: 6, paddingHorizontal: 16 },
+  syncText: { color: colors.postitText, fontSize: 13 },
   reopen: {
     marginTop: 120,
     width: 164,
