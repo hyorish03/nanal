@@ -216,6 +216,12 @@
 - 앱이 화면을 다시 그릴 때마다 위젯을 새로 고친다. 위젯은 30분마다, 새벽 4시 경계에 새로 고친다.
 - 컨트롤(iOS 18): 말로 적기 `nanal://voice`, 한 줄 적기 `nanal://today?focus=1`.
 - 실제 아이폰에 위젯을 넣으려면 유료 Apple Developer Program이 필요하다(App Groups).
+- 리뷰 반영(2026-10-12):
+  - 공유 폴더로 옮긴 뒤에는 옛 DB 파일로 되돌아가지 않는다(열기 실패는 오류로 알린다).
+  - 앱과 위젯이 같은 파일을 쓰므로 WAL + `busy_timeout`. 앱 트랜잭션은 "database is locked"이면 한 번 다시 시도한다. 앱이 `active`가 아니면 동기화를 시작하지 않는다(정지 중 잠금으로 앱이 종료되는 것 방지).
+  - 위젯 상태 버튼은 위젯에 보이던 상태일 때만 바꾼다(`AND status = ?`). COMMIT 결과를 확인하고, 누른 뒤 모든 위젯을 새로 고친다.
+  - 잠금화면의 할 일 글은 `privacySensitive`. Swift 논리 날짜도 앱처럼 "현지 4시 전이면 전날"(서머타임 안전).
+  - 앱을 연 링크(콜드 스타트 URL)는 한 번만 처리하고, 온보딩 중에 온 링크는 버린다.
 
 ### 11.7 데이터 모델 변경 요약
 - `items.status`: `open | doing | done | migrated` (`dropped` 제거). 로컬·서버 CHECK와 기존 `dropped` 행 처리(→ soft delete) 마이그레이션 필요.
