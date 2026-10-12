@@ -9,7 +9,12 @@
     "scheme": "nanal",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hyorish03.nanal"
+      "bundleIdentifier": "com.hyorish03.nanal",
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.hyorish03.nanal"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
