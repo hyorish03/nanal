@@ -167,21 +167,27 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
               하루는 이렇게 흘러가요
             </Txt>
             <View style={styles.flowItem}>
-              <View style={styles.postit} />
+              <View style={styles.flowIcon}>
+                <View style={styles.postit} />
+              </View>
               <View style={styles.cardText}>
                 <Txt variant="medium">아침</Txt>
                 <Txt style={styles.small}>어제에서 넘어온 일을 오늘 할지, 내일로 미룰지, 지울지 골라요.</Txt>
               </View>
             </View>
             <View style={styles.flowItem}>
-              <View style={styles.dotPaper} />
+              <View style={styles.flowIcon}>
+                <View style={styles.dotPaper} />
+              </View>
               <View style={styles.cardText}>
                 <Txt variant="medium">낮</Txt>
                 <Txt style={styles.small}>떠오를 때마다 할 일이나 메모로 한 줄씩 적어요.</Txt>
               </View>
             </View>
             <View style={styles.flowItem}>
-              <Inkwell id="onboarding-well" mood={4} size="large" paper={colors.paper} />
+              <View style={styles.flowIcon}>
+                <Inkwell id="onboarding-well" mood={4} size="large" paper={colors.paper} />
+              </View>
               <View style={styles.cardText}>
                 <Txt variant="medium">저녁</Txt>
                 <Txt style={styles.small}>잉크병에 오늘 기분을 담고, 원하면 짧게 돌아봐요.</Txt>
@@ -283,6 +289,7 @@ const styles = StyleSheet.create({
   inline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   muted: { color: colors.inkSoft },
   flowItem: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+  flowIcon: { width: 48, alignItems: 'center' }, // 그림 너비가 달라도 글이 한 줄로 맞는다
   postit: { width: 44, height: 40, backgroundColor: colors.postit, transform: [{ rotate: '-4deg' }] },
   dotPaper: { width: 44, height: 40, borderRadius: 4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.lineSoft },
   tip: { padding: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.navy, borderRadius: 12 },

@@ -4,7 +4,7 @@ import type { Db } from '../../db/types';
 import { createTemplate, updateTemplate } from '../../reflections/templateRepo';
 import { MAX_TEMPLATE_QUESTIONS, type TemplateDef } from '../../reflections/templates';
 import { RuledPaper } from '../../ui/RuledPaper';
-import { colors, fonts } from '../../ui/theme';
+import { colors, fonts, HIT } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { dimPressed } from '../../ui/press';
 
@@ -89,6 +89,8 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
               placeholder="예: 운동한 날"
               placeholderTextColor={colors.faint}
               accessibilityLabel="템플릿 이름"
+              textContentType="none"
+              autoComplete="off"
             />
           </View>
 
@@ -164,7 +166,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
   sheet: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 28, gap: 16 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerButton: { minHeight: 44, paddingHorizontal: 4, justifyContent: 'center' },
+  headerButton: { minHeight: HIT, minWidth: HIT, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   headerText: { fontSize: 15 },
   field: { gap: 6 },
   label: { fontSize: 13, color: colors.inkSoft },

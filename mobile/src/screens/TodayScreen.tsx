@@ -244,11 +244,12 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         </View>
         <View style={styles.headerActions}>
           {onOpenArchive && (
-            <Pressable accessibilityRole="button" accessibilityLabel="지난 기록" style={dimPressed(styles.iconButton)} onPress={onOpenArchive}>
+            <Pressable accessibilityRole="button" accessibilityLabel="지난 기록" style={dimPressed(styles.archive)} onPress={onOpenArchive}>
               <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
                 <Path d="M3 2.5h9.5a2 2 0 0 1 2 2v11H5a2 2 0 0 1-2-2v-11Z" stroke={colors.ink} strokeWidth={1.3} strokeLinejoin="round" />
                 <Path d="M3 13.5a2 2 0 0 1 2-2h9.5M6.5 6h5M6.5 8.5h3.5" stroke={colors.ink} strokeWidth={1.3} strokeLinecap="round" />
               </Svg>
+              <Txt style={styles.archiveText}>기록</Txt>
             </Pressable>
           )}
           <Pressable accessibilityRole="button" style={dimPressed(styles.evening)} onPress={onOpenEvening}>
@@ -344,15 +345,19 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, gap: 2 },
   date: { fontSize: 30, letterSpacing: -0.5 },
   headerActions: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  iconButton: {
-    width: 44,
-    height: 44,
+  // 지난 기록: 책 그림만으로는 뜻이 약해 짧은 글을 곁들인다
+  archive: {
+    minHeight: 44,
+    paddingLeft: 10,
+    paddingRight: 12,
     borderRadius: 22,
     borderWidth: 1,
     borderColor: colors.line,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
   },
+  archiveText: { fontSize: 14 },
   evening: {
     minHeight: 44,
     paddingHorizontal: 14,
