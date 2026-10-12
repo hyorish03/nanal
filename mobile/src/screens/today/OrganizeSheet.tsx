@@ -9,6 +9,8 @@ import { supabase } from '../../supabase';
 import { StatusSymbol } from '../../ui/StatusSymbol';
 import { colors, fonts, HIT, SCREEN_X } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
+import { useReduceMotion } from '../../ui/useReduceMotion';
+import { FadeIn } from '../../ui/FadeIn';
 import { dimPressed } from '../../ui/press';
 
 type Props = {
@@ -32,6 +34,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
   const alive = useRef(true);
   const busy = useRef(false); // 상태 갱신 전에 연타해도 한 번만 부른다
   const req = useRef(0); // 시트를 닫았다 다시 열면 이전 요청의 결과는 버린다
+  const reduce = useReduceMotion();
 
   useEffect(() => {
     alive.current = true;
@@ -172,29 +175,31 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
                 이렇게 정리했어요
               </Txt>
               <Txt style={styles.hint}>{drafts.length ? '넣고 싶은 것만 체크하세요.' : '넣을 만한 것을 찾지 못했어요.'}</Txt>
-              {drafts.map((d) => {
+              {drafts.map((d, i) => {
                 const when = dateLabel(d.date, today);
+                // 정리된 줄이 위에서부터 차례로 살짝 올라오며 나타난다(동작 줄이기면 흐리게만)
                 return (
-                  <Pressable
-                    key={d.id}
-                    accessibilityRole="checkbox"
-                    disabled={saving}
-                    accessibilityState={{ checked: d.picked }}
-                    accessibilityLabel={`${d.kind === 'task' ? '할 일' : '메모'} ${d.text}${when ? `, ${when}` : ''}`}
-                    style={dimPressed(styles.row)}
-                    onPress={() => toggle(d.id)}
-                  >
-                    <View style={[styles.check, d.picked && styles.checkOn]}>
-                      {d.picked && <Txt style={styles.checkMark}>✓</Txt>}
-                    </View>
-                    <StatusSymbol kind={d.kind === 'task' ? 'open' : 'note'} />
-                    <Txt style={styles.rowText}>{d.text}</Txt>
-                    {!!when && (
-                      <Txt variant="hand" style={styles.when}>
-                        {when}
-                      </Txt>
-                    )}
-                  </Pressable>
+                  <FadeIn key={d.id} duration={200} delay={i * 40} rise={reduce ? 0 : 6}>
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      disabled={saving}
+                      accessibilityState={{ checked: d.picked }}
+                      accessibilityLabel={`${d.kind === 'task' ? '할 일' : '메모'} ${d.text}${when ? `, ${when}` : ''}`}
+                      style={dimPressed(styles.row)}
+                      onPress={() => toggle(d.id)}
+                    >
+                      <View style={[styles.check, d.picked && styles.checkOn]}>
+                        {d.picked && <Txt style={styles.checkMark}>✓</Txt>}
+                      </View>
+                      <StatusSymbol kind={d.kind === 'task' ? 'open' : 'note'} />
+                      <Txt style={styles.rowText}>{d.text}</Txt>
+                      {!!when && (
+                        <Txt variant="hand" style={styles.when}>
+                          {when}
+                        </Txt>
+                      )}
+                    </Pressable>
+                  </FadeIn>
                 );
               })}
               {error && (
