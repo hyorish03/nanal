@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, BackHandler, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, AppState, BackHandler, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Db } from '../db/types';
 import { type CoverOpening, markCoverOpened, readCoverOpening } from '../lib/coverOpening';
@@ -11,8 +11,11 @@ import { claimOwner } from '../sync/owner';
 import { createSupabaseRemote } from '../sync/supabaseRemote';
 import { useSync } from '../sync/useSync';
 import { Cover } from '../ui/Cover';
+import { FadeIn } from '../ui/FadeIn';
+import { EASE_OUT } from '../ui/motion';
 import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { useReduceMotion } from '../ui/useReduceMotion';
 import { reloadWidgets } from '../widget/reload';
 import { ArchiveScreen } from './ArchiveScreen';
 import { EveningScreen } from './EveningScreen';
@@ -76,6 +79,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const [linkAction, setLinkAction] = useState<LinkAction | null>(null);
   const screenRef = useRef<Screen | null>(null);
   screenRef.current = screen;
+  const reduce = useReduceMotion();
 
   // 위젯·컨트롤에서 연 주소: 오늘 화면으로 가서(덮여 있으면 펼친 뒤) 동작을 넘긴다. 온보딩 중이면 화면은 그대로 둔다.
   const handleLink = useCallback((url: string | null) => {
@@ -176,9 +180,9 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     setCoverOpen(true);
   }, []);
 
-  const background = screen === 'evening' ? colors.paperEvening : colors.paper;
   return (
-    <View style={[styles.root, { backgroundColor: background }]}>
+    <View style={styles.root}>
+      <EveningBackdrop on={screen === 'evening'} />
       <SafeAreaView style={styles.container}>
         {(pending > 0 || error) && (
           <Txt style={styles.syncBar} accessibilityLiveRegion="polite">
@@ -189,41 +193,43 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
               : `동기화 대기 ${pending}건`}
           </Txt>
         )}
-        {screen === 'onboarding' && <OnboardingScreen onDone={finishOnboarding} />}
-        {screen === 'today' && (
-          <TodayScreen
-            db={db}
-            version={version}
-            onChanged={onChanged}
-            onOpenEvening={() => setScreen('evening')}
-            onOpenArchive={() => setScreen('archive')}
-            focusReady={coverSettled && focusPending}
-            onFocused={() => setFocusPending(false)}
-            pendingAction={coverSettled ? linkAction : null}
-            onActionHandled={() => setLinkAction(null)}
-          />
-        )}
-        {screen === 'evening' && <EveningScreen db={db} version={version} onChanged={onChanged} onClose={closeDay} />}
-        {screen === 'archive' && (
-          <ArchiveScreen
-            db={db}
-            version={version}
-            onClose={() => setScreen('today')}
-            onOpenReview={(m) => {
-              setReviewMonth(m);
-              setScreen('review');
-            }}
-          />
-        )}
-        {screen === 'review' && reviewMonth && (
-          <MonthlyReviewScreen
-            db={db}
-            month={reviewMonth}
-            version={version}
-            onChanged={onChanged}
-            onClose={() => setScreen('archive')}
-          />
-        )}
+        <ScreenEnter key={screen ?? 'none'} reduce={reduce}>
+          {screen === 'onboarding' && <OnboardingScreen onDone={finishOnboarding} />}
+          {screen === 'today' && (
+            <TodayScreen
+              db={db}
+              version={version}
+              onChanged={onChanged}
+              onOpenEvening={() => setScreen('evening')}
+              onOpenArchive={() => setScreen('archive')}
+              focusReady={coverSettled && focusPending}
+              onFocused={() => setFocusPending(false)}
+              pendingAction={coverSettled ? linkAction : null}
+              onActionHandled={() => setLinkAction(null)}
+            />
+          )}
+          {screen === 'evening' && <EveningScreen db={db} version={version} onChanged={onChanged} onClose={closeDay} />}
+          {screen === 'archive' && (
+            <ArchiveScreen
+              db={db}
+              version={version}
+              onClose={() => setScreen('today')}
+              onOpenReview={(m) => {
+                setReviewMonth(m);
+                setScreen('review');
+              }}
+            />
+          )}
+          {screen === 'review' && reviewMonth && (
+            <MonthlyReviewScreen
+              db={db}
+              month={reviewMonth}
+              version={version}
+              onChanged={onChanged}
+              onClose={() => setScreen('archive')}
+            />
+          )}
+        </ScreenEnter>
       </SafeAreaView>
       <Cover
         open={coverOpen}
@@ -233,17 +239,40 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
         opening={coverOpening}
       >
         {dayClosed && closedShown && (
-          <Pressable accessibilityRole="button" style={styles.reopen} onPress={reopen}>
-            <Txt style={styles.reopenText}>내일 다시 펼치기</Txt>
-          </Pressable>
+          <FadeIn delay={80} duration={240} rise={reduce ? 0 : 6}>
+            <Pressable accessibilityRole="button" style={({ pressed }) => [styles.reopen, pressed && styles.reopenPressed]} onPress={reopen}>
+              <Txt style={styles.reopenText}>내일 다시 펼치기</Txt>
+            </Pressable>
+          </FadeIn>
         )}
       </Cover>
     </View>
   );
 }
 
+// 화면이 바뀌면 새 화면만 살짝 올라오며 나타난다(이전 화면은 바로 사라진다).
+function ScreenEnter({ reduce, children }: { reduce: boolean; children: ReactNode }) {
+  return (
+    <FadeIn duration={200} rise={reduce ? 0 : 6} style={styles.container}>
+      {children}
+    </FadeIn>
+  );
+}
+
+// 저녁 마무리에서는 바탕(안전 영역 포함)이 저녁 종이색으로 천천히 바뀐다.
+function EveningBackdrop({ on }: { on: boolean }) {
+  const opacity = useRef(new Animated.Value(on ? 1 : 0)).current;
+  useEffect(() => {
+    const anim = Animated.timing(opacity, { toValue: on ? 1 : 0, duration: 250, easing: EASE_OUT, useNativeDriver: true });
+    anim.start();
+    return () => anim.stop();
+  }, [on, opacity]);
+  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.evening, { opacity }]} />;
+}
+
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: colors.paper },
+  evening: { backgroundColor: colors.paperEvening },
   container: { flex: 1 }, // 배경은 root와 각 화면이 칠한다(저녁은 paperEvening)
   blocked: { padding: 24, fontSize: 16, lineHeight: 24, color: colors.ink },
   syncBar: { backgroundColor: colors.postit, color: colors.postitText, paddingVertical: 6, paddingHorizontal: 16, fontSize: 13 },
@@ -257,5 +286,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  reopenPressed: { opacity: 0.6 },
   reopenText: { color: colors.coverText, fontSize: 15 },
 });
