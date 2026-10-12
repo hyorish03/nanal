@@ -8,6 +8,7 @@ import { addReflection, listReflections, type Reflection } from '../reflections/
 import { deleteTemplate, listTemplates } from '../reflections/templateRepo';
 import type { TemplateDef } from '../reflections/templates';
 import { countRecordedDays } from '../stats/recordedDays';
+import { eulReul } from '../lib/josa';
 import { confirmDelete, showActionSheet } from '../ui/dialogs';
 import { Inkwell } from '../ui/Inkwell';
 import { EASE_OUT } from '../ui/motion';
@@ -95,7 +96,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     });
 
   const askDelete = (t: TemplateDef) =>
-    confirmDelete(`‘${t.name}’ 템플릿을 지울까요?`, '이미 쓴 회고는 그대로 남아요. 앞으로 저녁 마무리에서만 안 보여요.', () => {
+    confirmDelete(`‘${t.name}’${eulReul(t.name)} 지울까요?`, '이 템플릿으로 쓴 회고는 그대로 남아요.', () => {
       // 시트를 먼저 닫아야 실패했을 때 오류 문구가 저녁 화면에 보인다
       setSheetVisible(false);
       run(async () => {
@@ -105,7 +106,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     });
 
   const templateActions = (t: TemplateDef) =>
-    showActionSheet(`‘${t.name}’ 템플릿`, [
+    showActionSheet(`‘${t.name}’`, [
       { label: '수정하기', onPress: () => openSheet(t) },
       { label: '삭제하기', destructive: true, onPress: () => askDelete(t) },
     ]);
@@ -138,6 +139,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
               return (
                 <Pressable
                   key={m}
+                  accessible
                   accessibilityRole="button"
                   accessibilityLabel={`기분 ${m}점, ${moodWord(m)}`}
                   accessibilityState={{ selected }}

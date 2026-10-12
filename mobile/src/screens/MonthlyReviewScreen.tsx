@@ -124,11 +124,9 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
             {label}에 남긴 기분, 회고, 할 일 기록을 읽고 반복된 흐름을 정리해 드려요. 판단이나 진단이 아니라, 기록에서 보이는 모양을 함께 보는 거예요.
           </Txt>
           <View style={styles.infoBox}>
-            <Txt style={styles.info}>읽는 것: 기분 점수, 회고 답변, 할 일 개수와 이월 횟수</Txt>
-            <Txt style={styles.info}>보내는 곳: Claude(Anthropic). 결과는 내 기록에만 저장돼요</Txt>
-            <Txt variant="medium" style={styles.info}>
-              할 일 내용은 보내지 않아요
-            </Txt>
+            <InfoLine label="읽는 것" text="기분 점수, 회고 답변, 할 일 개수와 이월 횟수" />
+            <InfoLine label="보내는 곳" text="Claude(Anthropic). 결과는 내 기록에만 저장돼요" />
+            <InfoLine label="보내지 않는 것" text="할 일 내용" />
           </View>
           <Txt style={styles.muted}>한 달에 한 번 무료로 만들 수 있어요.</Txt>
           <Pressable accessibilityRole="button" style={dimPressed(styles.primary)} onPress={make}>
@@ -285,6 +283,18 @@ function ReviewResult({
         <Txt>다시 만들기 · 유료(준비 중)</Txt>
       </Pressable>
     </FadeIn>
+  );
+}
+
+// 동의 안내 한 줄: "이름: 내용"
+function InfoLine({ label, text }: { label: string; text: string }) {
+  return (
+    <Txt style={styles.info}>
+      <Txt variant="medium" style={styles.info}>
+        {label}
+      </Txt>
+      {`: ${text}`}
+    </Txt>
   );
 }
 
