@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { colors, fonts } from './theme';
 import { Txt } from './Txt';
 import { useReduceMotion } from './useReduceMotion';
@@ -11,10 +11,11 @@ type Props = {
   children?: ReactNode; // 덮인 표지 위에 올릴 버튼 등
 };
 
-const DURATION = 950;
+const DURATION = 820;
 
 export function Cover({ open, line, onClosed, children }: Props) {
   const reduce = useReduceMotion();
+  const { width } = useWindowDimensions();
   const progress = useRef(new Animated.Value(open ? 1 : 0)).current;
   const [visible, setVisible] = useState(!open);
   const onClosedRef = useRef(onClosed);
@@ -43,7 +44,7 @@ export function Cover({ open, line, onClosed, children }: Props) {
     const anim = Animated.timing(progress, {
       toValue: open ? 1 : 0,
       duration: DURATION,
-      easing: Easing.bezier(0.32, 0.72, 0.2, 1),
+      easing: Easing.inOut(Easing.quad),
       useNativeDriver: true,
     });
     anim.start(({ finished }) => {
@@ -53,44 +54,45 @@ export function Cover({ open, line, onClosed, children }: Props) {
   }, [open, reduce, progress]);
 
   if (!visible) return null;
-  const rotateY = progress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-172deg'] });
+  // 화면 왼쪽 끝이 책등이라 90°를 넘으면 화면 밖이다. 보이는 구간에만 시간을 쓰고 조금 더 돌려 끝을 감춘다.
+  const rotateY = progress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-100deg'] });
+  // 넘어갈수록 빛을 덜 받아 어두워진다
+  const shade = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] });
   return (
-    <Animated.View
-      pointerEvents={open ? 'none' : 'auto'}
-      accessibilityViewIsModal={!open}
-      style={[styles.cover, { transform: [{ perspective: 1800 }, { rotateY }] }]}
-    >
-      <View style={styles.spine} />
-      <View style={styles.frame} />
-      <View style={styles.band} />
-      <View style={styles.titleBox}>
-        <Txt variant="title" style={styles.title}>
-          나날
-        </Txt>
-        <View style={styles.rule} />
-        <Txt variant="title" style={styles.line}>
-          {line}
-        </Txt>
-        {children}
-      </View>
-    </Animated.View>
+    <View pointerEvents={open ? 'none' : 'auto'} accessibilityViewIsModal={!open} style={styles.layer}>
+      <Animated.View style={[styles.leaf, styles.cover, { transform: [{ perspective: width * 2.5 }, { rotateY }] }]}>
+        <View style={styles.spine} />
+        <View style={styles.frame} />
+        <View style={styles.band} />
+        <View style={styles.titleBox}>
+          <Txt variant="title" style={styles.title}>
+            나날
+          </Txt>
+          <View style={styles.rule} />
+          <Txt variant="title" style={styles.line}>
+            {line}
+          </Txt>
+          {children}
+        </View>
+        <Animated.View pointerEvents="none" style={[styles.shade, { opacity: shade }]} />
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  cover: {
+  layer: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, zIndex: 20 },
+  leaf: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     left: 0,
     right: 0,
-    zIndex: 20,
-    backgroundColor: colors.navy,
-    borderTopRightRadius: 14,
-    borderBottomRightRadius: 14,
     transformOrigin: 'left center',
     backfaceVisibility: 'hidden',
   },
+  cover: { backgroundColor: colors.navy, borderTopRightRadius: 14, borderBottomRightRadius: 14, overflow: 'hidden' },
+  shade: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#000' },
   spine: {
     position: 'absolute',
     top: 0,

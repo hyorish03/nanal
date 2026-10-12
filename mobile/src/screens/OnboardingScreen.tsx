@@ -9,17 +9,32 @@ import { Txt } from '../ui/Txt';
 import { useReduceMotion } from '../ui/useReduceMotion';
 
 const STEPS = 4;
+const BOOK_W = 164;
 
 export function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0);
   const reduce = useReduceMotion();
   const book = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(1)).current;
   const opening = useRef(false);
 
-  // 첫 단계의 "시작하기"는 작은 다이어리 표지를 펼친 뒤 다음 단계로 간다.
+  // 단계가 바뀔 때 본문을 살짝 흐렸다가 새 단계로 바꾼다.
+  const goTo = (target: number) => {
+    if (reduce) {
+      setStep(target);
+      return;
+    }
+    Animated.timing(fade, { toValue: 0, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(() => {
+      setStep(target);
+      book.setValue(0);
+      Animated.timing(fade, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    });
+  };
+
+  // 첫 단계의 "시작하기"는 작은 다이어리의 표지를 책등 쪽으로 넘겨 펼친 뒤 다음 단계로 간다.
   const next = () => {
     if (step > 0) {
-      setStep(Math.min(step + 1, STEPS - 1));
+      goTo(Math.min(step + 1, STEPS - 1));
       return;
     }
     if (opening.current) return;
@@ -30,16 +45,16 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
     opening.current = true;
     Animated.timing(book, {
       toValue: 1,
-      duration: 800,
-      easing: Easing.bezier(0.32, 0.72, 0.2, 1),
+      duration: 900,
+      easing: Easing.inOut(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
       opening.current = false;
-      book.setValue(0);
-      setStep(1);
+      goTo(1);
     });
   };
-  const rotateY = book.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-165deg'] });
+  // 표지가 왼쪽으로 넘어가면 펼친 두 쪽이 가운데 오도록 책을 오른쪽으로 반 권 옮긴다.
+  const shift = book.interpolate({ inputRange: [0, 1], outputRange: [0, BOOK_W / 2] });
 
   return (
     <View style={styles.container}>
@@ -54,11 +69,12 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
         </Pressable>
       </View>
 
+      <Animated.View style={[styles.flex, { opacity: fade }]}>
       <ScrollView contentContainerStyle={styles.body}>
         {step === 0 && (
           <View style={styles.centered}>
-            <Animated.View style={[styles.book, { transform: [{ rotate: '-4deg' }, { perspective: 900 }, { rotateY }] }]}>
-              <BookCover width={164} height={216} titleSize={28} />
+            <Animated.View style={[styles.book, { transform: [{ translateX: shift }, { rotate: '-4deg' }] }]}>
+              <BookCover width={BOOK_W} height={216} titleSize={28} open={book} />
             </Animated.View>
             <View style={styles.copy}>
               <Txt variant="title" accessibilityRole="header" style={styles.h1}>
@@ -182,10 +198,11 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
           </View>
         )}
       </ScrollView>
+      </Animated.View>
 
       <View style={styles.actions}>
         {step > 0 && (
-          <Pressable accessibilityRole="button" style={styles.back} onPress={() => setStep(step - 1)}>
+          <Pressable accessibilityRole="button" style={styles.back} onPress={() => goTo(step - 1)}>
             <Txt>이전</Txt>
           </Pressable>
         )}
@@ -208,8 +225,9 @@ const styles = StyleSheet.create({
   skip: { minHeight: 44, paddingHorizontal: 6, justifyContent: 'center' },
   skipText: { fontSize: 14, color: colors.inkSoft },
   body: { flexGrow: 1 },
+  flex: { flex: 1 },
   centered: { flexGrow: 1, justifyContent: 'center', gap: 28 },
-  book: { alignSelf: 'center', transformOrigin: 'left center' },
+  book: { alignSelf: 'center' },
   copy: { gap: 12 },
   h1: { fontSize: 28, lineHeight: 38 },
   h2: { fontSize: 26, lineHeight: 35 },
