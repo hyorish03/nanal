@@ -10,6 +10,7 @@ import { useReduceMotion } from '../../ui/useReduceMotion';
 import { voiceErrorMessage } from '../../voice/errors';
 import { initialVoiceState, voiceReducer } from '../../voice/machine';
 import { dimPressed } from '../../ui/press';
+import { useKeyboardResizePaused } from '../../ui/KeyboardResize';
 
 type Props = {
   visible: boolean;
@@ -32,6 +33,7 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
   const reduce = useReduceMotion();
   const level = useRef(new Animated.Value(0)).current; // 0 조용함 → 1 크게 말함
   const listeningRef = useRef(false);
+  useKeyboardResizePaused(visible);
 
   useSpeechRecognitionEvent('start', () => dispatch({ type: 'started' }));
   useSpeechRecognitionEvent('result', (e) => dispatch({ type: 'result', text: e.results[0]?.transcript ?? '' }));
@@ -122,7 +124,7 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
       <View style={styles.sheet}>
         <Paper />
         <View style={styles.header}>
-          <Pressable accessibilityRole="button" accessibilityLabel="닫기" style={dimPressed(styles.headerButton)} onPress={onClose}>
+          <Pressable accessibilityRole="button" style={dimPressed(styles.headerButton)} onPress={onClose}>
             <Txt>닫기</Txt>
           </Pressable>
           <Txt variant="medium" accessibilityRole="header">
@@ -173,7 +175,8 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
               )}
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={listening ? '다 말했어요' : '받아 적는 중'}
+                accessibilityLabel={listening ? '말하기 끝내기' : '받아 적는 중'}
+                accessibilityHint={listening ? '누르면 정리를 시작해요' : undefined}
                 accessibilityState={{ disabled: !listening }}
                 disabled={!listening}
                 style={dimPressed([styles.mic, !listening && styles.micBusy])}
@@ -196,7 +199,7 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
           </View>
         )}
 
-        <Txt style={styles.privacy}>음성은 저장하지 않고, 받아 적은 글만 정리에 써요.</Txt>
+        <Txt style={styles.privacy}>음성은 저장하지 않아요. 정리할 때 받아 적은 글이 Claude(Anthropic)로 보내져요</Txt>
       </View>
     </Modal>
   );
@@ -211,7 +214,7 @@ const styles = StyleSheet.create({
   transcriptBox: { flexGrow: 0, maxHeight: 260, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.lineSoft },
   transcriptInner: { paddingVertical: 16 },
   transcript: { fontSize: 18, lineHeight: 28 },
-  placeholder: { fontSize: 18, lineHeight: 28, color: colors.faint },
+  placeholder: { fontSize: 18, lineHeight: 28, color: colors.muted },
   actions: { alignItems: 'center', gap: 12, marginTop: 'auto' },
   micWrap: { width: 76, height: 76 },
   ring: { position: 'absolute', top: 0, left: 0, width: 76, height: 76, borderRadius: 38, backgroundColor: colors.navy },

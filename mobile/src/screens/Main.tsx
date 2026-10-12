@@ -63,8 +63,8 @@ export function Main({ db, userId }: { db: Db; userId: string }) {
         <View style={styles.blocked}>
           <Txt style={styles.blockedText} accessibilityRole="alert">
             {claim === 'mismatch'
-              ? '이 기기에는 다른 계정의 기록이 있어요. 그 계정으로 다시 로그인해 주세요.'
-              : '이 기기의 기록을 확인하지 못했어요. 잠시 뒤에 다시 시도해 주세요.'}
+              ? '이 기기에는 다른 계정의 기록이 있어요. 그 계정으로 다시 로그인해 주세요'
+              : '이 기기의 기록을 확인하지 못했어요. 잠시 뒤에 다시 해 주세요'}
           </Txt>
           <View style={styles.blockedActions}>
             <Pressable accessibilityRole="button" style={dimPressed(styles.blockedPrimary)} onPress={() => setAttempt((n) => n + 1)}>
@@ -330,7 +330,7 @@ function SyncBar({ pending, error }: { pending: number; error: string | null }) 
   return (
     <View pointerEvents="none" style={[styles.syncBar, { top: insets.top }]}>
       <Txt style={styles.syncText} accessibilityLiveRegion="polite">
-        {error ? '아직 올리지 못했어요. 자동으로 다시 시도할게요 (기록은 이 기기에 안전해요)' : `${pending}개를 올리는 중이에요`}
+        {error ? '아직 올리지 못했어요. 기록은 이 기기에 있고, 곧 다시 올릴게요' : `${pending}개를 올리는 중이에요`}
       </Txt>
     </View>
   );

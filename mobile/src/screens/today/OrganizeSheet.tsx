@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { organizeText } from '../../ai/client';
-import { AiError } from '../../ai/errors';
+import { AI_MESSAGES, AiError } from '../../ai/errors';
 import { dateLabel, type DraftItem, toDrafts } from '../../ai/organize';
 import type { Db } from '../../db/types';
 import { addItem } from '../../items/repo';
 import { supabase } from '../../supabase';
+import { userMessage } from '../../lib/userError';
+import { useKeyboardResizePaused } from '../../ui/KeyboardResize';
 import { RuledPaper } from '../../ui/RuledPaper';
 import { StatusSymbol } from '../../ui/StatusSymbol';
 import { colors, fonts, HIT, SCREEN_X } from '../../ui/theme';
@@ -37,6 +39,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
   const busy = useRef(false); // 상태 갱신 전에 연타해도 한 번만 부른다
   const req = useRef(0); // 시트를 닫았다 다시 열면 이전 요청의 결과는 버린다
   const reduce = useReduceMotion();
+  useKeyboardResizePaused(visible);
 
   useEffect(() => {
     alive.current = true;
@@ -78,12 +81,12 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
           await addItem(db, { kind: 'note', text: raw });
           onAdded('인터넷이 없어 메모로 남겨 뒀어요');
         } catch (err) {
-          setError(err instanceof Error ? err.message : String(err));
+          setError(userMessage(err));
           setStep('write');
         }
         return;
       }
-      setError(e instanceof Error ? e.message : String(e));
+      setError(userMessage(e, AI_MESSAGES.ai_failed));
       setStep('write');
     } finally {
       if (id === req.current) busy.current = false;
@@ -106,9 +109,9 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
     } catch (e) {
       if (saved.length > 0) {
         // 일부만 들어갔다: 다시 눌러도 겹쳐 넣지 않도록 알리고 닫는다
-        onAdded('일부만 넣었어요. 나머지는 다시 정리해 주세요');
+        onAdded('일부만 넣었어요. 남은 글은 다시 정리해 볼까요?');
       } else if (alive.current) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(userMessage(e));
       }
     } finally {
       busy.current = false;
@@ -126,7 +129,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
         <Paper />
         <ScrollView contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Pressable accessibilityRole="button" accessibilityLabel="닫기" style={dimPressed(styles.headerButton)} onPress={onClose}>
+            <Pressable accessibilityRole="button" style={dimPressed(styles.headerButton)} onPress={onClose}>
               <Txt>닫기</Txt>
             </Pressable>
             <Txt variant="medium" accessibilityRole="header">
@@ -151,10 +154,10 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
                 maxLength={2000}
                 accessibilityLabel="정리할 글"
                 placeholder="예: 오늘 책도 사야 하고 빨래도 널어야 돼. 내일은 치과에 전화하기"
-                placeholderTextColor={colors.faint}
+                placeholderTextColor={colors.muted}
               />
               </RuledPaper>
-              <Txt style={styles.note}>정리하기를 누르면 쓴 글이 Claude(Anthropic)로 보내져요. 쓴 글은 따로 저장하지 않아요. 인터넷이 없으면 그대로 메모로 남겨요.</Txt>
+              <Txt style={styles.note}>정리하면 쓴 글이 Claude(Anthropic)로 보내져요. 글은 저장하지 않아요. 인터넷이 없으면 메모로 남겨요</Txt>
               {error && (
                 <Txt style={styles.error} accessibilityLiveRegion="polite">
                   {error}
@@ -179,7 +182,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
               <Txt variant="title" style={styles.lead}>
                 이렇게 정리했어요
               </Txt>
-              <Txt style={styles.hint}>{drafts.length ? '넣고 싶은 것만 체크하세요.' : '넣을 만한 것을 찾지 못했어요.'}</Txt>
+              <Txt style={styles.hint}>{drafts.length ? '넣을 것만 골라 주세요.' : '넣을 만한 것을 찾지 못했어요.'}</Txt>
               {drafts.map((d, i) => {
                 const when = dateLabel(d.date, today);
                 // 정리된 줄이 위에서부터 차례로 살짝 올라오며 나타난다(동작 줄이기면 흐리게만)

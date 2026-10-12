@@ -19,6 +19,7 @@ import {
 } from '../items/repo';
 import { formatLongDate, logicalDate } from '../lib/date';
 import { countRecordedDays } from '../stats/recordedDays';
+import { userMessage } from '../lib/userError';
 import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
@@ -122,7 +123,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         setError(null);
       })
       .catch((e) => {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(userMessage(e, LOAD_FAILED));
         setLoaded(true);
       });
     return () => {
@@ -140,7 +141,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       onChanged();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(userMessage(e));
       return false;
     } finally {
       busy.current = false;
@@ -221,8 +222,22 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   return (
     <View style={styles.container}>
       <Paper />
-      {/* 머리 빈 곳을 누르면 키보드가 내려간다. 알림 줄은 머리 아래 여백에 겹쳐 띄워 목록을 밀지 않는다 */}
+      {/* 머리 빈 곳을 누르면 키보드가 내려간다. 알림 줄은 머리 아래 여백에 겹쳐 띄워 목록을 밀지 않는다.
+          스크린 리더가 날짜 → 하루 마무리 → 지난 기록 순서로 읽도록 날짜를 먼저 그리고, 화면에서는 뒤집어 쌓아 버튼을 위에 둔다 */}
       <Pressable accessible={false} style={styles.header} onPress={Keyboard.dismiss}>
+        <View style={styles.headerText}>
+          <Txt
+            variant="title"
+            accessibilityRole="header"
+            style={styles.date}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {formatLongDate(today)}
+          </Txt>
+          <Txt variant="hand">기록한 날 {recordedDays}일</Txt>
+        </View>
         <View style={styles.headerActions}>
           <Pressable
             accessibilityRole="button"
@@ -235,19 +250,6 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
               하루 마무리
             </Txt>
           </Pressable>
-        </View>
-        <View style={styles.headerText}>
-          <Txt
-            variant="title"
-            accessibilityRole="header"
-            style={styles.date}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.75}
-          >
-            {formatLongDate(today)}
-          </Txt>
-          <Txt variant="hand">기록한 날 {recordedDays}일째</Txt>
         </View>
         {(error || notice) && (
           <Txt
@@ -278,9 +280,14 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
           scrollEventThrottle={16}
           ListEmptyComponent={
-            // 빈 날은 첫 줄에 흐리게 적어 두고, 그 아래로 빈 줄이 이어진다
-            <View style={styles.emptyRow}>
-              <Txt style={styles.empty}>아직 적은 줄이 없어요</Txt>
+            // 빈 날은 첫 두 줄에 흐리게 적어 두고, 그 아래로 빈 줄이 이어진다. 스크린 리더는 한 번에 읽는다
+            <View accessible accessibilityLabel={`${EMPTY_TITLE}. ${EMPTY_HINT}`}>
+              <View style={styles.emptyRow}>
+                <Txt style={styles.empty}>{EMPTY_TITLE}</Txt>
+              </View>
+              <View style={styles.emptyRow}>
+                <Txt style={styles.emptyHint}>{EMPTY_HINT}</Txt>
+              </View>
             </View>
           }
           ListFooterComponent={
@@ -336,12 +343,15 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 // 머리 버튼도 칩처럼 보이는 높이만 낮추고, 누르는 영역은 hitSlop으로 44pt를 지킨다
 const CHIP_SLOP = { top: 5, bottom: 5 };
 const RIBBON_GAP = 16;
+const LOAD_FAILED = '오늘 기록을 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요';
+const EMPTY_TITLE = '아직 적은 줄이 없어요';
+const EMPTY_HINT = '위 칸에 한 줄 적어 볼까요?';
 const REORDER = LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity); // 끈의 44pt 누르는 영역이 하루 마무리 버튼에 겹치지 않게
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingTop: 12, gap: 24 },
-  // 버튼은 맨 위 오른쪽 도구줄, 그 아래 날짜를 한 줄 전체 너비로
-  header: { gap: 10, zIndex: 1 },
+  // 버튼은 맨 위 오른쪽 도구줄, 그 아래 날짜를 한 줄 전체 너비로(날짜를 먼저 그리므로 뒤집어 쌓는다)
+  header: { flexDirection: 'column-reverse', gap: 10, zIndex: 1 },
   message: { position: 'absolute', top: '100%', left: 0, right: 0, fontSize: 13, lineHeight: 18 },
   headerText: { gap: 4 },
   date: { fontSize: 30, letterSpacing: -0.5 },
@@ -372,6 +382,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.ruled,
   },
   empty: { color: colors.muted },
+  emptyHint: { color: colors.muted, fontSize: 14 },
   footerHidden: { opacity: 0 },
   footer: { alignSelf: 'center', marginTop: 24, marginBottom: 24, fontSize: 20, color: colors.muted },
 });

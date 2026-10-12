@@ -7,6 +7,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardResize } from './src/ui/KeyboardResize';
+import { userMessage } from './src/lib/userError';
 import { openDb } from './src/db/client';
 import type { Db } from './src/db/types';
 import { LoginScreen } from './src/screens/LoginScreen';
@@ -15,6 +16,7 @@ import { supabase } from './src/supabase';
 import { colors } from './src/ui/theme';
 
 const LAST_USER_KEY = 'nanal.lastUserId';
+const DB_OPEN_FAILED = '이 기기에 저장한 기록을 열지 못했어요. 앱을 껐다가 다시 켜 주세요';
 
 // 남색 시작 화면을 불러오기가 끝날 때까지 붙들어, 표지가 뜨기 전에 크림색 로딩 화면이 깜빡이지 않게 한다.
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -30,7 +32,8 @@ export default function App() {
   useEffect(() => {
     openDb()
       .then(setDb)
-      .catch((e) => setFatal(`로컬 저장소를 열 수 없습니다: ${String(e)}`));
+      // 원문 오류는 화면에 띄우지 않고 기록만 남긴다(userMessage가 console.warn으로 남긴다)
+      .catch((e) => setFatal(userMessage(e, DB_OPEN_FAILED)));
 
     // 로컬 우선: 오프라인에서 액세스 토큰이 만료된 채 실행해도 로컬 데이터는 열려야 한다.
     // 네트워크 오류로 세션을 확인하지 못했고 마지막 사용자 id가 있으면 그 사용자로 연다.
