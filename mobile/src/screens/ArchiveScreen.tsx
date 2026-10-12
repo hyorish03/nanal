@@ -260,8 +260,10 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
               {!day
                 ? '기록이 없는 날이에요'
                 : day.tasksTotal === 0
-                  ? '이 날은 할 일을 적지 않았어요'
-                  : `할 일 ${day.tasksTotal}개 중 ${day.tasksDone}개 끝냄`}
+                  ? day.tasksMigrated > 0
+                    ? '다른 날로 옮긴 일만 있어요'
+                    : '이 날은 할 일을 적지 않았어요'
+                  : `할 일 ${day.tasksTotal}개 중 ${day.tasksDone}개 끝냄${day.tasksMigrated > 0 ? `, ${day.tasksMigrated}개는 다른 날로` : ''}`}
             </Txt>
             {dayReflections.length === 0 ? (
               <Txt style={styles.muted}>이 날은 회고를 남기지 않았어요. 괜찮아요.</Txt>
