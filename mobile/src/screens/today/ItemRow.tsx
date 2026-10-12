@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { Item } from '../../items/repo';
 import { confirmDelete } from '../../ui/dialogs';
@@ -22,6 +23,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
   const advance = canAdvance(item);
   const markDisabled = !item.priority && priorityFull;
   const done = kind === 'done';
+  const [marked, setMarked] = useState(false); // 이 줄에 방금 형광펜을 칠했다(그때만 긋는 애니메이션)
 
   return (
     <View style={styles.row}>
@@ -35,7 +37,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
         <View style={styles.symbol}>
           <StatusSymbol kind={kind} />
         </View>
-        <Highlight on={item.priority && !done}>
+        <Highlight on={item.priority && !done} animate={marked}>
           <Txt
             variant={kind === 'note' ? 'hand' : 'body'}
             style={[kind === 'note' ? styles.note : styles.text, done && styles.done]}
@@ -63,6 +65,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
             style={styles.menuItem}
             onPress={() => {
               menu.close();
+              setMarked(!item.priority);
               onTogglePriority();
             }}
           >
