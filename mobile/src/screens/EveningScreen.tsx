@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { MOODS, moodWord } from '../days/moods';
 import { getMood, setMood } from '../days/repo';
 import type { Db } from '../db/types';
@@ -10,6 +10,7 @@ import type { TemplateDef } from '../reflections/templates';
 import { countRecordedDays } from '../stats/recordedDays';
 import { confirmDelete, showActionSheet } from '../ui/dialogs';
 import { Inkwell } from '../ui/Inkwell';
+import { EASE_OUT } from '../ui/motion';
 import { RuledPaper } from '../ui/RuledPaper';
 import { colors, fonts, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
@@ -20,6 +21,7 @@ type Props = { db: Db; version: number; onChanged: () => void; onClose: () => vo
 export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const today = logicalDate(new Date());
   const [mood, setMoodState] = useState<number | null>(null);
+  const [moodPicked, setMoodPicked] = useState(false); // 이번에 직접 골랐다(불러온 값에는 깃펜을 내려 꽂지 않는다)
   const [saved, setSaved] = useState<Reflection[]>([]);
   const [templates, setTemplates] = useState<TemplateDef[]>([]);
   const [recordedDays, setRecordedDays] = useState(0);
@@ -72,7 +74,16 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     }
   };
 
-  const pickMood = (value: number) => run(() => setMood(db, today, mood === value ? null : value));
+  // 누르자마자 잉크병을 바꾸고 저장한다. 저장하지 못하면 되돌리고 오류 문구를 보여준다.
+  const pickMood = async (value: number) => {
+    if (busy.current) return;
+    const prev = mood;
+    const next = mood === value ? null : value;
+    setMoodPicked(true);
+    setMoodState(next);
+    const ok = await run(() => setMood(db, today, next));
+    if (!ok) setMoodState(prev);
+  };
 
   const save = () =>
     run(async () => {
@@ -132,9 +143,9 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                   style={styles.mood}
                   onPress={() => pickMood(m)}
                 >
-                  <View style={!selected && styles.dim}>
-                    <Inkwell id={`well${m}`} mood={m} size="large" selected={selected} />
-                  </View>
+                  <MoodWell selected={selected} animate={moodPicked}>
+                    <Inkwell id={`well${m}`} mood={m} size="large" selected={selected} animate={moodPicked} />
+                  </MoodWell>
                   <Txt
                     variant={selected ? 'medium' : 'body'}
                     style={[styles.moodWord, selected ? styles.moodWordOn : styles.moodWordOff]}
@@ -276,6 +287,23 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   );
 }
 
+const DIM = 0.55;
+
+// 고른 잉크병만 진하게. 직접 골랐을 때만 짧게 밝아진다.
+function MoodWell({ selected, animate, children }: { selected: boolean; animate: boolean; children: ReactNode }) {
+  const opacity = useRef(new Animated.Value(selected ? 1 : DIM)).current;
+  useEffect(() => {
+    if (!animate || !selected) {
+      opacity.setValue(selected ? 1 : DIM);
+      return;
+    }
+    const anim = Animated.timing(opacity, { toValue: 1, duration: 150, easing: EASE_OUT, useNativeDriver: true });
+    anim.start();
+    return () => anim.stop();
+  }, [selected, animate, opacity]);
+  return <Animated.View style={{ opacity }}>{children}</Animated.View>;
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paperEvening },
   container: { paddingHorizontal: SCREEN_X, paddingTop: 16, paddingBottom: 24, gap: 20 },
@@ -289,7 +317,6 @@ const styles = StyleSheet.create({
   h2: { fontSize: 26 },
   moods: { flexDirection: 'row', justifyContent: 'space-between' },
   mood: { minWidth: 60, padding: 4, alignItems: 'center', gap: 6 },
-  dim: { opacity: 0.55 },
   moodWord: { fontSize: 13, paddingBottom: 2, borderBottomWidth: 2 },
   moodWordOn: { borderBottomColor: colors.navy },
   moodWordOff: { color: colors.inkSoft, borderBottomColor: 'transparent' },
