@@ -86,9 +86,10 @@ struct LockRectView: View {
   var body: some View {
     HStack(spacing: 4) {
       VStack(alignment: .leading, spacing: 1) {
-        Text("나날 · 오늘 \(s.doneCount)/\(s.items.count)").font(.caption2).opacity(0.85)
-        Text(s.next?.text ?? "오늘 할 일을 다 했어요").font(.headline).lineLimit(1).privacySensitive()
-        Text(s.next.map(nextHint) ?? "오늘도 한 줄씩").font(.caption2).opacity(0.75).lineLimit(1)
+        Text(s.items.isEmpty ? "나날 · 오늘" : "나날 · 오늘 \(s.doneCount)/\(s.items.count)").font(.caption2).opacity(0.85)
+        // 아직 적은 일이 없는 날과 다 끝낸 날을 나눠 말한다
+        Text(s.next?.text ?? (s.items.isEmpty ? "오늘도 한 줄씩" : "다 했어요")).font(.headline).lineLimit(1).privacySensitive()
+        Text(s.next.map(nextHint) ?? (s.items.isEmpty ? "아직 적은 일이 없어요" : "오늘도 수고했어요")).font(.caption2).opacity(0.75).lineLimit(1)
       }
       Spacer(minLength: 0)
       if let next = s.next { StatusButton(item: next, size: 22) }
@@ -167,6 +168,7 @@ struct HomeMediumView: View {
         Text("+ 한 줄").font(.system(size: 13)).foregroundStyle(Color.navy)
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading) // 목록이 비어도 가운데로 몰리지 않게
   }
 }
 
@@ -183,13 +185,18 @@ struct HomeLargeView: View {
         chip("진행 중", s.doingCount)
         chip("한 일", s.doneCount)
       }
-      Text("상태를 눌러 바꿔요").font(.system(size: 11)).foregroundStyle(Color.inkMuted)
+      if s.items.isEmpty {
+        Text("오늘도 한 줄씩").font(.system(size: 14)).foregroundStyle(Color.inkMuted)
+      } else {
+        Text("상태를 눌러 바꿔요").font(.system(size: 11)).foregroundStyle(Color.inkMuted)
+      }
       ForEach(s.items.prefix(7)) { ItemLine(item: $0) }
       Spacer(minLength: 0)
       Link(destination: newLineURL) {
         Text("+ 한 줄").font(.system(size: 13)).foregroundStyle(Color.navy)
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading) // 목록이 비어도 가운데로 몰리지 않게
   }
 
   private func chip(_ label: String, _ count: Int) -> some View {
