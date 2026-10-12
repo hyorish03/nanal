@@ -4,6 +4,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import type { ItemKind } from '../../items/repo';
 import { Chip } from '../../ui/Chip';
 import { Popover, useAnchor } from '../../ui/Popover';
+import { haptic } from '../../ui/haptics';
 import { dimPressed } from '../../ui/press';
 import { colors, fonts } from '../../ui/theme';
 import { SymbolLegend } from './SymbolLegend';
@@ -26,6 +27,11 @@ export const Composer = memo(function Composer({ inputRef, voice, onCapture, onS
   const [kind, setKind] = useState<ItemKind>('task');
   const [text, setText] = useState('');
   const info = useAnchor();
+  const pickKind = (next: ItemKind) => {
+    if (next === kind) return;
+    haptic.select();
+    setKind(next);
+  };
 
   // 빈 칸에서 완료를 누르면 키보드만 내린다
   const submit = async () => {
@@ -73,7 +79,7 @@ export const Composer = memo(function Composer({ inputRef, voice, onCapture, onS
       </View>
       <View style={styles.kindRow}>
         {KINDS.map((k) => (
-          <Chip key={k.kind} label={k.label} symbol={k.symbol} selected={kind === k.kind} onPress={() => setKind(k.kind)} />
+          <Chip key={k.kind} label={k.label} symbol={k.symbol} selected={kind === k.kind} onPress={() => pickKind(k.kind)} />
         ))}
         <Pressable
           ref={info.ref}

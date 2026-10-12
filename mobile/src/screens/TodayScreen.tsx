@@ -32,6 +32,7 @@ import { Composer } from './today/Composer';
 import { voiceAvailable } from '../voice/available';
 import { dimPressed } from '../ui/press';
 import { CHIP_H } from '../ui/Chip';
+import { haptic } from '../ui/haptics';
 import { Toast, type ToastSpec } from '../ui/Toast';
 import { useEvent } from '../ui/useEvent';
 
@@ -140,7 +141,12 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   };
 
   // 아래 함수들은 늘 같은 참조라 입력칸·목록 줄이 화면이 다시 그려질 때 따라 그려지지 않는다
-  const submit = useEvent((kind: ItemKind, text: string) => run(() => addItem(db, { kind, text })));
+  // 진동은 저장이 된 뒤 한 번(실패하면 문구만)
+  const after = (feel: () => void) => (ok: boolean) => {
+    if (ok) feel();
+    return ok;
+  };
+  const submit = useEvent((kind: ItemKind, text: string) => run(() => addItem(db, { kind, text })).then(after(haptic.success)));
   // 실패하면 다음 불러오기(다른 이유로 일어날 수 있다)에 애니메이션이 묻어가지 않게 끈다
   const reordering = async (action: () => Promise<unknown>) => {
     reorder.current = true;
@@ -148,13 +154,14 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     if (!ok) reorder.current = false;
     return ok;
   };
-  const onAdvance = useEvent((id: string) => reordering(() => advanceStatus(db, id)));
-  const onTogglePriority = useEvent((id: string, on: boolean) => reordering(() => setPriority(db, id, on)));
+  const onAdvance = useEvent((id: string) => reordering(() => advanceStatus(db, id)).then(after(haptic.select)));
+  const onTogglePriority = useEvent((id: string, on: boolean) => reordering(() => setPriority(db, id, on)).then(after(haptic.light)));
   const onEdit = useEvent((id: string, text: string) => run(() => updateItemText(db, id, text)));
   // 지우기는 묻지 않고 바로 지운 뒤, 잠깐 '되돌리기'를 띄운다
   const removeWithUndo = async (id: string) => {
     const ok = await reordering(() => deleteItem(db, id));
     if (ok) {
+      haptic.warning();
       setToast({
         key: Date.now(),
         message: '지웠어요',
