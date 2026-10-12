@@ -1,11 +1,12 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { MOODS, moodWord } from '../days/moods';
 import { getMood, setMood } from '../days/repo';
 import type { Db } from '../db/types';
 import { listItemsForDate } from '../items/repo';
 import { formatLongDate, logicalDate } from '../lib/date';
-import { addReflection, listReflections, type Reflection } from '../reflections/repo';
+import { addReflection, deleteReflection, listReflections, type Reflection, updateReflection } from '../reflections/repo';
 import { deleteTemplate, listTemplates } from '../reflections/templateRepo';
 import type { TemplateDef } from '../reflections/templates';
 import { countRecordedDays } from '../stats/recordedDays';
@@ -15,10 +16,13 @@ import { Inkwell } from '../ui/Inkwell';
 import { LAMP_PAPER } from '../ui/lamp';
 import { EASE_IN_OUT, EASE_OUT } from '../ui/motion';
 import { RuledPaper } from '../ui/RuledPaper';
-import { colors, fonts, SCREEN_X } from '../ui/theme';
+import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
+import { type Draft, hasAnswer, readDraft, withoutTemplate, writeDraft } from './evening/draft';
+import { ReflectionForm, RULE, SIT } from './evening/ReflectionForm';
 import { TemplateSheet } from './evening/TemplateSheet';
+import { useKeepVisible } from './evening/useKeepVisible';
 import { dimPressed } from '../ui/press';
 import { Chip } from '../ui/Chip';
 import { PageHeader } from '../ui/PageHeader';
@@ -33,25 +37,63 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const [saved, setSaved] = useState<Reflection[]>([]);
   const [templates, setTemplates] = useState<TemplateDef[]>([]);
   const [recordedDays, setRecordedDays] = useState(0);
+  const [hasItems, setHasItems] = useState(false); // 오늘 적은 할 일·메모가 있다
   const [done, setDone] = useState<{ id: string; text: string }[]>([]); // 오늘 끝낸 일
   const [freshId, setFreshId] = useState<string | null>(null); // 방금 남긴 회고(잉크가 마르는 중)
   const [template, setTemplate] = useState<string | null>(null);
-  const [answers, setAnswers] = useState<Record<string, Record<string, string>>>({});
+  const [answers, setAnswers] = useState<Draft['answers']>({});
+  const [editing, setEditing] = useState<{ id: string; answers: Record<string, string> } | null>(null); // 고치는 중인 회고
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetEditing, setSheetEditing] = useState<TemplateDef | null>(null); // 닫히는 애니메이션 동안 내용을 유지하려고 visible과 분리
-  const openSheet = (editing: TemplateDef | null) => {
-    setSheetEditing(editing);
+  const openSheet = (t: TemplateDef | null) => {
+    setSheetEditing(t);
     setSheetVisible(true);
   };
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
   const reduce = useReduceMotion();
   const stampIn = useRef(new Animated.Value(1)).current;
+  const scroll = useRef<ScrollView>(null);
+  const frame = useRef<View>(null);
+  const { onScroll, keep } = useKeepVisible(scroll, frame);
+
+  // 쓰던 답은 날마다 따로 보관한다. 불러오기 전에는 덮어쓰지 않는다.
+  const draftReady = useRef(false);
+  const latest = useRef({ today, draft: { template, answers } as Draft });
+  latest.current = { today, draft: { template, answers } };
 
   useEffect(() => {
+    draftReady.current = false;
     setTemplate(null);
     setAnswers({});
+    setEditing(null);
+    let cancelled = false;
+    readDraft(AsyncStorage, today).then((d) => {
+      if (cancelled) return;
+      if (d) {
+        setTemplate((prev) => prev ?? d.template);
+        setAnswers((prev) => (Object.values(prev).some(hasAnswer) ? prev : d.answers));
+      }
+      draftReady.current = true;
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [today]);
+
+  useEffect(() => {
+    if (!draftReady.current) return;
+    const timer = setTimeout(() => writeDraft(AsyncStorage, today, { template, answers }), 400);
+    return () => clearTimeout(timer);
+  }, [today, template, answers]);
+
+  // 화면을 닫을 때 마지막 몇 글자도 남긴다
+  useEffect(
+    () => () => {
+      if (draftReady.current) writeDraft(AsyncStorage, latest.current.today, latest.current.draft);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -62,6 +104,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
         setSaved(r);
         setTemplates(t);
         setRecordedDays(n);
+        setHasItems(items.length > 0);
         setDone(items.filter((i) => i.status === 'done').map((i) => ({ id: i.id, text: i.text })));
         setError(null);
       })
@@ -105,19 +148,50 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   };
 
   const save = async () => {
-    if (!template) return;
+    if (!template || !hasAnswer(answers[template])) return;
     const ok = await run(async () => {
       const added = await addReflection(db, { templateId: template, answers: answers[template] ?? {} });
+      // 남긴 답은 바로 보관함에서 빼야 다시 열었을 때 같은 회고가 또 채워지지 않는다
+      const rest = withoutTemplate({ template, answers }, template);
+      await writeDraft(AsyncStorage, today, rest);
       // 도장 숫자와 카드가 바뀐 뒤에 찍히도록 여기서 바로 다시 읽는다
       const [list, n] = await Promise.all([listReflections(db, today), countRecordedDays(db)]);
       setSaved(list);
       setRecordedDays(n);
       setFreshId(added.id);
       setTemplate(null);
-      setAnswers((prev) => ({ ...prev, [template]: {} }));
+      setAnswers(rest.answers);
     });
     if (ok) dropStamp();
   };
+
+  const saveEdit = () => {
+    if (!editing || !hasAnswer(editing.answers)) return;
+    run(async () => {
+      await updateReflection(db, editing.id, editing.answers);
+      setSaved(await listReflections(db, today));
+      setEditing(null);
+    });
+  };
+
+  const askDeleteReflection = (r: Reflection) =>
+    confirmDelete(`‘${r.templateName}’ 회고를 지울까요?`, '지난 기록에서도 사라져요.', () =>
+      run(async () => {
+        await deleteReflection(db, r.id);
+        const [list, n] = await Promise.all([listReflections(db, today), countRecordedDays(db)]);
+        setSaved(list);
+        setRecordedDays(n);
+        setEditing((e) => (e?.id === r.id ? null : e));
+      }),
+    );
+
+  const startEdit = (r: Reflection) => setEditing({ id: r.id, answers: { ...r.answers } });
+
+  const reflectionActions = (r: Reflection) =>
+    showActionSheet(`‘${r.templateName}’`, [
+      { label: '고치기', onPress: () => startEdit(r) },
+      { label: '지우기', destructive: true, onPress: () => askDeleteReflection(r) },
+    ]);
 
   const askDelete = (t: TemplateDef) =>
     confirmDelete(`‘${t.name}’${eulReul(t.name)} 지울까요?`, '이 템플릿으로 쓴 회고는 그대로 남아요.', () => {
@@ -137,12 +211,26 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
   const current = templates.find((t) => t.id === template);
   const hasCustom = templates.some((t) => !t.builtin);
+  const hasRecord = mood !== null || saved.length > 0 || hasItems;
 
   return (
-    <View style={styles.flex}>
+    <View ref={frame} style={styles.flex}>
       <Paper />
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        <PageHeader title="오늘을 덮으며" subtitle={formatLongDate(today)} onBack={onClose} backAccessibilityLabel="하루 마무리 닫기" />
+      {/* 앱 화면이 이미 키보드만큼 줄어들므로(KeyboardResize) 인셋은 더하지 않고, 쓰는 칸 쪽으로 스크롤만 옮긴다 */}
+      <ScrollView
+        ref={scroll}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <PageHeader
+          title="하루 마무리"
+          subtitle={`오늘을 덮으며 · ${formatLongDate(today)}`}
+          onBack={onClose}
+          backAccessibilityLabel="하루 마무리 닫기"
+        />
 
         <View style={styles.section}>
           <Txt variant="hand" accessibilityRole="header" style={styles.h2}>
@@ -174,6 +262,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                   </MoodWell>
                   <Txt
                     variant={selected ? 'medium' : 'body'}
+                    maxFontSizeMultiplier={TEXT_MAX_SCALE}
                     style={[styles.moodWord, selected ? styles.moodWordOn : styles.moodWordOff]}
                   >
                     {moodWord(m)}
@@ -226,29 +315,16 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
         {current && (
           <View>
             <View accessible={false} style={styles.tape} />
-            <RuledPaper lineHeight={RULE} firstLineTop={FORM_TOP + RULE - SIT} style={styles.form}>
-              {current.questions.map((q) => (
-                <View key={q.key}>
-                  <Txt variant="hand" style={styles.formQ} accessible={false} importantForAccessibility="no">
-                    {q.text}
-                  </Txt>
-                  <TextInput
-                    style={styles.answer}
-                    multiline
-                    accessibilityLabel={q.text}
-                    value={answers[current.id]?.[q.key] ?? ''}
-                    onChangeText={(v) =>
-                      setAnswers((prev) => ({ ...prev, [current.id]: { ...prev[current.id], [q.key]: v } }))
-                    }
-                  />
-                </View>
-              ))}
-              <Pressable accessibilityRole="button" style={dimPressed(styles.save)} onPress={save}>
-                <Txt variant="medium" style={styles.saveText}>
-                  남겨두기
-                </Txt>
-              </Pressable>
-            </RuledPaper>
+            <ReflectionForm
+              questions={current.questions}
+              values={answers[current.id] ?? {}}
+              onChange={(key, v) => setAnswers((prev) => ({ ...prev, [current.id]: { ...prev[current.id], [key]: v } }))}
+              submitLabel="회고 남기기"
+              canSubmit={hasAnswer(answers[current.id])}
+              onSubmit={save}
+              keep={keep}
+              top={FORM_TOP}
+            />
           </View>
         )}
 
@@ -263,24 +339,62 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
             <Txt variant="medium" style={styles.question}>
               오늘 남긴 회고
             </Txt>
-            {saved.map((r) => (
-              <RuledPaper key={r.id} lineHeight={RULE} firstLineTop={RULE - SIT} style={styles.savedCard}>
-                <Txt variant="hand" style={styles.formQ}>
-                  {r.templateName}
-                </Txt>
-                {r.questions
-                  .filter((q) => r.answers[q.key])
-                  .map((q) =>
-                    r.id === freshId ? (
-                      <WetInk key={q.key} label={`${q.text} ${r.answers[q.key]}`} text={r.answers[q.key]} />
-                    ) : (
-                      <Txt key={q.key} style={styles.savedAnswer} accessibilityLabel={`${q.text} ${r.answers[q.key]}`}>
-                        {r.answers[q.key]}
+            {saved.map((r) =>
+              editing?.id === r.id ? (
+                <ReflectionForm
+                  key={r.id}
+                  title={r.templateName}
+                  questions={r.questions}
+                  values={editing.answers}
+                  onChange={(key, v) => setEditing((e) => e && { ...e, answers: { ...e.answers, [key]: v } })}
+                  submitLabel="고쳐 두기"
+                  canSubmit={hasAnswer(editing.answers)}
+                  onSubmit={saveEdit}
+                  onCancel={() => setEditing(null)}
+                  keep={keep}
+                  style={styles.savedCard}
+                />
+              ) : (
+                // 카드를 길게 눌러도 고치기·지우기가 나온다. 글은 줄마다 따로 읽히도록 카드 자체는 접근성 요소로 묶지 않는다.
+                <Pressable key={r.id} accessible={false} onLongPress={() => reflectionActions(r)}>
+                  <RuledPaper lineHeight={RULE} firstLineTop={RULE - SIT} style={styles.savedCard}>
+                    <View style={styles.cardHead}>
+                      <Txt variant="hand" style={[styles.formQ, styles.flexText]}>
+                        {r.templateName}
                       </Txt>
-                    ),
-                  )}
-              </RuledPaper>
-            ))}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`‘${r.templateName}’ 회고 고치기 또는 지우기`}
+                        accessibilityActions={[
+                          { name: 'edit', label: '고치기' },
+                          { name: 'delete', label: '지우기' },
+                        ]}
+                        onAccessibilityAction={(e) => {
+                          if (e.nativeEvent.actionName === 'edit') startEdit(r);
+                          else if (e.nativeEvent.actionName === 'delete') askDeleteReflection(r);
+                        }}
+                        hitSlop={{ top: 6, bottom: 6 }}
+                        style={dimPressed(styles.more)}
+                        onPress={() => reflectionActions(r)}
+                      >
+                        <Txt style={styles.moreText}>⋯</Txt>
+                      </Pressable>
+                    </View>
+                    {r.questions
+                      .filter((q) => r.answers[q.key])
+                      .map((q) =>
+                        r.id === freshId ? (
+                          <WetInk key={q.key} label={`${q.text} ${r.answers[q.key]}`} text={r.answers[q.key]} />
+                        ) : (
+                          <Txt key={q.key} style={styles.savedAnswer} accessibilityLabel={`${q.text} ${r.answers[q.key]}`}>
+                            {r.answers[q.key]}
+                          </Txt>
+                        ),
+                      )}
+                  </RuledPaper>
+                </Pressable>
+              ),
+            )}
           </View>
         )}
 
@@ -298,11 +412,22 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
               },
             ]}
           >
-            <Txt variant="title" style={styles.stampText}>
+            <Txt
+              variant="title"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+              maxFontSizeMultiplier={TEXT_MAX_SCALE}
+              style={styles.stampText}
+            >
               {recordedDays}일
             </Txt>
           </Animated.View>
-          <Txt style={styles.stampCopy}>오늘도 한 장을 채웠어요. 내일 아침에 이어서 적어요.</Txt>
+          <Txt style={styles.stampCopy}>
+            {hasRecord
+              ? '오늘도 한 장을 채웠어요. 내일 아침에 이어서 적어요.'
+              : '오늘 장은 아직 비어 있어요. 마음 하나만 골라도 충분해요.'}
+          </Txt>
         </View>
 
         {done.length > 0 && (
@@ -340,6 +465,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
 const DIM = 0.55;
 const DONE_MAX = 5;
+const TEXT_MAX_SCALE = 1.3; // 큰 글씨에서도 잉크병 줄과 도장이 무너지지 않을 만큼만 키운다
 const WET_INK = colors.navy; // 막 쓴 잉크는 남색으로 젖어 있다가 먹색으로 마른다
 
 // 색은 네이티브 드라이버로 바꿀 수 없어서, 먹색 글씨 위에 남색 글씨를 겹쳐 두고 남색만 흐리게 한다.
@@ -383,9 +509,6 @@ function MoodWell({ selected, animate, children }: { selected: boolean; animate:
   return <Animated.View style={{ opacity }}>{children}</Animated.View>;
 }
 
-// 줄 노트 간격. 선은 줄 상자 맨 아래에서 SIT만큼 올라와 글자 기준선 바로 밑에 그어진다.
-const RULE = 32;
-const SIT = 6;
 const FORM_TOP = 22;
 
 const styles = StyleSheet.create({
@@ -393,7 +516,8 @@ const styles = StyleSheet.create({
   container: { paddingHorizontal: SCREEN_X, paddingTop: 4, paddingBottom: 24, gap: 20 },
   section: { gap: 10 },
   h2: { fontSize: 26 },
-  moods: { flexDirection: 'row', justifyContent: 'space-between' },
+  // 큰 글씨로 다섯 병이 한 줄에 안 들어가면 다음 줄로 넘기고 가운데로 모은다
+  moods: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-evenly', rowGap: 8 },
   mood: { minWidth: 60, padding: 4, alignItems: 'center', gap: 6 },
   moodWord: { fontSize: 13, paddingBottom: 2, borderBottomWidth: 2 },
   moodWordOn: { borderBottomColor: colors.navy },
@@ -411,19 +535,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tape,
     transform: [{ rotate: '-2deg' }],
   },
-  // 질문과 답이 모두 RULE 간격으로 쌓여야 글자가 선 위에 앉는다(gap을 두지 않는다)
-  form: { paddingTop: FORM_TOP, paddingHorizontal: 16, paddingBottom: 14 },
   formQ: { fontSize: 23, lineHeight: RULE },
-  answer: { minHeight: RULE * 2, fontSize: 15, lineHeight: RULE, fontFamily: fonts.body, color: colors.ink, padding: 0, textAlignVertical: 'top' },
-  save: {
-    alignSelf: 'flex-end',
-    minHeight: 44,
-    paddingHorizontal: 22,
-    borderRadius: 22,
-    backgroundColor: colors.ink,
-    justifyContent: 'center',
-  },
-  saveText: { color: colors.card, fontSize: 15 },
+  flexText: { flex: 1 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', height: RULE },
+  more: { width: 44, height: RULE, marginRight: -10, alignItems: 'center', justifyContent: 'center' },
+  moreText: { fontSize: 18, color: colors.muted },
   error: { color: colors.danger, fontSize: 14 },
   savedCard: { paddingHorizontal: 14, paddingVertical: 0, borderWidth: 1, borderColor: colors.lineFaint },
   savedAnswer: { fontSize: 14, lineHeight: RULE },
@@ -444,10 +560,11 @@ const styles = StyleSheet.create({
     borderRadius: 27,
     borderWidth: 1.5,
     borderColor: colors.navy,
+    paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center', // -10° 기울기는 찍히는 애니메이션과 함께 넣는다
   },
-  stampText: { fontSize: 13, color: colors.navy },
+  stampText: { alignSelf: 'stretch', fontSize: 13, color: colors.navy, textAlign: 'center' }, // 폭을 정해 줘야 숫자가 길 때 줄어든다
   stampCopy: { flex: 1, fontSize: 14, color: colors.inkSoft },
   done: { paddingHorizontal: 14 },
   doneLabel: { fontSize: 12, color: colors.muted, marginBottom: 2 },
