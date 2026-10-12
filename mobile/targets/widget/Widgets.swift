@@ -91,5 +91,9 @@ struct NanalWidgets: WidgetBundle {
     NanalLockWidget()
     NanalMoodWidget()
     NanalHomeWidget()
+    if #available(iOS 18.0, *) {
+      NanalVoiceControl()
+      NanalLineControl()
+    }
   }
 }
