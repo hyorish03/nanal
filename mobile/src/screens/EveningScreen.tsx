@@ -6,6 +6,7 @@ import { getMood, setMood } from '../days/repo';
 import type { Db } from '../db/types';
 import { listItemsForDate } from '../items/repo';
 import { formatLongDate, logicalDate } from '../lib/date';
+import { userMessage } from '../lib/userError';
 import { addReflection, deleteReflection, listReflections, type Reflection, updateReflection } from '../reflections/repo';
 import { deleteTemplate, listTemplates } from '../reflections/templateRepo';
 import type { TemplateDef } from '../reflections/templates';
@@ -108,7 +109,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
         setDone(items.filter((i) => i.status === 'done').map((i) => ({ id: i.id, text: i.text })));
         setError(null);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => setError(userMessage(e, '오늘 기록을 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요')));
     return () => {
       cancelled = true;
     };
@@ -123,7 +124,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
       onChanged();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(userMessage(e));
       return false;
     } finally {
       busy.current = false;
@@ -194,7 +195,8 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     ]);
 
   const askDelete = (t: TemplateDef) =>
-    confirmDelete(`‘${t.name}’${eulReul(t.name)} 지울까요?`, '이 템플릿으로 쓴 회고는 그대로 남아요.', () => {
+    // ‘이름’ 뒤 조사: 받침이 있으면 은, 없으면 는
+    confirmDelete('템플릿을 지울까요?', `‘${t.name}’${eulReul(t.name) === '을' ? '은' : '는'} 지워지고, 이 템플릿으로 쓴 회고는 그대로 남아요.`, () => {
       // 시트를 먼저 닫아야 실패했을 때 오류 문구가 저녁 화면에 보인다
       setSheetVisible(false);
       run(async () => {
@@ -205,8 +207,8 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
   const templateActions = (t: TemplateDef) =>
     showActionSheet(`‘${t.name}’`, [
-      { label: '수정하기', onPress: () => openSheet(t) },
-      { label: '삭제하기', destructive: true, onPress: () => askDelete(t) },
+      { label: '고치기', onPress: () => openSheet(t) },
+      { label: '지우기', destructive: true, onPress: () => askDelete(t) },
     ]);
 
   const current = templates.find((t) => t.id === template);
@@ -274,9 +276,12 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
         </View>
 
         <View style={styles.section}>
-          <Txt variant="medium" style={styles.question}>
-            오늘은 어떤 날이었나요? (건너뛰어도 괜찮아요)
-          </Txt>
+          <View>
+            <Txt variant="medium" style={styles.question}>
+              오늘은 어떤 날이었나요?
+            </Txt>
+            <Txt style={styles.hint}>건너뛰어도 괜찮아요</Txt>
+          </View>
           <View style={styles.chips}>
             {templates.map((t) => {
               const selected = template === t.id;
@@ -290,8 +295,8 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                     t.builtin
                       ? undefined
                       : [
-                          { name: 'edit', label: '수정하기' },
-                          { name: 'delete', label: '삭제하기' },
+                          { name: 'edit', label: '고치기' },
+                          { name: 'delete', label: '지우기' },
                         ]
                   }
                   onAccessibilityAction={

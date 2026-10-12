@@ -71,7 +71,7 @@ describe('회고 모아보기', () => {
         template: 'lethargy',
         templateName: '무기력했던 날',
         mood: 3,
-        answers: [{ question: '무기력의 원인으로 짐작되는 것은?', answer: '잠 부족' }],
+        answers: [{ question: '무기력했던 이유를 짐작해 본다면 무엇일까요?', answer: '잠 부족' }],
       },
     ]);
     expect(await listReflectionPage(db, { limit: 2, offset: 4 })).toEqual([]);

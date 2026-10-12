@@ -7,7 +7,8 @@ import type { Db } from '../db/types';
 import { listItemsForDate, type Item } from '../items/repo';
 import { monthWeeks } from '../lib/calendar';
 import { addMonths, formatLongDate, formatMonth, logicalDate, monthOf } from '../lib/date';
-import { listReflections, type Reflection } from '../reflections/repo';
+import { userMessage } from '../lib/userError';
+import { deleteReflection, listReflections, type Reflection, updateReflection } from '../reflections/repo';
 import { monthLabel, reviewTargetMonth } from '../monthly/labels';
 import { getMonthlyReview } from '../monthly/repo';
 import { Inkwell } from '../ui/Inkwell';
@@ -21,8 +22,12 @@ import { dimPressed } from '../ui/press';
 import { Chip } from '../ui/Chip';
 import { PageHeader } from '../ui/PageHeader';
 import { useReduceMotion } from '../ui/useReduceMotion';
+import { confirmDelete, showActionSheet } from '../ui/dialogs';
+import { hasAnswer } from './evening/draft';
+import { ReflectionForm } from './evening/ReflectionForm';
+import { useKeepVisible } from './evening/useKeepVisible';
 
-type Props = { db: Db; version: number; onClose: () => void; onOpenReview?: (month: string) => void };
+type Props = { db: Db; version: number; onClose: () => void; onOpenReview?: (month: string) => void; onChanged?: () => void };
 type Tab = 'calendar' | 'collection';
 
 const TABS = [
@@ -47,8 +52,10 @@ function useFocusedVersion(version: number): number {
   return seen.current;
 }
 
-export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview }: Props) {
-  const version = useFocusedVersion(rawVersion);
+export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, onChanged }: Props) {
+  const focusedVersion = useFocusedVersion(rawVersion);
+  const [tick, setTick] = useState(0); // 여기서 회고를 고치거나 지우면 바로 다시 읽는다
+  const version = `${focusedVersion}:${tick}`; // 아래 읽기들이 다시 돌 기준
   const today = logicalDate(new Date());
   const [tab, setTab] = useState<Tab>('calendar');
   const [month, setMonth] = useState(monthOf(today));
@@ -64,6 +71,9 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview }
   const [filter, setFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fail = useCallback(() => setError(LOAD_ERROR), []);
+  const [editing, setEditing] = useState<{ id: string; answers: Record<string, string> } | null>(null); // 고치는 중인 회고
+  const [actionError, setActionError] = useState<string | null>(null);
+  const busy = useRef(false);
 
   const reviewMonth = reviewTargetMonth(today);
   const [hasReview, setHasReview] = useState(false);
@@ -184,6 +194,8 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview }
   };
   const pickDate = (date: string) => {
     setSelected(date);
+    setEditing(null);
+    setActionError(null);
     revealUntil.current = Date.now() + 1000;
     requestAnimationFrame(revealDetail);
   };
@@ -196,7 +208,51 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview }
     setTab('calendar');
     setMonth(monthOf(date));
     setSelected(date);
+    setEditing(null);
+    setActionError(null);
   }, []);
+
+  // 날짜 상세에서 회고를 고치거나 지운다. 끝나면 달력 점·모아보기까지 다시 읽는다.
+  const frame = useRef<View>(null);
+  const { onScroll: keepOnScroll, keep } = useKeepVisible(scrollRef, frame);
+  const run = async (action: () => Promise<unknown>) => {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      await action();
+      setActionError(null);
+      setTick((t) => t + 1);
+      onChanged?.();
+    } catch (e) {
+      setActionError(userMessage(e));
+    } finally {
+      busy.current = false;
+    }
+  };
+  const startEdit = (r: Reflection) => {
+    setActionError(null);
+    setEditing({ id: r.id, answers: { ...r.answers } });
+  };
+  const saveEdit = () => {
+    if (!editing || !hasAnswer(editing.answers)) return;
+    const { id, answers } = editing;
+    run(async () => {
+      await updateReflection(db, id, answers);
+      setEditing(null);
+    });
+  };
+  const askDeleteReflection = (r: Reflection) =>
+    confirmDelete(`‘${r.templateName}’ 회고를 지울까요?`, '지운 회고는 되돌릴 수 없어요.', () =>
+      run(async () => {
+        await deleteReflection(db, r.id);
+        setEditing((e) => (e?.id === r.id ? null : e));
+      }),
+    );
+  const reflectionActions = (r: Reflection) =>
+    showActionSheet(`‘${r.templateName}’`, [
+      { label: '고치기', onPress: () => startEdit(r) },
+      { label: '지우기', destructive: true, onPress: () => askDeleteReflection(r) },
+    ]);
 
   const showBanner = !!onOpenReview && (hasReview || reviewDays >= REVIEW_MIN_DAYS);
   const shownItems = dayItems.slice(0, DAY_ITEMS_MAX);
@@ -255,7 +311,7 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview }
                 ))}
               </View>
               <Txt style={styles.small}>
-                {current ? `${current.name} ${current.count}번` : total ? `회고 ${total}개` : '아직 남긴 회고가 없어요'}
+                {current ? `${current.name} ${current.count}개` : total ? `회고 ${total}개` : '아직 남긴 회고가 없어요'}
               </Txt>
               {!filter && total === 0 && <Txt style={styles.muted}>하루 마무리에서 남긴 회고가 여기 모여요</Txt>}
             </View>
@@ -266,14 +322,19 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview }
   }
 
   return (
-    <View style={styles.flex}>
+    <View ref={frame} style={styles.flex}>
       <Paper />
       <ScrollView
         ref={scrollRef}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         style={styles.scroll}
         contentContainerStyle={styles.container}
         scrollEventThrottle={16}
-        onScroll={(e) => (scrollY.current = e.nativeEvent.contentOffset.y)}
+        onScroll={(e) => {
+          scrollY.current = e.nativeEvent.contentOffset.y;
+          keepOnScroll(e);
+        }}
         onLayout={(e) => {
           viewH.current = e.nativeEvent.layout.height;
           if (Date.now() < revealUntil.current) revealDetail();
@@ -291,7 +352,7 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview }
               {monthLabel(reviewMonth)} 돌아보기 {hasReview ? '보기' : '만들기'}
             </Txt>
             <Txt style={styles.reviewBannerSub}>
-              {hasReview ? '지난달 흐름을 다시 읽어요' : '한 달의 기분과 회고를 AI와 같이 읽어 봐요'}
+              {hasReview ? '지난달 흐름을 다시 읽어요' : '한 달의 기분과 회고를 같이 읽어 봐요'}
             </Txt>
           </Pressable>
         )}
@@ -358,7 +419,7 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview }
             </View>
           ))}
         </View>
-        <Txt style={styles.legend}>잉크가 찰수록 좋았던 날. 아래 점은 회고를 남긴 날이에요.</Txt>
+        <Txt style={styles.legend}>잉크가 찰수록 기분이 좋았던 날이에요. 아래 점은 회고를 남긴 날이에요.</Txt>
 
         <View
           style={styles.detail}
@@ -399,20 +460,63 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview }
             </View>
           )}
           {dayReflections.length === 0 ? (
-            <Txt style={styles.muted}>이 날은 회고를 남기지 않았어요. 괜찮아요.</Txt>
+            <Txt style={styles.muted}>이 날은 회고가 없어요</Txt>
           ) : (
-            dayReflections.map((r) => (
-              <RuledPaper key={r.id} lineHeight={30} style={styles.card}>
-                <Txt variant="hand" style={styles.cardTitle}>
-                  {r.templateName}
-                </Txt>
-                {answersOf(r).map((a, i) => (
-                  <Txt key={i} style={styles.cardLine}>
-                    {a}
-                  </Txt>
-                ))}
-              </RuledPaper>
-            ))
+            dayReflections.map((r) =>
+              editing?.id === r.id ? (
+                <ReflectionForm
+                  key={r.id}
+                  title={r.templateName}
+                  questions={r.questions}
+                  values={editing.answers}
+                  onChange={(key, v) => setEditing((e) => e && { ...e, answers: { ...e.answers, [key]: v } })}
+                  submitLabel="고쳐 두기"
+                  canSubmit={hasAnswer(editing.answers)}
+                  onSubmit={saveEdit}
+                  onCancel={() => setEditing(null)}
+                  keep={keep}
+                  style={styles.card}
+                />
+              ) : (
+                // 카드를 길게 눌러도 고치기·지우기가 나온다. 글은 줄마다 따로 읽히도록 카드 자체는 접근성 요소로 묶지 않는다.
+                <Pressable key={r.id} accessible={false} onLongPress={() => reflectionActions(r)}>
+                  <RuledPaper lineHeight={30} style={styles.card}>
+                    <View style={styles.cardHead}>
+                      <Txt variant="hand" style={[styles.cardTitle, styles.flexText]}>
+                        {r.templateName}
+                      </Txt>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`‘${r.templateName}’ 회고 고치기 또는 지우기`}
+                        accessibilityActions={[
+                          { name: 'edit', label: '고치기' },
+                          { name: 'delete', label: '지우기' },
+                        ]}
+                        onAccessibilityAction={(e) => {
+                          if (e.nativeEvent.actionName === 'edit') startEdit(r);
+                          else if (e.nativeEvent.actionName === 'delete') askDeleteReflection(r);
+                        }}
+                        hitSlop={{ top: 7, bottom: 7 }}
+                        style={dimPressed(styles.more)}
+                        onPress={() => reflectionActions(r)}
+                      >
+                        <Txt style={styles.moreText}>⋯</Txt>
+                      </Pressable>
+                    </View>
+                    {answersOf(r).map((a, i) => (
+                      <Txt key={i} style={styles.cardLine}>
+                        {a}
+                      </Txt>
+                    ))}
+                  </RuledPaper>
+                </Pressable>
+              ),
+            )
+          )}
+          {actionError && (
+            <Txt style={styles.error} accessibilityLiveRegion="polite">
+              {actionError}
+            </Txt>
           )}
         </View>
       </ScrollView>
@@ -495,6 +599,10 @@ const styles = StyleSheet.create({
   muted: { fontSize: 14, color: colors.muted },
   card: { paddingHorizontal: 14, paddingVertical: 0, borderWidth: 1, borderColor: colors.lineFaint, borderRadius: 4 },
   cardTitle: { fontSize: 21, lineHeight: 30 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', height: 30 },
+  flexText: { flex: 1 },
+  more: { width: 44, height: 30, marginRight: -10, alignItems: 'center', justifyContent: 'center' },
+  moreText: { fontSize: 18, color: colors.muted },
   cardLine: { fontSize: 14, lineHeight: 30 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 10 },
   entry: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.lineFaint, borderRadius: 4, padding: 12, gap: 8 },

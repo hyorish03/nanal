@@ -2,6 +2,7 @@ import { isAuthRetryableFetchError, type AuthError } from '@supabase/supabase-js
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { OFFLINE_MESSAGE, userMessage } from '../lib/userError';
 import { supabase } from '../supabase';
 import { BookCover } from '../ui/BookCover';
 import { colors, fonts } from '../ui/theme';
@@ -13,7 +14,7 @@ const UNKNOWN_ERROR = '로그인하지 못했어요. 잠시 뒤에 다시 해 �
 
 // 서버의 영어 문구는 그대로 보여주지 않는다
 function authErrorMessage(e: AuthError): string {
-  if (isAuthRetryableFetchError(e)) return '인터넷에 연결되지 않았어요. 연결을 확인하고 다시 해 주세요';
+  if (isAuthRetryableFetchError(e)) return OFFLINE_MESSAGE;
   if (e.code === 'invalid_credentials' || e.message.includes('Invalid login credentials')) {
     return '이메일이나 비밀번호가 맞지 않아요. 다시 확인해 주세요';
   }
@@ -38,8 +39,8 @@ export function LoginScreen() {
     try {
       const { error: e } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (e) setError(authErrorMessage(e));
-    } catch {
-      setError(UNKNOWN_ERROR);
+    } catch (e) {
+      setError(userMessage(e, UNKNOWN_ERROR));
     } finally {
       setBusy(false);
     }
@@ -63,7 +64,7 @@ export function LoginScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="me@example.com"
-                placeholderTextColor={colors.faint}
+                placeholderTextColor={colors.muted}
                 accessibilityLabel="이메일"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -82,8 +83,6 @@ export function LoginScreen() {
               <TextInput
                 ref={passwordRef}
                 style={styles.input}
-                placeholder="비밀번호"
-                placeholderTextColor={colors.faint}
                 accessibilityLabel="비밀번호"
                 secureTextEntry
                 autoCorrect={false}

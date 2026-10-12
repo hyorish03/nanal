@@ -1,11 +1,9 @@
 import { openTestDb } from '../../test/sqlite';
-import { setMood } from '../days/repo';
 import { migrate } from '../db/schema';
 import type { Db } from '../db/types';
 import {
   addReflection,
   deleteReflection,
-  listReflectionHistory,
   listReflections,
   MAX_ANSWER_LENGTH,
   updateReflection,
@@ -50,18 +48,6 @@ test('모든 답변이 비어 있으면 거부한다', async () => {
   await expect(addReflection(db, { templateId: 'gratitude', answers: { good: '  ' } }, NOW)).rejects.toThrow('하나 이상');
 });
 
-test('모든 회고를 최신순으로 그날 기분과 함께 돌려준다', async () => {
-  await addReflection(db, { templateId: 'gratitude', answers: { good: '커피' } }, new Date(2026, 9, 2, 22, 0));
-  await addReflection(db, { templateId: 'lethargy', answers: { cause: '잠' } }, new Date(2026, 9, 5, 22, 0));
-  await setMood(db, '2026-10-05', 1, new Date(2026, 9, 5, 22, 0));
-
-  const all = await listReflectionHistory(db);
-  expect(all.map((r) => [r.date, r.templateName, r.mood])).toEqual([
-    ['2026-10-05', '무기력했던 날', 1],
-    ['2026-10-02', '감사한 날', null],
-  ]);
-});
-
 test('회고 답변을 고치면 정리해 저장하고 동기화 대기열에 올린다', async () => {
   const saved = await addReflection(db, { templateId: 'lethargy', answers: { cause: '잠' } }, NOW);
   await db.runAsync('DELETE FROM outbox', []);
@@ -85,7 +71,6 @@ test('회고를 지우면 목록에서 빠지고 지운 표시가 동기화된�
   await db.runAsync('DELETE FROM outbox', []);
   await deleteReflection(db, saved.id, NOW);
   expect(await listReflections(db, '2026-10-06')).toEqual([]);
-  expect(await listReflectionHistory(db)).toEqual([]);
   const row = await db.getFirstAsync<{ deleted_at: string | null }>('SELECT deleted_at FROM reflections WHERE id = ?', [saved.id]);
   expect(row?.deleted_at).toBe(NOW.toISOString());
   expect(await db.getAllAsync("SELECT row_key FROM outbox WHERE table_name = 'reflections'", [])).toEqual([{ row_key: saved.id }]);
@@ -112,7 +97,6 @@ test('동기화로 깨진 행이 들어와도 화면이 멈추지 않는다', as
   const list = await listReflections(db, '2026-10-06');
   expect(list.find((r) => r.id === 'bad-snap')).toMatchObject({ templateName: '감사한 날', answers: { good: '커피' } });
   expect(list.find((r) => r.id === 'bad-answers')).toMatchObject({ templateName: '회고', answers: {} });
-  expect(await listReflectionHistory(db)).toHaveLength(2);
 });
 
 test('질문을 알 수 없는 회고도 답변은 보인다', async () => {

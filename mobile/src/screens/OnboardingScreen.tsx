@@ -110,7 +110,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
         {step === 1 && (
           <View style={styles.section}>
             <Txt variant="title" accessibilityRole="header" style={styles.h2}>
-              기호 두 개면 충분해요
+              처음엔 할 일과 메모면 충분해요
             </Txt>
             <View style={styles.card}>
               <View style={styles.badge}>
@@ -142,7 +142,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
                 <Txt style={styles.flowText}>진행 중</Txt>
                 <Txt style={styles.arrow}>→</Txt>
                 <StatusSymbol kind="done" size={16} />
-                <Txt style={styles.flowText}>끝냄</Txt>
+                <Txt style={styles.flowText}>끝낸 일</Txt>
               </View>
               <Txt style={styles.note}>기호를 누를 때마다 다음 단계로 바뀌어요.</Txt>
               <View style={styles.wrapRow}>
@@ -154,7 +154,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
                 </View>
                 <View style={styles.inline}>
                   <StatusSymbol kind="migrated" size={16} />
-                  <Txt>다른 날로 옮김</Txt>
+                  <Txt>옮긴 일</Txt>
                 </View>
                 <View style={styles.inline}>
                   <Txt style={styles.muted}>⋯</Txt>
@@ -176,7 +176,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
               </View>
               <View style={styles.cardText}>
                 <Txt variant="medium">아침</Txt>
-                <Txt style={styles.small}>어제에서 넘어온 일을 오늘 할지, 내일로 미룰지, 지울지 골라요.</Txt>
+                <Txt style={styles.small}>어제에서 넘어온 일을 오늘 할지, 내일로 넘길지, 지울지 골라요.</Txt>
               </View>
             </View>
             <View style={styles.flowItem}>
@@ -194,7 +194,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
               </View>
               <View style={styles.cardText}>
                 <Txt variant="medium">저녁</Txt>
-                <Txt style={styles.small}>잉크병에 오늘 기분을 담고, 원하면 짧게 돌아봐요.</Txt>
+                <Txt style={styles.small}>잉크병에 오늘 기분을 담고, 원하면 짧게 회고를 남겨요.</Txt>
               </View>
             </View>
             <View style={styles.tip}>
@@ -213,7 +213,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
                 1
               </Txt>
               <Txt variant="title" style={styles.stampSmall}>
-                일째
+                일
               </Txt>
             </View>
             <View style={styles.copy}>
