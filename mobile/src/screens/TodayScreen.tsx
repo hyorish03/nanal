@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import type { Db } from '../db/types';
 import {
   addItem,
@@ -25,6 +25,12 @@ import type { LinkAction } from '../lib/deepLink';
 import { OrganizeSheet } from './today/OrganizeSheet';
 import { PostIt, type SettleHow } from './today/PostIt';
 import { SymbolLegend } from './today/SymbolLegend';
+import { voiceAvailable } from '../voice/available';
+
+// 개발용·출시 빌드에서만 말로 적기 시트를 불러온다(Expo Go에서는 네이티브 모듈이 없어 import 시 오류).
+const VoiceSheet: typeof import('./today/VoiceSheet').VoiceSheet | null = voiceAvailable
+  ? require('./today/VoiceSheet').VoiceSheet
+  : null;
 
 type Props = { db: Db; version: number; onChanged: () => void; onOpenEvening: () => void; onOpenArchive?: () => void; focusReady?: boolean; onFocused?: () => void; pendingAction?: LinkAction | null; onActionHandled?: () => void };
 
@@ -45,6 +51,9 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [organizeOpen, setOrganizeOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [organizeInput, setOrganizeInput] = useState<{ text: string; auto: boolean }>({ text: '', auto: false });
+  const afterVoice = useRef<{ text: string; auto: boolean } | null>(null); // 말로 적기 시트가 내려간 뒤 열 정리 시트
   const [notice, setNotice] = useState<string | null>(null);
   const busy = useRef(false);
   const info = useAnchor();
@@ -60,15 +69,24 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     // onFocused는 매 렌더 새 함수라 의존성에서 뺀다
   }, [focusReady]);
 
+  const openOrganize = (input: { text: string; auto: boolean } = { text: '', auto: false }) => {
+    setNotice(null);
+    setOrganizeInput(input);
+    setOrganizeOpen(true);
+  };
+  const openCapture = () => {
+    if (VoiceSheet) {
+      setNotice(null);
+      setVoiceOpen(true);
+    } else openOrganize();
+  };
+
   // 위젯·컨트롤에서 온 동작. 표지가 펼쳐지는 시간만큼 기다린 뒤 실행한다.
   useEffect(() => {
     if (!pendingAction) return;
     const t = setTimeout(() => {
       if (pendingAction === 'focus') inputRef.current?.focus();
-      else {
-        setNotice(null);
-        setOrganizeOpen(true);
-      }
+      else openCapture();
       onActionHandled?.();
     }, FOCUS_DELAY_MS);
     return () => clearTimeout(t);
@@ -142,18 +160,22 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           />
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="정리해서 넣기"
-            accessibilityHint="두서없이 쓴 글을 할 일과 메모로 정리해요"
+            accessibilityLabel={VoiceSheet ? '말로 적기' : '정리해서 넣기'}
+            accessibilityHint={VoiceSheet ? '말한 내용을 할 일과 메모로 정리해요' : '두서없이 쓴 글을 할 일과 메모로 정리해요'}
             style={styles.organize}
-            onPress={() => {
-              setNotice(null);
-              setOrganizeOpen(true);
-            }}
+            onPress={openCapture}
           >
-            <Svg width={22} height={22} viewBox="0 0 20 20" fill="none">
-              <Path d="M4 16l1-4 8.5-8.5a2.1 2.1 0 0 1 3 3L8 15l-4 1Z" stroke={colors.inkSoft} strokeWidth={1.4} strokeLinejoin="round" />
-              <Path d="M12 5l3 3" stroke={colors.inkSoft} strokeWidth={1.4} />
-            </Svg>
+            {VoiceSheet ? (
+              <Svg width={22} height={22} viewBox="0 0 18 18" fill="none">
+                <Rect x={6} y={1.5} width={6} height={10} rx={3} stroke={colors.inkSoft} strokeWidth={1.4} />
+                <Path d="M3 8.5a6 6 0 0 0 12 0M9 14.5v2.5" stroke={colors.inkSoft} strokeWidth={1.4} strokeLinecap="round" />
+              </Svg>
+            ) : (
+              <Svg width={22} height={22} viewBox="0 0 20 20" fill="none">
+                <Path d="M4 16l1-4 8.5-8.5a2.1 2.1 0 0 1 3 3L8 15l-4 1Z" stroke={colors.inkSoft} strokeWidth={1.4} strokeLinejoin="round" />
+                <Path d="M12 5l3 3" stroke={colors.inkSoft} strokeWidth={1.4} />
+              </Svg>
+            )}
           </Pressable>
         </View>
         <View style={styles.kindRow}>
@@ -261,6 +283,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         db={db}
         visible={organizeOpen}
         today={today}
+        initialText={organizeInput.text}
+        autoOrganize={organizeInput.auto}
         onClose={() => setOrganizeOpen(false)}
         onAdded={(message) => {
           setOrganizeOpen(false);
@@ -268,6 +292,25 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           onChanged();
         }}
       />
+      {VoiceSheet && (
+        <VoiceSheet
+          visible={voiceOpen}
+          onClose={() => setVoiceOpen(false)}
+          onTranscript={(spoken) => {
+            afterVoice.current = { text: spoken, auto: true };
+            setVoiceOpen(false);
+          }}
+          onTypeInstead={(spoken) => {
+            afterVoice.current = { text: spoken, auto: false };
+            setVoiceOpen(false);
+          }}
+          onDismissed={() => {
+            const next = afterVoice.current;
+            afterVoice.current = null;
+            if (next) openOrganize(next);
+          }}
+        />
+      )}
     </View>
   );
 }

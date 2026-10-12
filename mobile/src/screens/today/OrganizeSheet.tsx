@@ -15,13 +15,14 @@ type Props = {
   visible: boolean;
   today: string;
   initialText?: string; // 계획 D: 받아 적은 글을 넘겨받는다
+  autoOrganize?: boolean; // 받아 적은 글이면 열자마자 정리한다
   onClose: () => void;
   onAdded: (notice?: string) => void;
 };
 type Step = 'write' | 'loading' | 'review';
 
 // 두서없이 쓴(말한) 글 → AI 정리 → "이렇게 정리했어요"에서 고른 것만 넣는다(스펙 11.5).
-export function OrganizeSheet({ db, visible, today, initialText = '', onClose, onAdded }: Props) {
+export function OrganizeSheet({ db, visible, today, initialText = '', autoOrganize = false, onClose, onAdded }: Props) {
   const [step, setStep] = useState<Step>('write');
   const [text, setText] = useState(initialText);
   const [drafts, setDrafts] = useState<DraftItem[]>([]);
@@ -47,10 +48,12 @@ export function OrganizeSheet({ db, visible, today, initialText = '', onClose, o
     setText(initialText);
     setDrafts([]);
     setError(null);
-  }, [visible, initialText]);
+    if (autoOrganize && initialText.trim()) organize(initialText);
+    // organize는 매 렌더 새 함수라 의존성에서 뺀다
+  }, [visible, initialText, autoOrganize]);
 
-  const organize = async () => {
-    const raw = text.trim();
+  const organize = async (input: string = text) => {
+    const raw = input.trim();
     if (!raw || busy.current) return;
     busy.current = true;
     const id = req.current;
@@ -153,7 +156,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', onClose, o
                 accessibilityState={{ disabled: !canOrganize, busy: loading }}
                 disabled={!canOrganize}
                 style={[styles.primary, !canOrganize && styles.disabled]}
-                onPress={organize}
+                onPress={() => organize()}
               >
                 {loading ? (
                   <ActivityIndicator color={colors.onDark} accessibilityLabel="정리하는 중" />
