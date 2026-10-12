@@ -1,6 +1,6 @@
 import { migrate } from '../db/schema';
 import { setMood } from '../days/repo';
-import { addItem, advanceStatus, deleteItem, migrateToToday, setPriority } from '../items/repo';
+import { addItem, advanceStatus, deleteItem, listItemsForDate, migrateToToday, setPriority } from '../items/repo';
 import { countRecordedDays } from '../stats/recordedDays';
 import { openTestDb } from '../../test/sqlite';
 import { pickNext, readWidgetSnapshot, widgetAdvance } from './sql';
@@ -19,12 +19,14 @@ const outboxVersion = async (db: Awaited<ReturnType<typeof setup>>, id: string) 
   (await db.getFirstAsync<{ version: number }>("SELECT version FROM outbox WHERE table_name = 'items' AND row_key = ?", [id]))?.version ?? null;
 
 describe('readWidgetSnapshot', () => {
-  it('오늘 할 일만 진행 중 → 중요 → 입력 순 → 끝낸 일 순서로 읽는다', async () => {
+  it('오늘 할 일만 진행 중(중요 먼저) → 할 일(중요 먼저) → 끝낸 일 순서로 읽는다', async () => {
     const db = await setup();
-    const a = await addItem(db, { kind: 'task', text: '빨래' }, NOW);
-    await addItem(db, { kind: 'task', text: '책 사기' }, new Date(NOW.getTime() + 1000));
-    const c = await addItem(db, { kind: 'task', text: '전화' }, new Date(NOW.getTime() + 2000));
-    const d = await addItem(db, { kind: 'task', text: '보고서' }, new Date(NOW.getTime() + 3000));
+    const at = (s: number) => new Date(NOW.getTime() + s * 1000);
+    const a = await addItem(db, { kind: 'task', text: '빨래' }, at(0));
+    await addItem(db, { kind: 'task', text: '책 사기' }, at(1));
+    const c = await addItem(db, { kind: 'task', text: '전화' }, at(2));
+    const d = await addItem(db, { kind: 'task', text: '보고서' }, at(3));
+    const e = await addItem(db, { kind: 'task', text: '발표 준비' }, at(4));
     await addItem(db, { kind: 'note', text: '메모는 빠진다' }, NOW);
     const gone = await addItem(db, { kind: 'task', text: '지운 일' }, NOW);
     await deleteItem(db, gone.id, NOW);
@@ -32,15 +34,30 @@ describe('readWidgetSnapshot', () => {
     await advanceStatus(db, a.id, NOW); // 끝냄
     await setPriority(db, c.id, true, NOW);
     await advanceStatus(db, d.id, NOW); // 진행 중
+    await advanceStatus(db, e.id, NOW); // 진행 중 + 중요(먼저 입력한 보고서보다 앞)
+    await setPriority(db, e.id, true, NOW);
 
     const snap = await readWidgetSnapshot(db, TODAY);
     expect(snap.items.map((i) => [i.text, i.status, i.priority])).toEqual([
+      ['발표 준비', 'doing', true],
       ['보고서', 'doing', false],
       ['전화', 'open', true],
       ['책 사기', 'open', false],
       ['빨래', 'done', false],
     ]);
-    expect(pickNext(snap.items)?.id).toBe(d.id);
+    expect(pickNext(snap.items)?.id).toBe(e.id);
+
+    // 앱 목록(listItemsForDate)에서 위젯이 빼는 것만 뺀 순서와 같다
+    const app = (await listItemsForDate(db, TODAY)).filter((i) => i.kind === 'task' && i.status !== 'migrated');
+    expect(snap.items.map((i) => i.id)).toEqual(app.map((i) => i.id));
+  });
+
+  it('진행 중이 없으면 중요한 할 일이 다음 할 일', async () => {
+    const db = await setup();
+    await addItem(db, { kind: 'task', text: '먼저 적은 일' }, NOW);
+    const p = await addItem(db, { kind: 'task', text: '중요한 일' }, new Date(NOW.getTime() + 1000));
+    await setPriority(db, p.id, true, NOW);
+    expect(pickNext((await readWidgetSnapshot(db, TODAY)).items)?.id).toBe(p.id);
   });
 
   it('밀린 일은 개수만, 옮긴 원래 항목은 오늘 목록에서 빠진다', async () => {

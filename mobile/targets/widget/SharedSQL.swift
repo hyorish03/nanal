@@ -3,7 +3,8 @@ enum SharedSQL {
   static let items = """
     SELECT id, text, status, priority FROM items
     WHERE date = ? AND kind = 'task' AND deleted_at IS NULL AND status IN ('open', 'doing', 'done')
-    ORDER BY CASE WHEN status = 'doing' THEN 0 WHEN status = 'done' THEN 3 WHEN priority = 1 THEN 1 ELSE 2 END, created_at
+    ORDER BY CASE WHEN status = 'doing' THEN 1 - priority WHEN status IN ('done', 'migrated') THEN 4
+    ELSE 3 - priority END, created_at
     """
 
   static let carried = """

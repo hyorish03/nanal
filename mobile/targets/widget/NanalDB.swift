@@ -23,7 +23,7 @@ struct WidgetSnapshot {
   let mood: Int?
   let recordedDays: Int
 
-  // 잠금화면 "다음 할 일": 정렬된 목록에서 끝내지 않은 첫 항목(pickNext와 같다)
+  // 잠금화면 "다음 할 일": 정렬된 목록에서 끝내지 않은 첫 항목(진행 중 → 중요 → 목록 순, pickNext와 같다)
   var next: WidgetItem? { items.first { $0.status != "done" } }
   var doneCount: Int { items.filter { $0.status == "done" }.count }
   var doingCount: Int { items.filter { $0.status == "doing" }.count }

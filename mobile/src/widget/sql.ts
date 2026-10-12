@@ -3,10 +3,11 @@ import type { Db } from '../db/types';
 // 앱과 위젯(targets/widget/SharedSQL.swift)이 같이 쓰는 SQL. 하나를 바꾸면 다른 하나도 똑같이 바꾼다
 // (swiftParity.test.ts가 두 파일을 비교한다). 아래 TS 함수는 Swift가 하는 일을 그대로 실행해 앱 규칙과 같은지 시험하는 용도다.
 export const WIDGET_SQL = {
-  // 오늘 할 일: 진행 중 → 형광펜(중요) → 입력 순 → 끝낸 일. 메모·옮긴 원래 항목·지운 일은 뺀다(items/repo.ts의 ORDER와 같다).
+  // 오늘 할 일: 진행 중(중요 먼저) → 할 일(중요 먼저) → 끝낸 일, 같은 칸 안에서는 입력 순. 메모·옮긴 원래 항목·지운 일은 뺀다(items/repo.ts의 ORDER와 같다).
   items: `SELECT id, text, status, priority FROM items
 WHERE date = ? AND kind = 'task' AND deleted_at IS NULL AND status IN ('open', 'doing', 'done')
-ORDER BY CASE WHEN status = 'doing' THEN 0 WHEN status = 'done' THEN 3 WHEN priority = 1 THEN 1 ELSE 2 END, created_at`,
+ORDER BY CASE WHEN status = 'doing' THEN 1 - priority WHEN status IN ('done', 'migrated') THEN 4
+ELSE 3 - priority END, created_at`,
   // 밀린 일 개수(listMigrationCandidates와 같은 조건)
   carried: `SELECT COUNT(*) AS n FROM items
 WHERE date < ? AND kind = 'task' AND status IN ('open', 'doing') AND deleted_at IS NULL`,
@@ -41,7 +42,7 @@ export async function readWidgetSnapshot(db: Db, today: string): Promise<WidgetS
   };
 }
 
-// 잠금화면 "다음 할 일": 정렬된 목록에서 끝내지 않은 첫 항목
+// 잠금화면 "다음 할 일": 정렬된 목록에서 끝내지 않은 첫 항목(진행 중 → 중요 → 목록 순)
 export function pickNext(items: WidgetItem[]): WidgetItem | null {
   return items.find((i) => i.status !== 'done') ?? null;
 }
