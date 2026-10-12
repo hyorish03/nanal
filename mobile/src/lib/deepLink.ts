@@ -23,3 +23,14 @@ export function consumeInitialUrl(): boolean {
 export function resetInitialUrlForTest() {
   initialUrlConsumed = false;
 }
+
+// 컨트롤(iOS 18)이 App Group에 남긴 "동작|시각(ms)". 1분이 지난 것은 버린다(앱이 늦게 열려 엉뚱할 때 뜨지 않게).
+export const PENDING_ACTION_KEY = 'pendingAction';
+const PENDING_TTL_MS = 60_000;
+
+export function parsePendingAction(raw: string | null | undefined, nowMs: number): LinkAction | null {
+  const m = raw ? /^(voice|focus)\|(\d+)$/.exec(raw) : null;
+  if (!m) return null;
+  const age = nowMs - Number(m[2]);
+  return age >= -PENDING_TTL_MS && age <= PENDING_TTL_MS ? (m[1] as LinkAction) : null;
+}

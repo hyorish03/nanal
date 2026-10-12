@@ -1,4 +1,4 @@
-import { consumeInitialUrl, parseDeepLink, resetInitialUrlForTest } from './deepLink';
+import { consumeInitialUrl, parseDeepLink, parsePendingAction, resetInitialUrlForTest } from './deepLink';
 
 describe('parseDeepLink', () => {
   it('말로 적기를 연다', () => {
@@ -27,5 +27,20 @@ describe('consumeInitialUrl', () => {
     expect(consumeInitialUrl()).toBe(true);
     expect(consumeInitialUrl()).toBe(false);
     expect(consumeInitialUrl()).toBe(false);
+  });
+});
+
+describe('parsePendingAction', () => {
+  const now = 1_760_000_000_000;
+  it('컨트롤이 남긴 동작을 읽는다', () => {
+    expect(parsePendingAction(`voice|${now - 500}`, now)).toBe('voice');
+    expect(parsePendingAction(`focus|${now}`, now)).toBe('focus');
+  });
+
+  it('1분이 지났거나 모르는 값은 버린다', () => {
+    expect(parsePendingAction(`voice|${now - 61_000}`, now)).toBeNull();
+    expect(parsePendingAction('voice', now)).toBeNull();
+    expect(parsePendingAction(`settings|${now}`, now)).toBeNull();
+    expect(parsePendingAction(null, now)).toBeNull();
   });
 });

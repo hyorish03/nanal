@@ -20,6 +20,7 @@ import { dimPressed } from '../ui/press';
 import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { useReduceMotion } from '../ui/useReduceMotion';
+import { takePendingAction } from '../widget/pendingAction';
 import { reloadWidgets } from '../widget/reload';
 import { ArchiveScreen } from './ArchiveScreen';
 import { EveningScreen } from './EveningScreen';
@@ -92,10 +93,8 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   screenRef.current = screen;
   const reduce = useReduceMotion();
 
-  // 위젯·컨트롤에서 연 주소: 오늘 화면으로 가서(덮여 있으면 펼친 뒤) 동작을 넘긴다. 온보딩 중이면 화면은 그대로 둔다.
-  const handleLink = useCallback((url: string | null) => {
-    const link = parseDeepLink(url);
-    if (!link) return;
+  // 위젯·컨트롤에서 열면 오늘 화면으로 가서(덮여 있으면 펼친 뒤) 동작을 넘긴다. 온보딩 중이면 화면은 그대로 둔다.
+  const runAction = useCallback((action: LinkAction | null) => {
     // 온보딩 중에 온 동작은 버린다(끝난 뒤 말로 적기가 갑자기 뜨지 않게).
     if (screenRef.current === 'onboarding') return;
     setScreen((s) => (s === null || s === 'onboarding' ? s : 'today'));
@@ -104,14 +103,43 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     setDayClosed(false);
     setClosedShown(false);
     setCoverOpen(true);
-    setLinkAction(link.action);
+    if (action === 'voice') setFocusPending(false); // 말로 적기 시트 뒤에서 키보드가 뜨지 않게
+    setLinkAction(action);
   }, [nav]);
+
+  const handleLink = useCallback((url: string | null) => {
+    const link = parseDeepLink(url);
+    if (link) runAction(link.action);
+  }, [runAction]);
 
   useEffect(() => {
     if (consumeInitialUrl()) Linking.getInitialURL().then(handleLink, () => {});
     const sub = Linking.addEventListener('url', (e) => handleLink(e.url));
     return () => sub.remove();
   }, [handleLink]);
+
+  // 컨트롤(iOS 18)은 주소 대신 App Group에 동작을 남기고 앱을 연다. 열릴 때 꺼내 같은 길로 보낸다.
+  // 인텐트가 앱이 앞에 나온 직후에 실행되기도 해서 잠시 뒤 한 번 더 본다.
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const check = () => {
+      const action = takePendingAction();
+      if (action) runAction(action);
+    };
+    const checkSoon = () => {
+      check();
+      clearTimeout(t);
+      t = setTimeout(check, 600);
+    };
+    checkSoon();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkSoon();
+    });
+    return () => {
+      sub.remove();
+      clearTimeout(t);
+    };
+  }, [runAction]);
 
   useEffect(() => {
     hasSeenOnboarding(AsyncStorage).then((seen) => {

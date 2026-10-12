@@ -2,27 +2,12 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-// 컨트롤에서 앱을 특정 화면으로 연다(iOS 18 OpenURLIntent).
-@available(iOS 18.0, *)
-struct OpenNanalIntent: AppIntent {
-  static var title: LocalizedStringResource = "나날 열기"
-  static var isDiscoverable = false
-
-  @Parameter(title: "주소") var target: String
-
-  init() {}
-  init(target: String) { self.target = target }
-
-  func perform() async throws -> some IntentResult & OpensIntent {
-    .result(opensIntent: OpenURLIntent(URL(string: target) ?? todayURL))
-  }
-}
-
+// 컨트롤의 인텐트는 _shared/OpenAppIntents.swift에 있다(앱 타깃에도 있어야 앱이 열린다).
 @available(iOS 18.0, *)
 struct NanalVoiceControl: ControlWidget {
   var body: some ControlWidgetConfiguration {
     StaticControlConfiguration(kind: "NanalVoiceControl") {
-      ControlWidgetButton(action: OpenNanalIntent(target: "nanal://voice")) {
+      ControlWidgetButton(action: OpenNanalVoiceIntent()) {
         Label("말로 적기", systemImage: "mic")
       }
     }
@@ -34,7 +19,7 @@ struct NanalVoiceControl: ControlWidget {
 struct NanalLineControl: ControlWidget {
   var body: some ControlWidgetConfiguration {
     StaticControlConfiguration(kind: "NanalLineControl") {
-      ControlWidgetButton(action: OpenNanalIntent(target: newLineURL.absoluteString)) {
+      ControlWidgetButton(action: OpenNanalLineIntent()) {
         Label("한 줄 적기", systemImage: "pencil")
       }
     }

@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { APP_GROUP, DB_DIR, DB_NAME } from '../db/location';
 import { MOOD_WORDS } from '../days/moods';
+import { PENDING_ACTION_KEY } from '../lib/deepLink';
 import { WIDGET_SQL } from './sql';
 
 const TARGET = join(__dirname, '../../targets/widget');
@@ -27,5 +28,13 @@ describe('위젯 Swift가 앱과 같은 규칙을 쓴다', () => {
     expect(db).toContain(`"${APP_GROUP}"`);
     expect(db).toContain(`"${DB_DIR}/${DB_NAME}"`);
     expect(db).toContain(`[${MOOD_WORDS.map((w) => `"${w}"`).join(', ')}]`);
+  });
+
+  it('컨트롤 인텐트가 앱이 읽는 App Group 키에 동작을 남긴다', () => {
+    const intents = read('_shared/OpenAppIntents.swift');
+    expect(intents).toContain(`"${APP_GROUP}"`);
+    expect(intents).toContain(`static let key = "${PENDING_ACTION_KEY}"`);
+    expect(intents).toContain('PendingAction.store("voice")');
+    expect(intents).toContain('PendingAction.store("focus")');
   });
 });
