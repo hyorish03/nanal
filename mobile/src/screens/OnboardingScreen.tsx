@@ -84,9 +84,11 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
             <View key={i} style={[styles.dot, i === step && styles.dotOn]} />
           ))}
         </View>
-        <Pressable accessibilityRole="button" style={dimPressed(styles.skip)} onPress={onDone}>
-          <Txt style={styles.skipText}>건너뛰기</Txt>
-        </Pressable>
+        {step < STEPS - 1 && (
+          <Pressable accessibilityRole="button" style={dimPressed(styles.skip)} onPress={onDone}>
+            <Txt style={styles.skipText}>건너뛰기</Txt>
+          </Pressable>
+        )}
       </View>
 
       <Animated.View style={[styles.flex, { opacity: fade, transform: [{ translateX: slide }] }]}>
@@ -155,7 +157,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
                   <Txt>다른 날로 옮김</Txt>
                 </View>
                 <View style={styles.inline}>
-                  <Txt style={styles.muted}>×</Txt>
+                  <Txt style={styles.muted}>⋯</Txt>
                   <Txt style={styles.muted}>지우기</Txt>
                 </View>
               </View>
@@ -164,7 +166,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
         )}
 
         {step === 2 && (
-          <View style={styles.section}>
+          <View style={styles.flowSection}>
             <Txt variant="title" accessibilityRole="header" style={styles.h2}>
               하루는 이렇게 흘러가요
             </Txt>
@@ -188,7 +190,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
             </View>
             <View style={styles.flowItem}>
               <View style={styles.flowIcon}>
-                <Inkwell id="onboarding-well" mood={4} size="large" paper={colors.paper} />
+                <Inkwell id="onboarding-well" mood={4} size="small" paper={colors.paper} />
               </View>
               <View style={styles.cardText}>
                 <Txt variant="medium">저녁</Txt>
@@ -259,6 +261,7 @@ const styles = StyleSheet.create({
   h2: { fontSize: 26, lineHeight: 35 },
   lead: { fontSize: 16, lineHeight: 26, color: colors.inkSoft },
   section: { gap: 16 },
+  flowSection: { flexGrow: 1, justifyContent: 'center', gap: 24 },
   card: {
     flexDirection: 'row',
     gap: 14,
@@ -290,10 +293,10 @@ const styles = StyleSheet.create({
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, rowGap: 6 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   muted: { color: colors.inkSoft },
-  flowItem: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
-  flowIcon: { width: 48, alignItems: 'center' }, // 그림 너비가 달라도 글이 한 줄로 맞는다
-  postit: { width: 44, height: 40, backgroundColor: colors.postit, transform: [{ rotate: '-4deg' }] },
-  dotPaper: { width: 44, height: 40, borderRadius: 4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.lineSoft },
+  flowItem: { flexDirection: 'row', gap: 14, alignItems: 'center' },
+  flowIcon: { width: 56, height: 56, borderRadius: 12, borderWidth: 1.5, borderColor: colors.navy, alignItems: 'center', justifyContent: 'center' }, // 그림이 달라도 상자는 같다
+  postit: { width: 26, height: 24, backgroundColor: colors.postit, transform: [{ rotate: '-4deg' }] },
+  dotPaper: { width: 26, height: 24, borderRadius: 3, borderWidth: 1.5, borderColor: colors.navy },
   tip: { padding: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.navy, borderRadius: 12 },
   stamp: {
     alignSelf: 'center',

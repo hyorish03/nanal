@@ -204,7 +204,7 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
 
 const styles = StyleSheet.create({
   sheet: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingBottom: 28, gap: 14 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 52 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 52 },
   headerButton: { minWidth: HIT, minHeight: HIT, justifyContent: 'center' },
   lead: { fontSize: 24, marginTop: 8 },
   hint: { color: colors.muted, fontSize: 14 },
@@ -218,10 +218,10 @@ const styles = StyleSheet.create({
   mic: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center' },
   micBusy: { opacity: 0.6 },
   micHint: { color: colors.muted, fontSize: 14 },
-  error: { color: colors.danger, textAlign: 'center' },
+  error: { color: colors.inkSoft, textAlign: 'center' },
   secondary: { minHeight: HIT, paddingHorizontal: 18, justifyContent: 'center' },
-  outline: { minHeight: 48, alignSelf: 'stretch', borderRadius: 24, borderWidth: 1, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
-  primary: { minHeight: 48, alignSelf: 'stretch', borderRadius: 24, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  outline: { height: 48, alignSelf: 'stretch', borderRadius: 24, borderWidth: 1, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  primary: { height: 48, alignSelf: 'stretch', borderRadius: 24, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   primaryText: { color: colors.onDark },
   privacy: { color: colors.muted, fontSize: 12, textAlign: 'center' },
 });
