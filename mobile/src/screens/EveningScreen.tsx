@@ -147,7 +147,14 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                   onPress={() => pickMood(m)}
                 >
                   <MoodWell selected={selected} animate={moodPicked}>
-                    <Inkwell id={`well${m}`} mood={m} size="large" selected={selected} animate={moodPicked} />
+                    <Inkwell
+                      id={`well${m}`}
+                      mood={m}
+                      size="large"
+                      selected={selected}
+                      animate={moodPicked}
+                      color={selected ? colors.navy : colors.line}
+                    />
                   </MoodWell>
                   <Txt
                     variant={selected ? 'medium' : 'body'}
@@ -210,7 +217,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
         {current && (
           <View>
             <View accessible={false} style={styles.tape} />
-            <RuledPaper style={styles.form}>
+            <RuledPaper lineHeight={RULE} firstLineTop={FORM_TOP + RULE - SIT} style={styles.form}>
               {current.questions.map((q) => (
                 <View key={q.key}>
                   <Txt variant="hand" style={styles.formQ} accessible={false} importantForAccessibility="no">
@@ -248,7 +255,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
               오늘 남긴 회고
             </Txt>
             {saved.map((r) => (
-              <RuledPaper key={r.id} style={styles.savedCard}>
+              <RuledPaper key={r.id} lineHeight={RULE} firstLineTop={RULE - SIT} style={styles.savedCard}>
                 <Txt variant="hand" style={styles.formQ}>
                   {r.templateName}
                 </Txt>
@@ -292,20 +299,26 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
 const DIM = 0.55;
 
-// 고른 잉크병만 진하게. 직접 골랐을 때만 짧게 밝아진다.
+// 고르지 않은 병은 따뜻한 연필색 윤곽, 고른 병만 남색 잉크. 직접 골랐을 때만 남색이 짧게 배어 나온다.
 function MoodWell({ selected, animate, children }: { selected: boolean; animate: boolean; children: ReactNode }) {
-  const opacity = useRef(new Animated.Value(selected ? 1 : DIM)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (!animate || !selected) {
-      opacity.setValue(selected ? 1 : DIM);
+      opacity.setValue(1);
       return;
     }
+    opacity.setValue(DIM);
     const anim = Animated.timing(opacity, { toValue: 1, duration: 150, easing: EASE_OUT, useNativeDriver: true });
     anim.start();
     return () => anim.stop();
   }, [selected, animate, opacity]);
   return <Animated.View style={{ opacity }}>{children}</Animated.View>;
 }
+
+// 줄 노트 간격. 선은 줄 상자 맨 아래에서 SIT만큼 올라와 글자 기준선 바로 밑에 그어진다.
+const RULE = 32;
+const SIT = 6;
+const FORM_TOP = 22;
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paperEvening },
@@ -354,12 +367,13 @@ const styles = StyleSheet.create({
     width: 88,
     height: 22,
     zIndex: 1,
-    backgroundColor: 'rgba(30, 47, 77, 0.22)',
+    backgroundColor: 'rgba(214, 194, 146, 0.7)', // 누런 종이 테이프
     transform: [{ rotate: '-2deg' }],
   },
-  form: { paddingTop: 22, paddingHorizontal: 16, paddingBottom: 14, gap: 6 },
-  formQ: { fontSize: 23, lineHeight: 32 },
-  answer: { minHeight: 64, fontSize: 15, lineHeight: 32, fontFamily: fonts.body, color: colors.ink, padding: 0, textAlignVertical: 'top' },
+  // 질문과 답이 모두 RULE 간격으로 쌓여야 글자가 선 위에 앉는다(gap을 두지 않는다)
+  form: { paddingTop: FORM_TOP, paddingHorizontal: 16, paddingBottom: 14 },
+  formQ: { fontSize: 23, lineHeight: RULE },
+  answer: { minHeight: RULE * 2, fontSize: 15, lineHeight: RULE, fontFamily: fonts.body, color: colors.ink, padding: 0, textAlignVertical: 'top' },
   save: {
     alignSelf: 'flex-end',
     minHeight: 44,
@@ -371,7 +385,7 @@ const styles = StyleSheet.create({
   saveText: { color: colors.card, fontSize: 15 },
   error: { color: colors.danger, fontSize: 14 },
   savedCard: { paddingHorizontal: 14, paddingVertical: 0, borderWidth: 1, borderColor: colors.lineFaint },
-  savedAnswer: { fontSize: 14, lineHeight: 32 },
+  savedAnswer: { fontSize: 14, lineHeight: RULE },
   stampBox: {
     flexDirection: 'row',
     gap: 12,
