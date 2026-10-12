@@ -39,9 +39,19 @@ async function openRaw(): Promise<SQLiteDatabase> {
     }
     return await openDatabaseAsync(DB_NAME, undefined, plan.dir);
   } catch (e) {
-    // 공유 폴더 쪽에서 무엇이 실패하든 원래 위치로 돌아간다(원본은 건드리지 않았다)
+    // 이미 옮긴 뒤라면 원래 위치의 파일은 옛 기록이다. 그걸 열면 기록이 갈라지므로 오류를 그대로 알린다.
+    if (dir && sharedDbExists(dir)) throw e;
+    // 아직 옮기기 전이면 원래 위치로 돌아간다(원본은 건드리지 않았다)
     console.log('[db] 공유 폴더 사용 실패, 원래 위치 사용', e instanceof Error ? e.message : '');
     return openDatabaseAsync(DB_NAME);
+  }
+}
+
+function sharedDbExists(dir: Directory): boolean {
+  try {
+    return new File(dir, DB_NAME).exists;
+  } catch {
+    return false;
   }
 }
 
