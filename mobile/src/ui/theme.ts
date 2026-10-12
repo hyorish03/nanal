@@ -7,10 +7,13 @@ export const colors = {
   card: '#FBF7EE', // 회고 카드, 칩
   popover: '#FFFDF8',
   chipSelected: '#EDE4D2',
-  chipBorder: '#B9AC96',
+  // 고르지 않은 칩 테두리. 누를 수 있는 것의 경계라 WCAG 1.4.11(비텍스트 대비) 3:1을 넘겨야 한다.
+  // 종이 #F6F0E4 대비 3.15:1, 저녁 종이 #F3EBDA 대비 3.02:1, 카드 #FBF7EE 대비 3.35:1.
+  // 저녁 종이까지 3:1을 넘는 가장 옅은 따뜻한 회갈색이다(예전 #B9AC96은 1.97:1).
+  chipBorder: '#928670',
   ink: '#2A2520', // 먹색 글씨
   inkSoft: '#4A4234',
-  muted: '#6E6456',
+  muted: '#6E6456', // 작은 글씨·자리표시(placeholder)·보조 글씨는 이것. 종이 대비 5.11:1(AA)
   faint: '#8A8070', // 14pt보다 작은 글씨에는 쓰지 않는다(대비 부족). 작은 글씨는 muted
   line: '#B9AC96',
   lineSoft: '#D8CDB9',
