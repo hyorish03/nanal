@@ -219,7 +219,14 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerText}>
-          <Txt variant="title" accessibilityRole="header" style={styles.date}>
+          <Txt
+            variant="title"
+            accessibilityRole="header"
+            style={styles.date}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
             {formatLongDate(today)}
           </Txt>
           <Txt variant="hand">기록한 날 {recordedDays}일째</Txt>
@@ -318,7 +325,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingTop: 16, gap: 18 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
-  headerText: { flexShrink: 1, gap: 2 },
+  headerText: { flex: 1, gap: 2 },
   date: { fontSize: 30, letterSpacing: -0.5 },
   headerActions: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   iconButton: {
