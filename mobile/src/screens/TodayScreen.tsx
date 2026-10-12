@@ -65,9 +65,19 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const inputRef = useRef<TextInput>(null);
   const scrollY = useRef(new Animated.Value(0)).current; // 여백선이 목록 머리를 따라 움직이게
   const [headerH, setHeaderH] = useState(0);
+  const [keyboardUp, setKeyboardUp] = useState(false); // 맺음말은 페이지 맨 아래 자리라 키보드를 따라 올라오지 않는다
   const [eveningW, setEveningW] = useState(0); // 책갈피 끈을 하루 마무리 버튼 왼쪽에 매달려고 잰다
 
   // 표지가 다 펼쳐진 뒤에만 true가 된다(Main이 Cover의 onOpened로 알려 준다). 그래서 기다리지 않고 바로 포커스한다.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', () => setKeyboardUp(true));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardUp(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   useEffect(() => {
     if (!focusReady) return;
     inputRef.current?.focus();
@@ -294,7 +304,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
             // 목록 아래 빈 곳까지 빈 줄로 채워, 누르면 키보드가 내려간다
             <Pressable accessible={false} style={styles.footerWrap} onPress={Keyboard.dismiss}>
               <RuledFill />
-              <Txt variant="hand" style={styles.footer}>
+              <Txt variant="hand" style={[styles.footer, keyboardUp && styles.footerHidden]}>
                 오늘도 한 줄씩.
               </Txt>
             </Pressable>
@@ -390,5 +400,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.ruled,
   },
   empty: { color: colors.muted },
+  footerHidden: { opacity: 0 },
   footer: { alignSelf: 'center', marginTop: 24, marginBottom: 24, fontSize: 20, color: colors.muted },
 });
