@@ -1,11 +1,11 @@
 import { memo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { type AccessibilityActionEvent, Pressable, StyleSheet, View } from 'react-native';
 import type { ItemKind, TaskStatus } from '../../items/repo';
 import { promptText } from '../../ui/dialogs';
 import { Highlight } from '../../ui/Highlight';
 import { Popover, useAnchor } from '../../ui/Popover';
 import { StatusSymbol } from '../../ui/StatusSymbol';
-import { advanceAction, canAdvance, itemA11yLabel, symbolKind } from '../../ui/symbols';
+import { advanceAction, canAdvance, itemA11yHint, itemA11yLabel, symbolKind } from '../../ui/symbols';
 import { colors, fonts } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { dimPressed, tintPressed } from '../../ui/press';
@@ -39,23 +39,45 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
     menu.close();
     fn();
   };
+  const togglePriority = () => {
+    setMarked(!item.priority);
+    onTogglePriority(id, !item.priority);
+  };
+  const edit = () => promptText('고치기', text, (edited) => onEdit(id, edited));
+
+  // 스크린 리더에서는 줄 하나가 한 요소다. 두 번 누르면 상태가 넘어가고, 나머지는 동작 목록(위아래로 쓸기)에 있다
+  const actions = [
+    ...(advance ? [{ name: 'activate' }, { name: 'advance', label: '상태 바꾸기' }] : []),
+    ...(canMark && !markDisabled ? [{ name: 'priority', label: item.priority ? '중요 표시 지우기' : '중요 표시' }] : []),
+    { name: 'edit', label: '고치기' },
+    { name: 'delete', label: '지우기' },
+  ];
+  const onAction = (e: AccessibilityActionEvent) => {
+    const name = e.nativeEvent.actionName;
+    if (name === 'activate' || name === 'advance') onAdvance(id);
+    else if (name === 'priority') togglePriority();
+    else if (name === 'edit') edit();
+    else if (name === 'delete') onDelete(id);
+  };
 
   return (
-    <View style={[styles.row, menu.anchor !== null && styles.rowOpen]}>
+    <View
+      style={[styles.row, menu.anchor !== null && styles.rowOpen]}
+      accessible
+      accessibilityRole={advance ? 'button' : undefined}
+      accessibilityLabel={itemA11yLabel(item)}
+      accessibilityHint={itemA11yHint(item)}
+      accessibilityActions={actions}
+      onAccessibilityAction={onAction}
+    >
       <View style={styles.main}>
         {/* 상태는 기호만 눌러 바꾼다. 글 자리는 비워 둔다(나중에 눌러서 고치기) */}
         {advance ? (
-          <Pressable
-            style={tintPressed(styles.symbol)}
-            hitSlop={SYMBOL_SLOP}
-            accessibilityRole="button"
-            accessibilityLabel={itemA11yLabel(item)}
-            onPress={() => onAdvance(id)}
-          >
+          <Pressable style={tintPressed(styles.symbol)} hitSlop={SYMBOL_SLOP} onPress={() => onAdvance(id)}>
             <StatusSymbol kind={kind} />
           </Pressable>
         ) : (
-          <View style={styles.symbol} accessible accessibilityLabel={itemA11yLabel(item)}>
+          <View style={styles.symbol}>
             <StatusSymbol kind={kind} />
           </View>
         )}
@@ -96,10 +118,7 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
             disabled={markDisabled}
             accessibilityState={{ disabled: markDisabled }}
             style={dimPressed(styles.menuItem)}
-            onPress={pick(() => {
-              setMarked(!item.priority);
-              onTogglePriority(id, !item.priority);
-            })}
+            onPress={pick(togglePriority)}
           >
             <View style={styles.swatch} />
             <Txt style={[styles.menuText, markDisabled && styles.menuDisabled]}>
@@ -110,7 +129,7 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
         <Pressable
           accessibilityRole="button"
           style={dimPressed(styles.menuItem)}
-          onPress={pick(() => promptText('고치기', text, (edited) => onEdit(id, edited)))}
+          onPress={pick(edit)}
         >
           <Txt style={[styles.menuText, styles.swatchText]}>✎</Txt>
           <Txt style={styles.menuText}>고치기</Txt>
@@ -137,7 +156,7 @@ const styles = StyleSheet.create({
   body: { flex: 1, alignItems: 'flex-start' },
   text: { fontSize: 16, lineHeight: 24, flexShrink: 1 },
   note: { fontFamily: fonts.hand, fontSize: 22, lineHeight: 28, flexShrink: 1 },
-  done: { color: colors.faint, textDecorationLine: 'line-through' },
+  done: { color: colors.muted, textDecorationLine: 'line-through' },
   more: { width: 44, height: 50, alignItems: 'center', justifyContent: 'center' },
   moreText: { fontSize: 18, color: colors.faint },
   menuItem: { minHeight: 44, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },

@@ -1,7 +1,7 @@
 import { memo, type Ref, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
-import type { ItemKind } from '../../items/repo';
+import { type ItemKind, MAX_TEXT } from '../../items/repo';
 import { Chip } from '../../ui/Chip';
 import { Popover, useAnchor } from '../../ui/Popover';
 import { haptic } from '../../ui/haptics';
@@ -48,8 +48,9 @@ export const Composer = memo(function Composer({ inputRef, voice, onCapture, onS
         <TextInput
           style={styles.input}
           ref={inputRef}
-          placeholder="한 줄로 남기기"
-          placeholderTextColor={colors.faint}
+          placeholder={kind === 'task' ? '할 일 한 줄' : '메모 한 줄'}
+          placeholderTextColor={colors.muted}
+          maxLength={MAX_TEXT}
           accessibilityLabel="새 항목"
           value={text}
           onChangeText={setText}
@@ -106,7 +107,7 @@ export const Composer = memo(function Composer({ inputRef, voice, onCapture, onS
 const styles = StyleSheet.create({
   inputBlock: { gap: 14 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.ink, paddingBottom: 6 },
-  input: { flex: 1, height: 44, paddingHorizontal: 6, fontSize: 16, fontFamily: fonts.body, color: colors.ink },
+  input: { flex: 1, minHeight: 44, paddingHorizontal: 6, fontSize: 16, fontFamily: fonts.body, color: colors.ink },
   kindRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   organize: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   info: { width: 44, height: 44, marginLeft: -6, alignItems: 'center', justifyContent: 'center' },
