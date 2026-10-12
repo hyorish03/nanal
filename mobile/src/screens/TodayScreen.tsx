@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Keyboard, LayoutAnimation, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Animated, Keyboard, LayoutAnimation, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import type { Db } from '../db/types';
 import {
@@ -22,6 +22,7 @@ import { colors, fonts, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { ItemRow } from './today/ItemRow';
+import { MarginRule, NOTE_MARGIN, RULE_GAP, RuledFill } from './today/NotebookPage';
 import type { LinkAction } from '../lib/deepLink';
 import { OrganizeSheet } from './today/OrganizeSheet';
 import { PostIt, type SettleHow } from './today/PostIt';
@@ -59,6 +60,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const reduce = useReduceMotion();
   const info = useAnchor();
   const inputRef = useRef<TextInput>(null);
+  const scrollY = useRef(new Animated.Value(0)).current; // 여백선이 목록 머리를 따라 움직이게
+  const [headerH, setHeaderH] = useState(0);
 
   // 표지가 다 펼쳐진 뒤에만 true가 된다(Main이 Cover의 onOpened로 알려 준다). 그래서 기다리지 않고 바로 포커스한다.
   useEffect(() => {
@@ -151,7 +154,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
   // 포스트잇과 입력칸을 목록 머리로 둬서 후보가 많아도 함께 스크롤된다. 컴포넌트 타입이 아닌 엘리먼트라 입력칸이 다시 마운트되지 않는다.
   const listHeader = (
-    <View style={styles.listHeader}>
+    <View style={styles.listHeader} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}>
       {candidates.length > 0 && <PostIt candidates={candidates} onSettle={settle} />}
 
       <View style={styles.inputBlock}>
@@ -274,34 +277,46 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         <SymbolLegend kind={kind} onClose={info.close} />
       </Popover>
 
-      <FlatList
-        style={styles.list}
-        data={items}
-        keyExtractor={(i) => i.id}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        contentContainerStyle={styles.listContent}
-        ListFooterComponentStyle={styles.footerWrap}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={<Txt style={styles.empty}>아직 적은 줄이 없어요</Txt>}
-        ListFooterComponent={
-          // 목록 아래 빈 곳까지 채워, 누르면 키보드가 내려간다
-          <Pressable accessible={false} style={styles.footerWrap} onPress={Keyboard.dismiss}>
-            <Txt variant="hand" style={styles.footer}>
-              오늘도 한 줄씩.
-            </Txt>
-          </Pressable>
-        }
-        renderItem={({ item }) => (
-          <ItemRow
-            item={item}
-            priorityFull={priorityCount >= MAX_PRIORITY_PER_DAY}
-            onAdvance={() => run(() => advanceStatus(db, item.id))}
-            onTogglePriority={() => run(() => setPriority(db, item.id, !item.priority))}
-            onDelete={() => run(() => deleteItem(db, item.id))}
-          />
-        )}
-      />
+      {/* 공책 한 쪽: 여백선은 목록 뒤에 깔리고, 빈 줄은 목록 꼬리에서 함께 스크롤된다 */}
+      <View style={styles.page}>
+        <MarginRule scrollY={scrollY} startY={headerH} />
+        <Animated.FlatList
+          style={styles.list}
+          data={items}
+          keyExtractor={(i) => i.id}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={styles.listContent}
+          ListFooterComponentStyle={styles.footerWrap}
+          ListHeaderComponent={listHeader}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+          scrollEventThrottle={16}
+          ListEmptyComponent={
+            // 빈 날은 첫 줄에 흐리게 적어 두고, 그 아래로 빈 줄이 이어진다
+            <View style={styles.emptyRow}>
+              <Txt style={styles.empty}>아직 적은 줄이 없어요</Txt>
+            </View>
+          }
+          ListFooterComponent={
+            // 목록 아래 빈 곳까지 빈 줄로 채워, 누르면 키보드가 내려간다
+            <Pressable accessible={false} style={styles.footerWrap} onPress={Keyboard.dismiss}>
+              <RuledFill />
+              <Txt variant="hand" style={styles.footer}>
+                오늘도 한 줄씩.
+              </Txt>
+            </Pressable>
+          }
+          renderItem={({ item }) => (
+            <ItemRow
+              item={item}
+              priorityFull={priorityCount >= MAX_PRIORITY_PER_DAY}
+              onAdvance={() => run(() => advanceStatus(db, item.id))}
+              onTogglePriority={() => run(() => setPriority(db, item.id, !item.priority))}
+              onDelete={() => run(() => deleteItem(db, item.id))}
+            />
+          )}
+        />
+      </View>
       <OrganizeSheet
         db={db}
         visible={organizeOpen}
@@ -383,11 +398,20 @@ const styles = StyleSheet.create({
   notice: { color: colors.inkSoft },
   info: { width: 44, height: 44, marginLeft: -6, alignItems: 'center', justifyContent: 'center' },
   error: { color: colors.danger },
+  page: { flex: 1, overflow: 'hidden' }, // 여백선이 머리 높이만큼 내려가도 화면 아래로 삐져나오지 않게
   list: { flex: 1 },
   listContent: { flexGrow: 1 },
   // 할 일이 적으면 화면 맨 아래에 머물고, 목록이 길면 마지막 줄 아래로 밀려난다
   footerWrap: { flexGrow: 1, justifyContent: 'flex-end' },
   listHeader: { gap: 26, paddingBottom: 20 },
-  empty: { color: colors.muted, textAlign: 'center', marginTop: 24 },
+  // 여백선 오른쪽 글 자리에서 시작하는 한 줄(줄 높이와 같은 50pt)
+  emptyRow: {
+    minHeight: RULE_GAP,
+    justifyContent: 'center',
+    paddingLeft: NOTE_MARGIN - SCREEN_X + 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.ruled,
+  },
+  empty: { color: colors.muted },
   footer: { alignSelf: 'center', marginTop: 24, marginBottom: 24, fontSize: 20, color: colors.muted },
 });
