@@ -22,6 +22,17 @@ const WORD: Record<SymbolKind, string> = {
   migrated: '옮긴 일',
   note: '메모',
 };
+// 다음 상태로 넘기는 메뉴 문구
+const ADVANCE: Partial<Record<SymbolKind, { label: string; to: SymbolKind }>> = {
+  open: { label: '진행 중으로', to: 'doing' },
+  doing: { label: '끝냄으로', to: 'done' },
+  done: { label: '다시 할 일로', to: 'open' },
+};
+
+export function advanceAction(item: ItemLike): { label: string; to: SymbolKind } | null {
+  return ADVANCE[symbolKind(item)] ?? null;
+}
+
 const HINT: Partial<Record<SymbolKind, string>> = {
   open: '탭하면 진행 중',
   doing: '탭하면 끝냄',

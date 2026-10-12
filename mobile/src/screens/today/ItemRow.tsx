@@ -5,7 +5,7 @@ import { promptText } from '../../ui/dialogs';
 import { Highlight } from '../../ui/Highlight';
 import { Popover, useAnchor } from '../../ui/Popover';
 import { StatusSymbol } from '../../ui/StatusSymbol';
-import { canAdvance, itemA11yLabel, symbolKind } from '../../ui/symbols';
+import { advanceAction, canAdvance, itemA11yLabel, symbolKind } from '../../ui/symbols';
 import { colors, fonts } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { dimPressed, tintPressed } from '../../ui/press';
@@ -32,6 +32,13 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
   const markDisabled = !item.priority && priorityFull;
   const done = kind === 'done';
   const [marked, setMarked] = useState(false); // 이 줄에 방금 형광펜을 칠했다(그때만 긋는 애니메이션)
+  const next = advanceAction(item);
+  const canMark = item.kind === 'task' && (status === 'open' || status === 'doing');
+  // 메뉴를 닫고 고른 일을 한다
+  const pick = (fn: () => void) => () => {
+    menu.close();
+    fn();
+  };
 
   return (
     <View style={[styles.row, menu.anchor !== null && styles.rowOpen]}>
@@ -52,14 +59,17 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
             <StatusSymbol kind={kind} />
           </View>
         )}
-        <Highlight on={item.priority && !done} animate={marked}>
-          <Txt
-            variant={kind === 'note' ? 'hand' : 'body'}
-            style={[kind === 'note' ? styles.note : styles.text, done && styles.done]}
-          >
-            {item.text}
-          </Txt>
-        </Highlight>
+        {/* 글을 길게 누르면 ⋯와 같은 메뉴가 뜬다 */}
+        <Pressable accessible={false} style={styles.body} onLongPress={menu.open}>
+          <Highlight on={item.priority && !done} animate={marked}>
+            <Txt
+              variant={kind === 'note' ? 'hand' : 'body'}
+              style={[kind === 'note' ? styles.note : styles.text, done && styles.done]}
+            >
+              {item.text}
+            </Txt>
+          </Highlight>
+        </Pressable>
       </View>
       <Pressable
         ref={menu.ref}
@@ -72,43 +82,41 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
         <Txt style={styles.moreText}>⋯</Txt>
       </Pressable>
       <Popover anchor={menu.anchor} align="right" width={220} label={`${item.text} 메뉴`} onClose={menu.close}>
-        {item.kind === 'task' && !done && (
+        {next && (
+          <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => onAdvance(id))}>
+            <View style={styles.swatchText}>
+              <StatusSymbol kind={next.to} size={14} />
+            </View>
+            <Txt style={styles.menuText}>{next.label}</Txt>
+          </Pressable>
+        )}
+        {canMark && (
           <Pressable
-            accessibilityRole="menuitem"
+            accessibilityRole="button"
             disabled={markDisabled}
             accessibilityState={{ disabled: markDisabled }}
             style={dimPressed(styles.menuItem)}
-            onPress={() => {
-              menu.close();
+            onPress={pick(() => {
               setMarked(!item.priority);
               onTogglePriority(id, !item.priority);
-            }}
+            })}
           >
             <View style={styles.swatch} />
             <Txt style={[styles.menuText, markDisabled && styles.menuDisabled]}>
-              {item.priority ? '형광펜 지우기' : markDisabled ? '중요는 하루 3개까지예요' : '형광펜 칠하기 (중요)'}
+              {item.priority ? '중요 표시 지우기' : markDisabled ? '중요는 하루 3개까지예요' : '중요 표시하기'}
             </Txt>
           </Pressable>
         )}
         <Pressable
-          accessibilityRole="menuitem"
+          accessibilityRole="button"
           style={dimPressed(styles.menuItem)}
-          onPress={() => {
-            menu.close();
-            promptText('고치기', text, (next) => onEdit(id, next));
-          }}
+          onPress={pick(() => promptText('고치기', text, (edited) => onEdit(id, edited)))}
         >
           <Txt style={[styles.menuText, styles.swatchText]}>✎</Txt>
           <Txt style={styles.menuText}>고치기</Txt>
         </Pressable>
-        <Pressable
-          accessibilityRole="menuitem"
-          style={dimPressed(styles.menuItem)}
-          onPress={() => {
-            menu.close();
-            onDelete(id); // 묻지 않는다. 화면이 '되돌리기'를 잠깐 띄운다
-          }}
-        >
+        {/* 묻지 않는다. 화면이 '되돌리기'를 잠깐 띄운다 */}
+        <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => onDelete(id))}>
           <Txt style={[styles.menuText, styles.danger, styles.swatchText]}>×</Txt>
           <Txt style={[styles.menuText, styles.danger]}>지우기</Txt>
         </Pressable>
@@ -126,6 +134,7 @@ const styles = StyleSheet.create({
   rowOpen: { backgroundColor: '#EDE4D2' }, // 메뉴가 열린 줄
   main: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 13 },
   symbol: { width: 18, height: 24, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
+  body: { flex: 1, alignItems: 'flex-start' },
   text: { fontSize: 16, lineHeight: 24, flexShrink: 1 },
   note: { fontFamily: fonts.hand, fontSize: 22, lineHeight: 28, flexShrink: 1 },
   done: { color: colors.faint, textDecorationLine: 'line-through' },
@@ -133,7 +142,7 @@ const styles = StyleSheet.create({
   moreText: { fontSize: 18, color: colors.faint },
   menuItem: { minHeight: 44, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   swatch: { width: 18, height: 8, backgroundColor: colors.highlight },
-  swatchText: { width: 18, textAlign: 'center' },
+  swatchText: { width: 18, textAlign: 'center', alignItems: 'center' },
   menuText: { fontSize: 14 },
   menuDisabled: { color: colors.faint },
   danger: { color: colors.danger },
