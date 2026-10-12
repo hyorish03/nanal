@@ -17,6 +17,7 @@ import { colors, fonts, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { TemplateSheet } from './evening/TemplateSheet';
 import { dimPressed } from '../ui/press';
+import { Chip } from '../ui/Chip';
 
 type Props = { db: Db; version: number; onChanged: () => void; onClose: () => void };
 
@@ -169,10 +170,10 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
             {templates.map((t) => {
               const selected = template === t.id;
               return (
-                <Pressable
+                <Chip
                   key={t.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
+                  label={t.name}
+                  selected={selected}
                   accessibilityHint={t.builtin ? undefined : '길게 누르면 고치거나 지울 수 있어요'}
                   accessibilityActions={
                     t.builtin
@@ -190,19 +191,12 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                           else if (e.nativeEvent.actionName === 'delete') askDelete(t);
                         }
                   }
-                  style={dimPressed([styles.chip, selected && styles.chipOn])}
                   onPress={() => setTemplate(selected ? null : t.id)}
                   onLongPress={t.builtin ? undefined : () => templateActions(t)}
-                >
-                  <Txt variant={selected ? 'medium' : 'body'} style={styles.chipText}>
-                    {t.name}
-                  </Txt>
-                </Pressable>
+                />
               );
             })}
-            <Pressable accessibilityRole="button" style={dimPressed(styles.newChip)} onPress={() => openSheet(null)}>
-              <Txt style={styles.newChipText}>+ 새 템플릿</Txt>
-            </Pressable>
+            <Chip label="새 템플릿" symbol="+" dashed onPress={() => openSheet(null)} />
           </View>
           {hasCustom && <Txt style={styles.hint}>내가 만든 템플릿은 길게 눌러 고치거나 지울 수 있어요</Txt>}
         </View>
@@ -324,28 +318,7 @@ const styles = StyleSheet.create({
   moodWordOn: { borderBottomColor: colors.navy },
   moodWordOff: { color: colors.inkSoft, borderBottomColor: 'transparent' },
   question: { fontSize: 14, color: colors.muted },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.chipBorder,
-    backgroundColor: colors.card,
-    justifyContent: 'center',
-  },
-  chipOn: { backgroundColor: colors.highlight, borderColor: colors.ink },
-  chipText: { fontSize: 14 },
-  newChip: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.faint,
-    justifyContent: 'center',
-  },
-  newChipText: { fontSize: 14, color: colors.inkSoft },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 10 }, // 줄 사이 10: 칩 hitSlop이 겹치지 않게
   hint: { fontSize: 12, color: colors.muted },
   tape: {
     position: 'absolute',

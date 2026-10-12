@@ -19,7 +19,7 @@ function Glyph({ symbol }: { symbol: LegendEntry['symbol'] }) {
   return <StatusSymbol kind={symbol} />;
 }
 
-// (i) 팝오버 안의 기호 설명. 지금 고른 입력 종류는 형광펜으로 표시한다.
+// (i) 팝오버 안의 기호 설명. 지금 고른 입력 종류는 고른 칩과 같은 바탕으로 표시한다.
 export function SymbolLegend({ kind, onClose }: { kind: ItemKind; onClose: () => void }) {
   return (
     <View style={styles.box}>
@@ -49,7 +49,7 @@ export function SymbolLegend({ kind, onClose }: { kind: ItemKind; onClose: () =>
 const styles = StyleSheet.create({
   box: { paddingTop: 10, paddingHorizontal: 12, gap: 2 },
   row: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', padding: 6, borderRadius: 6 },
-  current: { backgroundColor: colors.highlight },
+  current: { backgroundColor: colors.chipSelected },
   glyph: { width: 22, minHeight: 20, alignItems: 'center', justifyContent: 'center' },
   hl: { fontSize: 14 },
   more: { fontSize: 18, color: colors.faint },

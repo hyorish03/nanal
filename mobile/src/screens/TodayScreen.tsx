@@ -28,6 +28,7 @@ import { PostIt, type SettleHow } from './today/PostIt';
 import { SymbolLegend } from './today/SymbolLegend';
 import { voiceAvailable } from '../voice/available';
 import { dimPressed } from '../ui/press';
+import { Chip, CHIP_H } from '../ui/Chip';
 
 // 개발용·출시 빌드에서만 말로 적기 시트를 불러온다(Expo Go에서는 네이티브 모듈이 없어 import 시 오류).
 const VoiceSheet: typeof import('./today/VoiceSheet').VoiceSheet | null = voiceAvailable
@@ -192,19 +193,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           {KINDS.map((k) => {
             const selected = kind === k.kind;
             return (
-              <Pressable
-                key={k.kind}
-                accessibilityRole="button"
-                accessibilityLabel={k.label}
-                accessibilityState={{ selected }}
-                hitSlop={CHIP_SLOP}
-                style={dimPressed([styles.kind, selected && styles.kindSelected])}
-                onPress={() => setKind(k.kind)}
-              >
-                <Txt style={styles.kindText}>
-                  {k.symbol} {k.label}
-                </Txt>
-              </Pressable>
+              <Chip key={k.kind} label={k.label} symbol={k.symbol} selected={selected} onPress={() => setKind(k.kind)} />
             );
           })}
           <Pressable
@@ -338,8 +327,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   );
 }
 
-// 칩·머리 버튼은 보이는 높이만 낮추고, 누르는 영역은 hitSlop으로 44pt를 지킨다
-const CHIP_H = 34;
+// 머리 버튼도 칩처럼 보이는 높이만 낮추고, 누르는 영역은 hitSlop으로 44pt를 지킨다
 const CHIP_SLOP = { top: 5, bottom: 5 };
 
 const styles = StyleSheet.create({
@@ -376,9 +364,6 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.ink, paddingBottom: 6 },
   input: { flex: 1, height: 44, paddingHorizontal: 6, fontSize: 16, fontFamily: fonts.body, color: colors.ink },
   kindRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  kind: { minHeight: CHIP_H, paddingHorizontal: 14, borderRadius: CHIP_H / 2, borderWidth: 1, borderColor: colors.line, justifyContent: 'center' },
-  kindSelected: { backgroundColor: colors.chipSelected, borderColor: colors.ink },
-  kindText: { fontSize: 14 },
   organize: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   notice: { color: colors.inkSoft },
   info: { width: 44, height: 44, marginLeft: -6, alignItems: 'center', justifyContent: 'center' },

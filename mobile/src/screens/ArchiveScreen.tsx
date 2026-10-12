@@ -14,6 +14,7 @@ import { RuledPaper } from '../ui/RuledPaper';
 import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { dimPressed } from '../ui/press';
+import { Chip } from '../ui/Chip';
 import { useReduceMotion } from '../ui/useReduceMotion';
 
 type Props = { db: Db; version: number; onClose: () => void; onOpenReview?: (month: string) => void };
@@ -291,15 +292,7 @@ export function ArchiveScreen({ db, version, onClose, onOpenReview }: Props) {
             {[{ id: null, name: '전체' }, ...filters].map((f) => {
               const on = filter === f.id;
               return (
-                <Pressable
-                  key={f.id ?? 'all'}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                  style={dimPressed([styles.filter, on && styles.filterOn])}
-                  onPress={() => setFilter(f.id)}
-                >
-                  <Txt style={styles.filterText}>{f.name}</Txt>
-                </Pressable>
+                <Chip key={f.id ?? 'all'} label={f.name} selected={on} onPress={() => setFilter(f.id)} />
               );
             })}
           </View>
@@ -372,10 +365,7 @@ const styles = StyleSheet.create({
   card: { paddingHorizontal: 14, paddingVertical: 0, borderWidth: 1, borderColor: colors.lineFaint, borderRadius: 4 },
   cardTitle: { fontSize: 21, lineHeight: 30 },
   cardLine: { fontSize: 14, lineHeight: 30 },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  filter: { minHeight: 44, paddingHorizontal: 12, borderRadius: 22, borderWidth: 1, borderColor: colors.chipBorder, justifyContent: 'center' },
-  filterOn: { backgroundColor: colors.highlight, borderColor: colors.ink },
-  filterText: { fontSize: 13 },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 10 },
   entry: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.lineFaint, borderRadius: 4, padding: 12, gap: 6 },
   entryHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 },
   entryTitle: { fontSize: 20, flexShrink: 1 },
