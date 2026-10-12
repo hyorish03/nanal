@@ -230,19 +230,6 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     <View style={styles.container}>
       {/* 머리 빈 곳을 누르면 키보드가 내려간다. 알림 줄은 머리 아래 여백에 겹쳐 띄워 목록을 밀지 않는다 */}
       <Pressable accessible={false} style={styles.header} onPress={Keyboard.dismiss}>
-        <View style={styles.headerText}>
-          <Txt
-            variant="title"
-            accessibilityRole="header"
-            style={styles.date}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.75}
-          >
-            {formatLongDate(today)}
-          </Txt>
-          <Txt variant="hand">기록한 날 {recordedDays}일째</Txt>
-        </View>
         <View style={styles.headerActions}>
           {onOpenArchive && (
             <Pressable accessibilityRole="button" accessibilityLabel="지난 기록" hitSlop={CHIP_SLOP} style={dimPressed(styles.archive)} onPress={onOpenArchive}>
@@ -258,6 +245,19 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
               하루 마무리
             </Txt>
           </Pressable>
+        </View>
+        <View style={styles.headerText}>
+          <Txt
+            variant="title"
+            accessibilityRole="header"
+            style={styles.date}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {formatLongDate(today)}
+          </Txt>
+          <Txt variant="hand">기록한 날 {recordedDays}일째</Txt>
         </View>
         {(error || notice) && (
           <Txt
@@ -343,12 +343,13 @@ const CHIP_H = 34;
 const CHIP_SLOP = { top: 5, bottom: 5 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingTop: 16, gap: 18 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, zIndex: 1 },
+  container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingTop: 12, gap: 24 },
+  // 버튼은 맨 위 오른쪽 도구줄, 그 아래 날짜를 한 줄 전체 너비로
+  header: { gap: 10, zIndex: 1 },
   message: { position: 'absolute', top: '100%', left: 0, right: 0, fontSize: 13, lineHeight: 18 },
-  headerText: { flex: 1, gap: 2 },
+  headerText: { gap: 4 },
   date: { fontSize: 30, letterSpacing: -0.5 },
-  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center', alignSelf: 'flex-end' },
   // 지난 기록: 책 그림만으로는 뜻이 약해 짧은 글을 곁들인다
   archive: {
     minHeight: CHIP_H,
@@ -384,7 +385,8 @@ const styles = StyleSheet.create({
   error: { color: colors.danger },
   list: { flex: 1 },
   listContent: { flexGrow: 1 },
-  footerWrap: { flexGrow: 1 },
+  // 할 일이 적으면 화면 맨 아래에 머물고, 목록이 길면 마지막 줄 아래로 밀려난다
+  footerWrap: { flexGrow: 1, justifyContent: 'flex-end' },
   listHeader: { gap: 26, paddingBottom: 20 },
   empty: { color: colors.muted, textAlign: 'center', marginTop: 24 },
   footer: { alignSelf: 'center', marginTop: 24, marginBottom: 24, fontSize: 20, color: colors.muted },
