@@ -3,6 +3,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, TextInput, View } from 're
 import { MOODS, moodWord } from '../days/moods';
 import { getMood, setMood } from '../days/repo';
 import type { Db } from '../db/types';
+import { listItemsForDate } from '../items/repo';
 import { formatLongDate, logicalDate } from '../lib/date';
 import { addReflection, listReflections, type Reflection } from '../reflections/repo';
 import { deleteTemplate, listTemplates } from '../reflections/templateRepo';
@@ -12,12 +13,13 @@ import { eulReul } from '../lib/josa';
 import { confirmDelete, showActionSheet } from '../ui/dialogs';
 import { Inkwell } from '../ui/Inkwell';
 import { LAMP_PAPER } from '../ui/lamp';
-import { EASE_OUT } from '../ui/motion';
+import { EASE_IN_OUT, EASE_OUT } from '../ui/motion';
 import { RuledPaper } from '../ui/RuledPaper';
 import { colors, fonts, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { TemplateSheet } from './evening/TemplateSheet';
 import { dimPressed } from '../ui/press';
+import { useReduceMotion } from '../ui/useReduceMotion';
 
 type Props = { db: Db; version: number; onChanged: () => void; onClose: () => void };
 
@@ -28,6 +30,8 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const [saved, setSaved] = useState<Reflection[]>([]);
   const [templates, setTemplates] = useState<TemplateDef[]>([]);
   const [recordedDays, setRecordedDays] = useState(0);
+  const [done, setDone] = useState<{ id: string; text: string }[]>([]); // 오늘 끝낸 일
+  const [freshId, setFreshId] = useState<string | null>(null); // 방금 남긴 회고(잉크가 마르는 중)
   const [template, setTemplate] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, Record<string, string>>>({});
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -38,6 +42,8 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   };
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
+  const reduce = useReduceMotion();
+  const stampIn = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     setTemplate(null);
@@ -46,13 +52,14 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getMood(db, today), listReflections(db, today), listTemplates(db), countRecordedDays(db)])
-      .then(([m, r, t, n]) => {
+    Promise.all([getMood(db, today), listReflections(db, today), listTemplates(db), countRecordedDays(db), listItemsForDate(db, today)])
+      .then(([m, r, t, n, items]) => {
         if (cancelled) return;
         setMoodState(m);
         setSaved(r);
         setTemplates(t);
         setRecordedDays(n);
+        setDone(items.filter((i) => i.status === 'done').map((i) => ({ id: i.id, text: i.text })));
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
@@ -88,13 +95,26 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     if (!ok) setMoodState(prev);
   };
 
-  const save = () =>
-    run(async () => {
-      if (!template) return;
-      await addReflection(db, { templateId: template, answers: answers[template] ?? {} });
+  // 남기면 기록한 날 도장이 새 숫자로 찍힌다. 동작 줄이기에서는 흐려졌다 나타나기만 한다.
+  const dropStamp = () => {
+    stampIn.setValue(0);
+    Animated.timing(stampIn, { toValue: 1, duration: 180, easing: EASE_OUT, useNativeDriver: true }).start();
+  };
+
+  const save = async () => {
+    if (!template) return;
+    const ok = await run(async () => {
+      const added = await addReflection(db, { templateId: template, answers: answers[template] ?? {} });
+      // 도장 숫자와 카드가 바뀐 뒤에 찍히도록 여기서 바로 다시 읽는다
+      const [list, n] = await Promise.all([listReflections(db, today), countRecordedDays(db)]);
+      setSaved(list);
+      setRecordedDays(n);
+      setFreshId(added.id);
       setTemplate(null);
       setAnswers((prev) => ({ ...prev, [template]: {} }));
     });
+    if (ok) dropStamp();
+  };
 
   const askDelete = (t: TemplateDef) =>
     confirmDelete(`‘${t.name}’${eulReul(t.name)} 지울까요?`, '이 템플릿으로 쓴 회고는 그대로 남아요.', () => {
@@ -263,24 +283,56 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
                 </Txt>
                 {r.questions
                   .filter((q) => r.answers[q.key])
-                  .map((q) => (
-                    <Txt key={q.key} style={styles.savedAnswer} accessibilityLabel={`${q.text} ${r.answers[q.key]}`}>
-                      {r.answers[q.key]}
-                    </Txt>
-                  ))}
+                  .map((q) =>
+                    r.id === freshId ? (
+                      <WetInk key={q.key} label={`${q.text} ${r.answers[q.key]}`} text={r.answers[q.key]} />
+                    ) : (
+                      <Txt key={q.key} style={styles.savedAnswer} accessibilityLabel={`${q.text} ${r.answers[q.key]}`}>
+                        {r.answers[q.key]}
+                      </Txt>
+                    ),
+                  )}
               </RuledPaper>
             ))}
           </View>
         )}
 
         <View style={styles.stampBox}>
-          <View accessible={false} style={styles.stamp}>
+          <Animated.View
+            accessible={false}
+            style={[
+              styles.stamp,
+              {
+                opacity: stampIn,
+                transform: [
+                  { rotate: '-10deg' },
+                  { scale: reduce ? 1 : stampIn.interpolate({ inputRange: [0, 1], outputRange: [1.15, 1] }) },
+                ],
+              },
+            ]}
+          >
             <Txt variant="title" style={styles.stampText}>
               {recordedDays}일
             </Txt>
-          </View>
+          </Animated.View>
           <Txt style={styles.stampCopy}>오늘도 한 장을 채웠어요. 내일 아침에 이어서 적어요.</Txt>
         </View>
+
+        {done.length > 0 && (
+          <View style={styles.done}>
+            <Txt style={styles.doneLabel}>오늘 끝낸 일</Txt>
+            {done.slice(0, DONE_MAX).map((d) => (
+              <Txt key={d.id} variant="hand" style={styles.doneItem} numberOfLines={1}>
+                – {d.text}
+              </Txt>
+            ))}
+            {done.length > DONE_MAX && (
+              <Txt variant="hand" style={styles.doneItem}>
+                외 {done.length - DONE_MAX}개
+              </Txt>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       <TemplateSheet
@@ -300,6 +352,33 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 }
 
 const DIM = 0.55;
+const DONE_MAX = 5;
+const WET_INK = colors.navy; // 막 쓴 잉크는 남색으로 젖어 있다가 먹색으로 마른다
+
+// 색은 네이티브 드라이버로 바꿀 수 없어서, 먹색 글씨 위에 남색 글씨를 겹쳐 두고 남색만 흐리게 한다.
+function WetInk({ text, label }: { text: string; label: string }) {
+  const wet = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const anim = Animated.timing(wet, { toValue: 0, duration: 1200, easing: EASE_IN_OUT, useNativeDriver: true });
+    anim.start();
+    return () => anim.stop();
+  }, [wet]);
+  return (
+    <View>
+      <Txt style={styles.savedAnswer} accessibilityLabel={label}>
+        {text}
+      </Txt>
+      <Animated.View
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[StyleSheet.absoluteFill, { opacity: wet }]}
+      >
+        <Txt style={[styles.savedAnswer, { color: WET_INK }]}>{text}</Txt>
+      </Animated.View>
+    </View>
+  );
+}
 
 // 고르지 않은 병은 따뜻한 연필색 윤곽, 고른 병만 남색 잉크. 직접 골랐을 때만 남색이 짧게 배어 나온다.
 function MoodWell({ selected, animate, children }: { selected: boolean; animate: boolean; children: ReactNode }) {
@@ -406,9 +485,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.navy,
     alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '-10deg' }],
+    justifyContent: 'center', // -10° 기울기는 찍히는 애니메이션과 함께 넣는다
   },
   stampText: { fontSize: 13, color: colors.navy },
   stampCopy: { flex: 1, fontSize: 14, color: colors.inkSoft },
+  done: { paddingHorizontal: 14 },
+  doneLabel: { fontSize: 12, color: colors.muted, marginBottom: 2 },
+  doneItem: { fontSize: 20, lineHeight: 26, color: colors.muted },
 });
