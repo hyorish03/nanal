@@ -2,8 +2,8 @@ import { Image, StyleSheet, View } from 'react-native';
 
 // 256px 타일을 @2x로 두어 128pt마다 되풀이한다(알갱이가 화면에서 뭉개지지 않게)
 const TEXTURES = {
-  paper: require('../../assets/textures/paper@2x.png'),
-  cloth: require('../../assets/textures/cloth@2x.png'),
+  paper: require('../../assets/textures/paper.png'),
+  cloth: require('../../assets/textures/cloth.png'),
 };
 
 const OPACITY = { paper: 0.035, cloth: 0.06 };
