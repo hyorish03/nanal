@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import type { Item } from '../../items/repo';
 import { formatShortDate } from '../../lib/date';
@@ -10,16 +10,38 @@ import { dimPressed } from '../../ui/press';
 
 export type SettleHow = 'today' | 'tomorrow' | 'delete';
 
+export const POSTIT_SHOWN = 3; // 처음에 보여 주는 줄 수. 나머지는 '외 N개'로 접는다
+
 type Props = {
   candidates: Item[];
   // 저장소 작업을 실행하고 성공 여부를 돌려준다(실패 문구는 화면이 보여준다).
   onSettle: (item: Item, how: SettleHow) => Promise<boolean>;
+  onSettleAll: () => Promise<boolean>; // 모두 오늘 하기
 };
 
-export function PostIt({ candidates, onSettle }: Props) {
+export function PostIt({ candidates, onSettle, onSettleAll }: Props) {
   const reduce = useReduceMotion();
   const peel = useRef(new Animated.Value(0)).current;
   const leaving = useRef(new Set<string>()).current;
+  const [expanded, setExpanded] = useState(false);
+  const hidden = expanded ? 0 : Math.max(0, candidates.length - POSTIT_SHOWN);
+  const shown = hidden > 0 ? candidates.slice(0, POSTIT_SHOWN) : candidates;
+
+  // 모두 오늘로: 줄마다 빼지 않고 포스트잇을 통째로 뗀다
+  const settleAll = async () => {
+    if (leaving.size > 0) return;
+    candidates.forEach((c) => leaving.add(c.id));
+    if (!reduce) {
+      await new Promise<void>((resolve) =>
+        Animated.timing(peel, { toValue: 1, duration: 500, easing: Easing.bezier(0.4, 0, 0.6, 1), useNativeDriver: true }).start(() =>
+          resolve(),
+        ),
+      );
+    }
+    const ok = await onSettleAll();
+    leaving.clear();
+    if (!ok) peel.setValue(0);
+  };
 
   const settle = async (item: Item, how: SettleHow, row: Animated.Value) => {
     if (leaving.has(item.id)) return;
@@ -51,11 +73,32 @@ export function PostIt({ candidates, onSettle }: Props) {
   return (
     <Animated.View style={[styles.note, { opacity, transform: [{ translateX }, { translateY }, { rotate }] }]}>
       <Txt variant="hand" accessibilityRole="header" style={styles.title}>
-        어제에서 넘어온 일이 있어요
+        지난 날에서 넘어온 일
       </Txt>
-      {candidates.map((c) => (
+      {shown.map((c) => (
         <CandidateRow key={c.id} item={c} onSettle={settle} />
       ))}
+      {(hidden > 0 || candidates.length > 1) && (
+        <View style={styles.footer}>
+          {hidden > 0 && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`외 ${hidden}개 더 보기`}
+              style={dimPressed(styles.action)}
+              onPress={() => setExpanded(true)}
+            >
+              <Txt style={styles.tomorrow}>외 {hidden}개</Txt>
+            </Pressable>
+          )}
+          {candidates.length > 1 && (
+            <Pressable accessibilityRole="button" style={dimPressed([styles.action, styles.all])} onPress={settleAll}>
+              <Txt variant="medium" style={styles.today}>
+                모두 오늘 하기
+              </Txt>
+            </Pressable>
+          )}
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -124,6 +167,8 @@ const styles = StyleSheet.create({
   action: { minHeight: 44, paddingHorizontal: 10, justifyContent: 'center' },
   today: { fontSize: 14, color: colors.navy },
   tomorrow: { fontSize: 14, color: colors.inkSoft },
+  footer: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderStyle: 'dashed', borderTopColor: colors.inkDash },
+  all: { marginLeft: 'auto' },
   remove: { marginLeft: 'auto', width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   removeText: { fontSize: 20, color: colors.postitText },
 });

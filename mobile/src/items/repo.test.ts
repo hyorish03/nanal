@@ -7,6 +7,7 @@ import {
   deleteItem,
   listItemsForDate,
   listMigrationCandidates,
+  migrateAllToToday,
   migrateToToday,
   migrateToTomorrow,
   restoreItem,
@@ -233,4 +234,23 @@ test('restoreItem: 지우지 않은 항목이나 없는 항목은 거부한다',
   const item = await addItem(db, { kind: 'task', text: '운동' }, MON);
   await expect(restoreItem(db, item.id, MON)).rejects.toThrow('되돌릴 항목을 찾을 수 없습니다');
   await expect(restoreItem(db, 'nope', MON)).rejects.toThrow('되돌릴 항목을 찾을 수 없습니다');
+});
+
+test('migrateAllToToday: 넘어온 일을 한 번에 오늘로 옮긴다', async () => {
+  const a = await addItem(db, { kind: 'task', text: 'a' }, MON);
+  const b = await addItem(db, { kind: 'task', text: 'b' }, MON);
+  const created = await migrateAllToToday(db, [a.id, b.id], TUE);
+  expect(created.map((c) => c.migrated_from)).toEqual([a.id, b.id]);
+  expect((await listItemsForDate(db, '2026-10-06')).map((i) => i.text).sort()).toEqual(['a', 'b']);
+  expect(await listMigrationCandidates(db, '2026-10-06')).toHaveLength(0);
+});
+
+test('migrateAllToToday: 하나라도 못 옮기면 모두 그대로 둔다', async () => {
+  const a = await addItem(db, { kind: 'task', text: 'a' }, MON);
+  const done = await addItem(db, { kind: 'task', text: 'b' }, MON);
+  await advanceStatus(db, done.id, MON);
+  await advanceStatus(db, done.id, MON);
+  await expect(migrateAllToToday(db, [a.id, done.id], TUE)).rejects.toThrow('끝나지 않은 할 일만');
+  expect(await listItemsForDate(db, '2026-10-06')).toHaveLength(0);
+  expect((await listMigrationCandidates(db, '2026-10-06')).map((c) => c.id)).toEqual([a.id]);
 });

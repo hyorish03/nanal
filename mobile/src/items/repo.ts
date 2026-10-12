@@ -130,32 +130,43 @@ export async function setPriority(db: Db, id: string, on: boolean, now = new Dat
   });
 }
 
-async function migrateTo(db: Db, id: string, target: (today: string) => string, now: Date): Promise<Item> {
+async function migrateInTx(tx: Tx, id: string, target: (today: string) => string, now: Date): Promise<Item> {
   const ts = now.toISOString();
-  return db.transaction(async (tx) => {
-    const item = await requireItem(tx, id);
-    if (item.status !== 'open' && item.status !== 'doing') throw new Error('끝나지 않은 할 일만 옮길 수 있습니다');
-    const today = logicalDate(now);
-    if (item.date >= today) throw new Error('이전 날짜의 할 일만 옮길 수 있습니다');
-    await update(tx, id, { status: 'migrated' }, now);
-    const created: Item = {
-      ...item,
-      id: newId(),
-      date: target(today),
-      status: 'open',
-      priority: false,
-      migrated_from: item.id,
-      created_at: ts,
-      updated_at: ts,
-      deleted_at: null,
-    };
-    await insertItem(tx, created);
-    return created;
-  });
+  const item = await requireItem(tx, id);
+  if (item.status !== 'open' && item.status !== 'doing') throw new Error('끝나지 않은 할 일만 옮길 수 있습니다');
+  const today = logicalDate(now);
+  if (item.date >= today) throw new Error('이전 날짜의 할 일만 옮길 수 있습니다');
+  await update(tx, id, { status: 'migrated' }, now);
+  const created: Item = {
+    ...item,
+    id: newId(),
+    date: target(today),
+    status: 'open',
+    priority: false,
+    migrated_from: item.id,
+    created_at: ts,
+    updated_at: ts,
+    deleted_at: null,
+  };
+  await insertItem(tx, created);
+  return created;
+}
+
+function migrateTo(db: Db, id: string, target: (today: string) => string, now: Date): Promise<Item> {
+  return db.transaction((tx) => migrateInTx(tx, id, target, now));
 }
 
 export function migrateToToday(db: Db, id: string, now = new Date()): Promise<Item> {
   return migrateTo(db, id, (today) => today, now);
+}
+
+// 포스트잇의 '모두 오늘 하기'. 하나라도 못 옮기면 아무것도 옮기지 않는다.
+export function migrateAllToToday(db: Db, ids: string[], now = new Date()): Promise<Item[]> {
+  return db.transaction(async (tx) => {
+    const created: Item[] = [];
+    for (const id of ids) created.push(await migrateInTx(tx, id, (today) => today, now));
+    return created;
+  });
 }
 
 export function migrateToTomorrow(db: Db, id: string, now = new Date()): Promise<Item> {

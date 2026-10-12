@@ -10,6 +10,7 @@ import {
   listItemsForDate,
   listMigrationCandidates,
   MAX_PRIORITY_PER_DAY,
+  migrateAllToToday,
   migrateToToday,
   migrateToTomorrow,
   restoreItem,
@@ -27,7 +28,7 @@ import { MarginRule, NOTE_MARGIN, RULE_GAP, RuledFill } from './today/NotebookPa
 import { Ribbon } from './today/Ribbon';
 import type { LinkAction } from '../lib/deepLink';
 import { OrganizeSheet } from './today/OrganizeSheet';
-import { PostIt, type SettleHow } from './today/PostIt';
+import { PostIt, POSTIT_SHOWN, type SettleHow } from './today/PostIt';
 import { Composer } from './today/Composer';
 import { voiceAvailable } from '../voice/available';
 import { dimPressed } from '../ui/press';
@@ -48,6 +49,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const [items, setItems] = useState<Item[]>([]);
   const [candidates, setCandidates] = useState<Item[]>([]);
   const [recordedDays, setRecordedDays] = useState(0);
+  const [loaded, setLoaded] = useState(false); // 처음 목록을 불러왔다(넘어온 일 수를 알아야 포커스를 정한다)
   const [error, setError] = useState<string | null>(null);
   const [organizeOpen, setOrganizeOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -75,11 +77,12 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   }, []);
 
   useEffect(() => {
-    if (!focusReady) return;
-    inputRef.current?.focus();
+    if (!focusReady || !loaded) return;
+    // 넘어온 일이 많으면 키보드로 포스트잇을 가리지 않고 먼저 정리할 수 있게 둔다
+    if (candidates.length <= POSTIT_SHOWN) inputRef.current?.focus();
     onFocused?.();
-    // onFocused는 매 렌더 새 함수라 의존성에서 뺀다
-  }, [focusReady]);
+    // onFocused는 매 렌더 새 함수라, candidates는 처음 불러온 값만 보면 돼서 의존성에서 뺀다
+  }, [focusReady, loaded]);
 
   const openOrganize = (input: { text: string; auto: boolean } = { text: '', auto: false }) => {
     setNotice(null);
@@ -115,9 +118,13 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         setItems(i);
         setCandidates(c);
         setRecordedDays(n);
+        setLoaded(true);
         setError(null);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : String(e));
+        setLoaded(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -179,6 +186,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       ? removeWithUndo(item.id)
       : reordering(() => (how === 'today' ? migrateToToday(db, item.id) : migrateToTomorrow(db, item.id)));
 
+  const settleAll = () => reordering(() => migrateAllToToday(db, candidates.map((c) => c.id)));
+
   const priorityCount = items.filter((i) => i.priority && (i.status === 'open' || i.status === 'doing')).length;
   const priorityFull = priorityCount >= MAX_PRIORITY_PER_DAY;
 
@@ -203,7 +212,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   // 포스트잇과 입력칸을 목록 머리로 둬서 후보가 많아도 함께 스크롤된다. 컴포넌트 타입이 아닌 엘리먼트라 입력칸이 다시 마운트되지 않는다.
   const listHeader = (
     <View style={styles.listHeader} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}>
-      {candidates.length > 0 && <PostIt candidates={candidates} onSettle={settle} />}
+      {candidates.length > 0 && <PostIt candidates={candidates} onSettle={settle} onSettleAll={settleAll} />}
 
       <Composer inputRef={inputRef} voice={VoiceSheet !== null} onCapture={onCapture} onSubmit={submit} />
     </View>
