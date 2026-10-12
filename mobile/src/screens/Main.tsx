@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, BackHandler, Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Db } from '../db/types';
+import { type CoverOpening, markCoverOpened, readCoverOpening } from '../lib/coverOpening';
 import { consumeInitialUrl, type LinkAction, parseDeepLink } from '../lib/deepLink';
 import { hasSeenOnboarding, markOnboardingSeen } from '../lib/onboarding';
 import { supabase } from '../supabase';
@@ -68,6 +69,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const [reviewMonth, setReviewMonth] = useState<string | null>(null);
   const [coverOpen, setCoverOpen] = useState(false);
   const [coverSettled, setCoverSettled] = useState(false); // 표지가 다 펼쳐졌다(포커스, 링크 동작은 이때부터)
+  const [coverOpening, setCoverOpening] = useState<CoverOpening>('turn');
   const [dayClosed, setDayClosed] = useState(false); // 저녁 마무리에서 "닫기"를 눌렀다
   const [closedShown, setClosedShown] = useState(false); // 덮기 애니메이션이 끝났다
   const [focusPending, setFocusPending] = useState(true); // 표지가 열린 뒤 입력칸 포커스는 한 번만
@@ -102,12 +104,27 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   }, []);
 
   // 첫 화면이 정해지면 잠깐 표지를 보여준 뒤 펼친다(스펙 11.1).
+  // 그날 처음 열 때만 표지를 넘기고, 같은 날 다시 열면 짧게 보여준 뒤 흐리게 연다.
   const ready = screen !== null;
   useEffect(() => {
     if (!ready) return;
-    const t = setTimeout(() => setCoverOpen(true), 450);
-    return () => clearTimeout(t);
+    let alive = true;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    readCoverOpening(AsyncStorage, new Date()).then((how) => {
+      if (!alive) return;
+      setCoverOpening(how);
+      t = setTimeout(() => setCoverOpen(true), how === 'turn' ? 450 : 200);
+    });
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
   }, [ready]);
+
+  const onCoverOpened = useCallback(() => {
+    setCoverSettled(true);
+    markCoverOpened(AsyncStorage, new Date());
+  }, []);
 
   // 앱을 다시 열면 날짜(새벽 4시 경계)가 바뀌었을 수 있으므로 다시 그린다.
   useEffect(() => {
@@ -152,6 +169,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
 
   const reopen = useCallback(() => {
     setScreen('today');
+    setCoverOpening('turn'); // 직접 펼칠 때는 표지를 넘긴다
     setDayClosed(false);
     setClosedShown(false);
     setFocusPending(true);
@@ -211,7 +229,8 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
         open={coverOpen}
         line={dayClosed ? '오늘도 수고했어요' : '오늘도 한 줄씩'}
         onClosed={() => setClosedShown(true)}
-        onOpened={() => setCoverSettled(true)}
+        onOpened={onCoverOpened}
+        opening={coverOpening}
       >
         {dayClosed && closedShown && (
           <Pressable accessibilityRole="button" style={styles.reopen} onPress={reopen}>
