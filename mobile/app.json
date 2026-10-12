@@ -42,7 +42,8 @@
           "speechRecognitionPermission": "말한 내용을 글로 받아 적어 할 일로 정리해요. 음성은 저장하지 않아요."
         }
       ],
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "./plugins/withSceneLifecycle"
     ]
   }
 }
