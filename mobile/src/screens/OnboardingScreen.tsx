@@ -222,6 +222,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
               </Txt>
               <Txt style={styles.lead}>며칠 쉬어도 괜찮아요. 쌓인 날은 줄어들지 않아요.</Txt>
               <Txt style={styles.note}>기호 설명은 오늘 화면의 (i)에서 언제든 다시 볼 수 있어요.</Txt>
+              <Txt style={styles.note}>책갈피 끈을 누르면 지난 날을 볼 수 있어요.</Txt>
             </View>
           </View>
         )}
