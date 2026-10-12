@@ -4,10 +4,11 @@ import WidgetKit
 struct NanalEntry: TimelineEntry {
   let date: Date
   let snapshot: WidgetSnapshot
+  var isPlaceholder = false // 위젯 갤러리·로딩 중 자리표시
 }
 
 struct NanalProvider: TimelineProvider {
-  func placeholder(in context: Context) -> NanalEntry { NanalEntry(date: Date(), snapshot: .sample) }
+  func placeholder(in context: Context) -> NanalEntry { NanalEntry(date: Date(), snapshot: .sample, isPlaceholder: true) }
 
   func getSnapshot(in context: Context, completion: @escaping (NanalEntry) -> Void) {
     completion(NanalEntry(date: Date(), snapshot: context.isPreview ? .sample : NanalDB.snapshot()))
@@ -23,7 +24,7 @@ struct NanalProvider: TimelineProvider {
 struct NanalLockWidget: Widget {
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: "NanalLock", provider: NanalProvider()) { entry in
-      LockEntryView(entry: entry).containerBackground(.clear, for: .widget)
+      LockEntryView(entry: entry).redacted(reason: entry.isPlaceholder ? .placeholder : []).containerBackground(.clear, for: .widget)
     }
     .configurationDisplayName("나날 오늘 할 일")
     .description("다음 할 일과 남은 수")
@@ -49,7 +50,7 @@ struct LockEntryView: View {
 struct NanalMoodWidget: Widget {
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: "NanalMood", provider: NanalProvider()) { entry in
-      LockMoodView(s: entry.snapshot).containerBackground(.clear, for: .widget)
+      LockMoodView(s: entry.snapshot).redacted(reason: entry.isPlaceholder ? .placeholder : []).containerBackground(.clear, for: .widget)
     }
     .configurationDisplayName("나날 오늘 기분")
     .description("하루 마무리에서 고른 기분")
@@ -60,7 +61,7 @@ struct NanalMoodWidget: Widget {
 struct NanalHomeWidget: Widget {
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: "NanalHome", provider: NanalProvider()) { entry in
-      HomeEntryView(entry: entry).containerBackground(Color.paper, for: .widget)
+      HomeEntryView(entry: entry).redacted(reason: entry.isPlaceholder ? .placeholder : []).containerBackground(Color.paper, for: .widget)
     }
     .configurationDisplayName("나날")
     .description("오늘 할 일과 기분")

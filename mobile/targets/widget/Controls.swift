@@ -12,6 +12,7 @@ struct NanalVoiceControl: ControlWidget {
       }
     }
     .displayName("나날 말로 적기")
+    .description("나날을 열고 바로 말로 적어요")
   }
 }
 
@@ -24,5 +25,6 @@ struct NanalLineControl: ControlWidget {
       }
     }
     .displayName("나날 한 줄 적기")
+    .description("나날을 열고 바로 한 줄 적어요")
   }
 }

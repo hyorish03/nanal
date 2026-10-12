@@ -7,7 +7,12 @@ export const WIDGET_SQL = {
   items: `SELECT id, text, status, priority FROM items
 WHERE date = ? AND kind = 'task' AND deleted_at IS NULL AND status IN ('open', 'doing', 'done')
 ORDER BY CASE WHEN status = 'doing' THEN 1 - priority WHEN status IN ('done', 'migrated') THEN 4
-ELSE 3 - priority END, created_at`,
+ELSE 3 - priority END, created_at
+LIMIT 8`,
+  // 위젯에 그릴 수 있는 줄은 많아야 5개라 목록은 8개까지만 읽는다. 상태별 총 개수는 목록과 따로 센다.
+  counts: `SELECT status, COUNT(*) AS n FROM items
+WHERE date = ? AND kind = 'task' AND deleted_at IS NULL AND status IN ('open', 'doing', 'done')
+GROUP BY status`,
   // 밀린 일 개수(listMigrationCandidates와 같은 조건)
   carried: `SELECT COUNT(*) AS n FROM items
 WHERE date < ? AND kind = 'task' AND status IN ('open', 'doing') AND deleted_at IS NULL`,
@@ -27,15 +32,20 @@ ON CONFLICT (table_name, row_key) DO UPDATE SET version = version + 1`,
 } as const;
 
 export type WidgetItem = { id: string; text: string; status: 'open' | 'doing' | 'done'; priority: boolean };
-export type WidgetSnapshot = { items: WidgetItem[]; carried: number; mood: number | null; recordedDays: number };
+export type WidgetCounts = { open: number; doing: number; done: number };
+export type WidgetSnapshot = { items: WidgetItem[]; counts: WidgetCounts; carried: number; mood: number | null; recordedDays: number };
 
 export async function readWidgetSnapshot(db: Db, today: string): Promise<WidgetSnapshot> {
   const rows = await db.getAllAsync<Omit<WidgetItem, 'priority'> & { priority: number }>(WIDGET_SQL.items, [today]);
+  const countRows = await db.getAllAsync<{ status: keyof WidgetCounts; n: number }>(WIDGET_SQL.counts, [today]);
+  const counts: WidgetCounts = { open: 0, doing: 0, done: 0 };
+  for (const r of countRows) counts[r.status] = r.n;
   const carried = await db.getFirstAsync<{ n: number }>(WIDGET_SQL.carried, [today]);
   const mood = await db.getFirstAsync<{ mood: number | null }>(WIDGET_SQL.mood, [today]);
   const recorded = await db.getFirstAsync<{ n: number }>(WIDGET_SQL.recordedDays, []);
   return {
     items: rows.map((r) => ({ ...r, priority: r.priority === 1 })),
+    counts,
     carried: carried?.n ?? 0,
     mood: mood?.mood ?? null,
     recordedDays: recorded?.n ?? 0,

@@ -52,6 +52,17 @@ describe('readWidgetSnapshot', () => {
     expect(snap.items.map((i) => i.id)).toEqual(app.map((i) => i.id));
   });
 
+  it('목록은 8개까지만 읽고 상태별 총 개수는 따로 센다', async () => {
+    const db = await setup();
+    for (let i = 0; i < 10; i++) await addItem(db, { kind: 'task', text: `일${i}` }, new Date(NOW.getTime() + i * 1000));
+    const first = await addItem(db, { kind: 'task', text: '끝낼 일' }, new Date(NOW.getTime() + 20_000));
+    await advanceStatus(db, first.id, NOW);
+    await advanceStatus(db, first.id, NOW);
+    const snap = await readWidgetSnapshot(db, TODAY);
+    expect(snap.items).toHaveLength(8);
+    expect(snap.counts).toEqual({ open: 10, doing: 0, done: 1 });
+  });
+
   it('진행 중이 없으면 중요한 할 일이 다음 할 일', async () => {
     const db = await setup();
     await addItem(db, { kind: 'task', text: '먼저 적은 일' }, NOW);

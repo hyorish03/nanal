@@ -5,6 +5,13 @@ enum SharedSQL {
     WHERE date = ? AND kind = 'task' AND deleted_at IS NULL AND status IN ('open', 'doing', 'done')
     ORDER BY CASE WHEN status = 'doing' THEN 1 - priority WHEN status IN ('done', 'migrated') THEN 4
     ELSE 3 - priority END, created_at
+    LIMIT 8
+    """
+
+  static let counts = """
+    SELECT status, COUNT(*) AS n FROM items
+    WHERE date = ? AND kind = 'task' AND deleted_at IS NULL AND status IN ('open', 'doing', 'done')
+    GROUP BY status
     """
 
   static let carried = """

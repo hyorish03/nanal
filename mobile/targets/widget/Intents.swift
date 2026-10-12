@@ -6,9 +6,9 @@ struct AdvanceItemIntent: AppIntent {
   static var title: LocalizedStringResource = "할 일 상태 바꾸기"
   static var isDiscoverable = false
 
-  @Parameter(title: "항목") var itemID: String
+  @Parameter(title: "할 일") var itemID: String
 
-  @Parameter(title: "보인 상태") var status: String
+  @Parameter(title: "현재 상태") var status: String
 
   init() {}
   init(itemID: String, status: String) {

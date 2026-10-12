@@ -17,21 +17,22 @@ struct WidgetItem: Identifiable, Hashable {
 }
 
 struct WidgetSnapshot {
-  let available: Bool // 공유 DB를 열었는지(아니면 "앱을 한 번 열어 주세요")
-  let items: [WidgetItem]
+  let available: Bool // 공유 DB를 열었는지(아니면 "앱을 한 번 열면 위젯이 채워져요")
+  let items: [WidgetItem] // 위젯에 그릴 앞쪽 일부(SQL의 LIMIT). 총 개수는 아래 세 값을 쓴다
+  let openCount: Int
+  let doingCount: Int
+  let doneCount: Int
   let carried: Int
   let mood: Int?
   let recordedDays: Int
 
   // 잠금화면 "다음 할 일": 정렬된 목록에서 끝내지 않은 첫 항목(진행 중 → 중요 → 목록 순, pickNext와 같다)
   var next: WidgetItem? { items.first { $0.status != "done" } }
-  var doneCount: Int { items.filter { $0.status == "done" }.count }
-  var doingCount: Int { items.filter { $0.status == "doing" }.count }
-  var openCount: Int { items.filter { $0.status == "open" }.count }
-  var remaining: Int { items.count - doneCount }
+  var total: Int { openCount + doingCount + doneCount }
+  var remaining: Int { openCount + doingCount }
   var moodWord: String? { mood.flatMap { (1...5).contains($0) ? moodWords[$0 - 1] : nil } }
 
-  static let unavailable = WidgetSnapshot(available: false, items: [], carried: 0, mood: nil, recordedDays: 0)
+  static let unavailable = WidgetSnapshot(available: false, items: [], openCount: 0, doingCount: 0, doneCount: 0, carried: 0, mood: nil, recordedDays: 0)
   static let sample = WidgetSnapshot(
     available: true,
     items: [
@@ -40,6 +41,7 @@ struct WidgetSnapshot {
       WidgetItem(id: "3", text: "빨래 널기", status: "open", priority: false),
       WidgetItem(id: "4", text: "아침 스트레칭 10분", status: "done", priority: false),
     ],
+    openCount: 2, doingCount: 1, doneCount: 1,
     carried: 2, mood: 4, recordedDays: 12)
 }
 
@@ -92,6 +94,16 @@ enum NanalDB {
     rows(db, SharedSQL.items, [date]) { s in
       items.append(WidgetItem(id: text(s, 0), text: text(s, 1), status: text(s, 2), priority: sqlite3_column_int(s, 3) == 1))
     }
+    var openCount = 0, doingCount = 0, doneCount = 0
+    rows(db, SharedSQL.counts, [date]) { s in
+      let n = Int(sqlite3_column_int(s, 1))
+      switch text(s, 0) {
+      case "open": openCount = n
+      case "doing": doingCount = n
+      case "done": doneCount = n
+      default: break
+      }
+    }
     var carried = 0
     rows(db, SharedSQL.carried, [date]) { carried = Int(sqlite3_column_int($0, 0)) }
     var mood: Int?
@@ -100,7 +112,8 @@ enum NanalDB {
     }
     var recorded = 0
     rows(db, SharedSQL.recordedDays, []) { recorded = Int(sqlite3_column_int($0, 0)) }
-    return WidgetSnapshot(available: true, items: items, carried: carried, mood: mood, recordedDays: recorded)
+    return WidgetSnapshot(
+      available: true, items: items, openCount: openCount, doingCount: doingCount, doneCount: doneCount, carried: carried, mood: mood, recordedDays: recorded)
   }
 
   // 앱의 advanceStatus와 같은 규칙(widgetAdvance). 보여 준 상태와 같을 때만 바꾸고, 바뀐 행이 있을 때만 outbox에 남긴다. 동기화는 앱이 열릴 때 한다.
