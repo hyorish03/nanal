@@ -26,12 +26,15 @@ export function PageHeader({ title, subtitle, onBack, backLabel = '오늘', back
           style={dimPressed(styles.back)}
           onPress={onBack}
         >
-          <Txt style={styles.chevron}>‹</Txt>
-          <Txt variant="small">{backLabel}</Txt>
+          <Txt compact style={styles.chevron}>‹</Txt>
+          <Txt compact variant="small" numberOfLines={1}>
+            {backLabel}
+          </Txt>
         </Pressable>
         {right}
       </View>
       <View style={styles.titleBox}>
+        {/* 글자를 키워도 잘리지 않고 다음 줄로 넘어간다(numberOfLines를 두지 않는다) */}
         <Txt variant="display" accessibilityRole="header">
           {title}
         </Txt>
@@ -45,7 +48,7 @@ const styles = StyleSheet.create({
   header: { gap: space.sm },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: HIT },
   // 글자는 화면 여백에 맞추고, 누르는 영역만 왼쪽으로 조금 더 넓힌다
-  back: { minHeight: HIT, minWidth: HIT, flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingRight: space.sm },
+  back: { flexShrink: 1, minHeight: HIT, minWidth: HIT, flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingRight: space.sm },
   chevron: { fontSize: 22, lineHeight: 24, color: colors.ink, marginTop: -2 },
   titleBox: { gap: 2 },
   subtitle: { color: colors.muted },

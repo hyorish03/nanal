@@ -34,3 +34,21 @@ test('수정과 삭제는 사용자 템플릿만', async () => {
   await expect(updateTemplate(db, 'gratitude', { name: 'x', questions: ['y'] }, NOW)).rejects.toThrow('기본 템플릿');
   await expect(deleteTemplate(db, 'gratitude', NOW)).rejects.toThrow('기본 템플릿');
 });
+
+test('이름은 24자, 질문은 80자까지', async () => {
+  await expect(createTemplate(db, { name: '가'.repeat(24), questions: ['나'.repeat(80)] }, NOW)).resolves.toMatchObject({ name: '가'.repeat(24) });
+  await expect(createTemplate(db, { name: '가'.repeat(25), questions: ['a'] }, NOW)).rejects.toThrow('24자');
+  await expect(createTemplate(db, { name: 'x', questions: ['a', '나'.repeat(81)] }, NOW)).rejects.toThrow('80자');
+  const t = await createTemplate(db, { name: 'x', questions: ['a'] }, NOW);
+  await expect(updateTemplate(db, t.id, { name: '가'.repeat(25), questions: ['a'] }, NOW)).rejects.toThrow('24자');
+});
+
+test('질문 목록이 깨져 있어도 자유 질문 하나로 연다', async () => {
+  const bad = await createTemplate(db, { name: '깨진 것', questions: ['a'] }, NOW);
+  const odd = await createTemplate(db, { name: '이상한 것', questions: ['a'] }, NOW);
+  await db.runAsync('UPDATE templates SET questions = ? WHERE id = ?', ['{not json', bad.id]);
+  await db.runAsync('UPDATE templates SET questions = ? WHERE id = ?', ['[{"key":"q1"},{"key":"q2","text":"남은 질문"}]', odd.id]);
+  expect((await findTemplate(db, bad.id))?.questions).toEqual([{ key: 'q1', text: '자유롭게 쓰기' }]);
+  expect((await findTemplate(db, odd.id))?.questions).toEqual([{ key: 'q2', text: '남은 질문' }]);
+  expect((await listTemplates(db)).map((x) => x.name)).toEqual(expect.arrayContaining(['깨진 것', '이상한 것']));
+});

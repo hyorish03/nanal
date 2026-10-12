@@ -26,7 +26,9 @@ export function Chip({ label, selected = false, symbol, dashed = false, style, a
       {...rest}
       style={dimPressed([styles.chip, dashed && styles.dashed, selected && styles.selected, style])}
     >
-      <Txt style={[styles.text, selected && styles.textSelected]}>{symbol ? `${symbol} ${label}` : label}</Txt>
+      <Txt compact numberOfLines={1} ellipsizeMode="tail" style={[styles.text, selected && styles.textSelected]}>
+        {symbol ? `${symbol} ${label}` : label}
+      </Txt>
     </Pressable>
   );
 }
@@ -34,6 +36,7 @@ export function Chip({ label, selected = false, symbol, dashed = false, style, a
 const styles = StyleSheet.create({
   chip: {
     minHeight: CHIP_H,
+    maxWidth: '100%', // 긴 이름은 줄 밖으로 넘치지 않고 말줄임으로 끝난다
     paddingHorizontal: 14,
     borderRadius: CHIP_H / 2,
     borderWidth: 1,
