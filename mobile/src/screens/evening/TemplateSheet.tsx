@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import type { Db } from '../../db/types';
 import { createTemplate, updateTemplate } from '../../reflections/templateRepo';
 import { MAX_TEMPLATE_QUESTIONS, type TemplateDef } from '../../reflections/templates';
@@ -35,6 +35,20 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
 
   const filled = questions.map((q) => q.trim()).filter(Boolean);
   const valid = name.trim().length > 0 && filled.length > 0;
+  const original = editing ? [editing.name, ...editing.questions.map((q) => q.text)] : [''];
+  const dirty = [name, ...filled].map((s) => s.trim()).join('\n') !== original.map((s) => s.trim()).filter(Boolean).join('\n');
+
+  // 쓰던 내용이 있으면 취소·아래로 쓸어내리기 전에 한 번 묻는다
+  const requestClose = () => {
+    if (!dirty || saving) {
+      onClose();
+      return;
+    }
+    Alert.alert('작성 중인 템플릿을 버릴까요?', undefined, [
+      { text: '계속 쓰기', style: 'cancel' },
+      { text: '버리기', style: 'destructive', onPress: onClose },
+    ]);
+  };
 
   const save = async () => {
     if (!valid || saving) return;
@@ -55,12 +69,12 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={requestClose}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Paper />
         <ScrollView contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Pressable accessibilityRole="button" style={dimPressed(styles.headerButton)} onPress={onClose}>
+            <Pressable accessibilityRole="button" style={dimPressed(styles.headerButton)} onPress={requestClose}>
               <Txt style={styles.headerText}>취소</Txt>
             </Pressable>
             <Txt variant="medium" accessibilityRole="header">
