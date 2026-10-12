@@ -1,6 +1,6 @@
 // expo-speech-recognition 오류 코드(Web Speech API 이름) → 한국어 문구
 const MESSAGES: Record<string, string> = {
-  'not-allowed': '마이크와 음성 인식 권한이 필요해요. 설정에서 켜 주세요.',
+  'not-allowed': '설정에서 마이크와 음성 인식을 켜 주세요',
   'no-speech': '말소리를 듣지 못했어요. 다시 말해 볼까요?',
   network: '음성 인식에 인터넷이 필요해요. 글로 적어 주세요.',
   interrupted: '전화나 알림 때문에 멈췄어요. 다시 말해 주세요.',

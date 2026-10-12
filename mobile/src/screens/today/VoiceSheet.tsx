@@ -1,6 +1,6 @@
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { useEffect, useReducer, useRef } from 'react';
-import { ActivityIndicator, Animated, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { EASE_OUT } from '../../ui/motion';
 import { colors, HIT, SCREEN_X } from '../../ui/theme';
@@ -102,6 +102,7 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
   const listening = state.kind === 'listening';
   const text = state.kind === 'listening' || state.kind === 'stopping' || state.kind === 'failed' ? state.text : '';
   const failed = state.kind === 'failed' ? state : null;
+  const denied = failed?.code === 'not-allowed'; // 권한이 없으면 다시 말해도 소용없으니 설정으로 보낸다
   listeningRef.current = listening;
 
   // 듣기가 끝나면 고리를 바로 거둔다
@@ -131,22 +132,30 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
         <Txt variant="title" style={styles.lead}>
           편하게 말해 보세요
         </Txt>
-        <Txt style={styles.hint}>정리되지 않아도 괜찮아요. 할 일만 골라 둘게요.</Txt>
+        <Txt style={styles.hint}>{denied ? '말로 적으려면 마이크와 음성 인식 권한이 있어야 해요.' : '정리되지 않아도 괜찮아요. 할 일만 골라 둘게요.'}</Txt>
 
-        <ScrollView style={styles.transcriptBox} contentContainerStyle={styles.transcriptInner}>
-          <Txt style={text ? styles.transcript : styles.placeholder} accessibilityLiveRegion="polite">
-            {text || (listening ? '듣고 있어요…' : ' ')}
-          </Txt>
-        </ScrollView>
+        {!denied && (
+          <ScrollView style={styles.transcriptBox} contentContainerStyle={styles.transcriptInner}>
+            <Txt style={text ? styles.transcript : styles.placeholder} accessibilityLiveRegion="polite">
+              {text || (listening ? '듣고 있어요…' : ' ')}
+            </Txt>
+          </ScrollView>
+        )}
 
         {failed ? (
           <View style={styles.actions}>
             <Txt style={styles.error} accessibilityRole="alert">
               {voiceErrorMessage(failed.code)}
             </Txt>
-            <Pressable accessibilityRole="button" style={dimPressed(styles.secondary)} onPress={() => start().catch(() => dispatch({ type: 'error', code: 'client' }))}>
-              <Txt>다시 말하기</Txt>
-            </Pressable>
+            {denied ? (
+              <Pressable accessibilityRole="button" style={dimPressed(styles.outline)} onPress={() => Linking.openSettings()}>
+                <Txt>설정 열기</Txt>
+              </Pressable>
+            ) : (
+              <Pressable accessibilityRole="button" style={dimPressed(styles.secondary)} onPress={() => start().catch(() => dispatch({ type: 'error', code: 'client' }))}>
+                <Txt>다시 말하기</Txt>
+              </Pressable>
+            )}
             <Pressable accessibilityRole="button" style={dimPressed(styles.primary)} onPress={() => onTypeInstead(failed.text)}>
               <Txt style={styles.primaryText}>글로 적기</Txt>
             </Pressable>
@@ -209,6 +218,7 @@ const styles = StyleSheet.create({
   micHint: { color: colors.muted, fontSize: 14 },
   error: { color: colors.danger, textAlign: 'center' },
   secondary: { minHeight: HIT, paddingHorizontal: 18, justifyContent: 'center' },
+  outline: { minHeight: 48, alignSelf: 'stretch', borderRadius: 24, borderWidth: 1, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   primary: { minHeight: 48, alignSelf: 'stretch', borderRadius: 24, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   primaryText: { color: colors.onDark },
   privacy: { color: colors.faint, fontSize: 12, textAlign: 'center' },
