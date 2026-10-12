@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, StyleSheet, View, type ViewProps } from 'react-native';
 import { createMonthlyReview } from '../ai/client';
 import { AI_MESSAGES } from '../ai/errors';
 import type { Db } from '../db/types';
@@ -11,19 +11,27 @@ import { monthLabel } from '../monthly/labels';
 import { getMonthlyReview, saveMonthlyReview } from '../monthly/repo';
 import { supabase } from '../supabase';
 import { Inkwell } from '../ui/Inkwell';
+import { EASE_OUT } from '../ui/motion';
 import { colors, HIT, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
+import { useReduceMotion } from '../ui/useReduceMotion';
 
 type Props = { db: Db; month: string; version: number; onChanged: () => void; onClose: () => void };
 type Step = 'loading' | 'consent' | 'making' | 'result';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+// 방금 만든 돌아보기가 나타날 때(저장된 것을 다시 열 때는 그대로 보여준다)
+const SECTION_MS = 260;
+const SECTION_GAP_MS = 60;
+const CELL_STEP_MS = 15; // 달력 칸은 왼쪽 위에서 대각선으로 번진다
+const CELL_TOTAL_MS = 500;
 
 export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: Props) {
   const [step, setStep] = useState<Step>('loading');
   const [content, setContent] = useState<MonthlyReviewContent | null>(null);
   const [writtenAt, setWrittenAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [justMade, setJustMade] = useState(false); // 이 화면에서 방금 만들었다
   const alive = useRef(true);
   const busy = useRef(false);
   const label = monthLabel(month);
@@ -75,6 +83,7 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
       if (!alive.current) return;
       setContent(review.content);
       setWrittenAt(review.updated_at);
+      setJustMade(true);
       setStep('result');
     } catch (e) {
       if (!alive.current) return;
@@ -138,7 +147,7 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
       )}
 
       {step === 'result' && content && (
-        <ReviewResult content={content} month={month} writtenAt={writtenAt} onRemake={showPaid} />
+        <ReviewResult content={content} month={month} writtenAt={writtenAt} reveal={justMade} onRemake={showPaid} />
       )}
     </ScrollView>
   );
@@ -148,13 +157,20 @@ function ReviewResult({
   content,
   month,
   writtenAt,
+  reveal,
   onRemake,
 }: {
   content: MonthlyReviewContent;
   month: string;
   writtenAt: string | null;
+  reveal: boolean; // 처음 그릴 때 한 번 차례로 나타난다
   onRemake: () => void;
 }) {
+  const reduce = useReduceMotion();
+  // 동작 줄이기면 전체를 한 번에 흐리게 띄운다
+  const stagger = reveal && !reduce;
+  let order = 0;
+  const section = () => ({ on: stagger, delay: order++ * SECTION_GAP_MS, rise: 8, duration: SECTION_MS });
   const { stats, insights } = content;
   const byDate = useMemo(() => new Map(stats.days.map((d) => [d.date, d])), [stats.days]);
   const cells = useMemo(() => monthGrid(month), [month]);
@@ -163,73 +179,95 @@ function ReviewResult({
   const written = writtenAt ? formatShortDate(writtenAt.slice(0, 10)) : null;
 
   return (
-    <View style={styles.block}>
-      <Section title="한 달의 잉크">
-        <View style={styles.grid} accessibilityLabel={`${monthLabel(month)} 기분 달력`}>
-          {WEEKDAYS.map((w) => (
-            <Txt key={w} style={[styles.cell, styles.weekday]} accessible={false}>
-              {w}
-            </Txt>
-          ))}
-          {cells.map((date, i) => {
-            const d = date ? byDate.get(date) : undefined;
-            return (
-              <View key={date ?? `e${i}`} style={styles.cell} accessible={false}>
-                {date && (
-                  <>
-                    <Inkwell id={`rv${date}`} mood={d?.mood ?? null} size="small" paper={colors.paper} />
-                    <Txt style={styles.dayNum}>{Number(date.slice(8))}</Txt>
-                    <View style={[styles.dot, d?.lethargy && styles.dotOn]} />
-                  </>
-                )}
-              </View>
-            );
-          })}
-        </View>
-        <Txt style={styles.legend}>진할수록 좋았던 날 · ● 무기력했던 날</Txt>
-      </Section>
-
-      <Section title="기분의 흐름">
-        <Txt style={styles.body}>{insights.moodFlow}</Txt>
-      </Section>
-
-      <Section title="무기력했던 날">
-        <View style={styles.stats}>
-          <Stat value={`${stats.lethargyDates.length}번`} label={lethargyDays ? `${lethargyDays}일` : '없음'} />
-          {stats.lethargyAvgGapDays !== null && <Stat value={`약 ${Math.round(stats.lethargyAvgGapDays)}일`} label="평균 간격" />}
-        </View>
-        {insights.lethargy.causes.length > 0 && (
-          <View style={styles.causes}>
-            <Txt style={styles.muted}>회고에서 반복된 원인</Txt>
-            {insights.lethargy.causes.map((c) => (
-              <Txt key={c.label} style={styles.body}>
-                {c.label} · {c.count}번
+    <Reveal on={reveal && reduce} duration={200} style={styles.block}>
+      <Reveal {...section()}>
+        <Section title="한 달의 잉크">
+          <View style={styles.grid} accessibilityLabel={`${monthLabel(month)} 기분 달력`}>
+            {WEEKDAYS.map((w) => (
+              <Txt key={w} style={[styles.cell, styles.weekday]} accessible={false}>
+                {w}
               </Txt>
             ))}
+            {cells.map((date, i) => {
+              const d = date ? byDate.get(date) : undefined;
+              const wave = (Math.floor(i / 7) + (i % 7)) * CELL_STEP_MS;
+              return (
+                <Reveal
+                  key={date ?? `e${i}`}
+                  on={stagger && !!date}
+                  delay={Math.min(wave, CELL_TOTAL_MS - SECTION_MS)}
+                  duration={SECTION_MS}
+                  style={styles.cell}
+                  accessible={false}
+                >
+                  {date && (
+                    <>
+                      <Inkwell id={`rv${date}`} mood={d?.mood ?? null} size="small" paper={colors.paper} />
+                      <Txt style={styles.dayNum}>{Number(date.slice(8))}</Txt>
+                      <View style={[styles.dot, d?.lethargy && styles.dotOn]} />
+                    </>
+                  )}
+                </Reveal>
+              );
+            })}
           </View>
-        )}
-        <Txt style={styles.body}>{insights.lethargy.summary}</Txt>
-      </Section>
+          <Txt style={styles.legend}>진할수록 좋았던 날 · ● 무기력했던 날</Txt>
+        </Section>
+      </Reveal>
 
-      <Section title="할 일과 마음">
-        <Txt style={styles.body}>{insights.tasksAndMind}</Txt>
-      </Section>
+      <Reveal {...section()}>
+        <Section title="기분의 흐름">
+          <Txt style={styles.body}>{insights.moodFlow}</Txt>
+        </Section>
+      </Reveal>
+
+      <Reveal {...section()}>
+        <Section title="무기력했던 날">
+          <View style={styles.stats}>
+            <Stat value={`${stats.lethargyDates.length}번`} label={lethargyDays ? `${lethargyDays}일` : '없음'} />
+            {stats.lethargyAvgGapDays !== null && <Stat value={`약 ${Math.round(stats.lethargyAvgGapDays)}일`} label="평균 간격" />}
+          </View>
+          {insights.lethargy.causes.length > 0 && (
+            <View style={styles.causes}>
+              <Txt style={styles.muted}>회고에서 반복된 원인</Txt>
+              {insights.lethargy.causes.map((c) => (
+                <Txt key={c.label} style={styles.body}>
+                  {c.label} · {c.count}번
+                </Txt>
+              ))}
+            </View>
+          )}
+          <Txt style={styles.body}>{insights.lethargy.summary}</Txt>
+        </Section>
+      </Reveal>
+
+      <Reveal {...section()}>
+        <Section title="할 일과 마음">
+          <Txt style={styles.body}>{insights.tasksAndMind}</Txt>
+        </Section>
+      </Reveal>
 
       {!!insights.gratitude && (
-        <Section title="자주 고마웠던 것">
-          <Txt style={styles.body}>{insights.gratitude}</Txt>
-        </Section>
+        <Reveal {...section()}>
+          <Section title="자주 고마웠던 것">
+            <Txt style={styles.body}>{insights.gratitude}</Txt>
+          </Section>
+        </Reveal>
       )}
 
-      <Section title={`${nextLabel}에 해 볼 한 가지`}>
-        <Txt variant="hand" style={styles.oneThing}>
-          {insights.oneThing}
-        </Txt>
-      </Section>
+      <Reveal {...section()}>
+        <Section title={`${nextLabel}에 해 볼 한 가지`}>
+          <Txt variant="hand" style={styles.oneThing}>
+            {insights.oneThing}
+          </Txt>
+        </Section>
+      </Reveal>
 
-      <Txt style={styles.disclaimer}>
-        기록한 {stats.recordedDays}일을 읽고 정리했어요{written ? ` · ${written} 작성` : ''}. 기록에서 보이는 흐름일 뿐 진단이 아니에요. 마음이 오래 힘들면 주변이나 전문가와 이야기해 보세요.
-      </Txt>
+      <Reveal {...section()}>
+        <Txt style={styles.disclaimer}>
+          기록한 {stats.recordedDays}일을 읽고 정리했어요{written ? ` · ${written} 작성` : ''}. 기록에서 보이는 흐름일 뿐 진단이 아니에요. 마음이 오래 힘들면 주변이나 전문가와 이야기해 보세요.
+        </Txt>
+      </Reveal>
 
       <Pressable
         accessibilityRole="button"
@@ -239,7 +277,33 @@ function ReviewResult({
       >
         <Txt>다시 만들기 · 유료(준비 중)</Txt>
       </Pressable>
-    </View>
+    </Reveal>
+  );
+}
+
+// 처음 그릴 때 한 번만 흐리게(rise가 있으면 살짝 올라오며) 나타난다. 누르기·스크롤은 막지 않는다.
+function Reveal({
+  on,
+  delay = 0,
+  rise = 0,
+  duration,
+  style,
+  children,
+  ...rest
+}: ViewProps & { on: boolean; delay?: number; rise?: number; duration: number }) {
+  const v = useRef(new Animated.Value(on ? 0 : 1)).current;
+  useEffect(() => {
+    if (!on) return;
+    const anim = Animated.timing(v, { toValue: 1, duration, delay, easing: EASE_OUT, useNativeDriver: true });
+    anim.start();
+    return () => anim.stop();
+    // 마운트할 때 한 번만
+  }, []);
+  const transform = rise ? [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [rise, 0] }) }] : undefined;
+  return (
+    <Animated.View {...rest} style={[style, { opacity: v, transform }]}>
+      {children}
+    </Animated.View>
   );
 }
 
