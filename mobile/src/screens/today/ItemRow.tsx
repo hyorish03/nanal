@@ -28,7 +28,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
   const [marked, setMarked] = useState(false); // 이 줄에 방금 형광펜을 칠했다(그때만 긋는 애니메이션)
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, menu.anchor !== null && styles.rowOpen]}>
       <Pressable
         style={tintPressed(styles.main)}
         disabled={!advance}
@@ -59,7 +59,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
         <Txt style={styles.moreText}>⋯</Txt>
       </Pressable>
       <Popover anchor={menu.anchor} align="right" width={220} label={`${item.text} 메뉴`} onClose={menu.close}>
-        {item.kind === 'task' && (
+        {item.kind === 'task' && !done && (
           <Pressable
             accessibilityRole="menuitem"
             disabled={markDisabled}
@@ -94,14 +94,15 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
 }
 
 const styles = StyleSheet.create({
-  // 줄 노트처럼 줄마다 옅은 선을 긋는다
-  row: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.ruled },
-  main: { flex: 1, minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 4, paddingVertical: 7 },
-  symbol: { width: 18, alignItems: 'center' },
-  text: { fontSize: 16, flexShrink: 1 },
-  note: { fontFamily: fonts.hand, fontSize: 22, flexShrink: 1 },
+  // 줄 노트처럼 줄마다 옅은 선을 긋는다. 여러 줄이면 첫 줄에 맞춰 위로 붙인다
+  row: { flexDirection: 'row', alignItems: 'flex-start', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.ruled },
+  rowOpen: { backgroundColor: '#EDE4D2' }, // 메뉴가 열린 줄
+  main: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 13 },
+  symbol: { width: 18, height: 24, alignItems: 'center', justifyContent: 'center' },
+  text: { fontSize: 16, lineHeight: 24, flexShrink: 1 },
+  note: { fontFamily: fonts.hand, fontSize: 22, lineHeight: 28, flexShrink: 1 },
   done: { color: colors.faint, textDecorationLine: 'line-through' },
-  more: { width: 44, minHeight: 50, alignItems: 'center', justifyContent: 'center' },
+  more: { width: 44, height: 50, alignItems: 'center', justifyContent: 'center' },
   moreText: { fontSize: 18, color: colors.faint },
   menuItem: { minHeight: 44, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   swatch: { width: 18, height: 8, backgroundColor: colors.highlight },
