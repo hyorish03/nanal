@@ -182,6 +182,16 @@ export async function deleteItem(db: Db, id: string, now = new Date()): Promise<
   });
 }
 
+// 지운 항목을 되살린다(지우고 바로 '되돌리기'를 눌렀을 때).
+export async function restoreItem(db: Db, id: string, now = new Date()): Promise<void> {
+  await db.transaction(async (tx) => {
+    const row = await tx.getFirstAsync<{ id: string }>('SELECT id FROM items WHERE id = ? AND deleted_at IS NOT NULL', [id]);
+    if (!row) throw new Error(`되돌릴 항목을 찾을 수 없습니다: ${id}`);
+    await tx.runAsync('UPDATE items SET deleted_at = NULL, updated_at = ? WHERE id = ?', [now.toISOString(), id]);
+    await markDirty(tx, 'items', id);
+  });
+}
+
 export async function listItemsForDate(db: Db, date: string): Promise<Item[]> {
   const rows = await db.getAllAsync<ItemRow>(
     `SELECT ${COLUMNS} FROM items WHERE date = ? AND deleted_at IS NULL ORDER BY ${ORDER}`,

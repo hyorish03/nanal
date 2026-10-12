@@ -9,6 +9,7 @@ import {
   listMigrationCandidates,
   migrateToToday,
   migrateToTomorrow,
+  restoreItem,
   setPriority,
   updateItemText,
 } from './repo';
@@ -213,4 +214,23 @@ test('updateItemText: 빈 글, 200자 넘는 글, 지운 항목은 거부한다'
   await updateItemText(db, item.id, '가'.repeat(200), MON);
   await deleteItem(db, item.id, MON);
   await expect(updateItemText(db, item.id, 'b', MON)).rejects.toThrow('항목을 찾을 수 없습니다');
+});
+
+test('restoreItem: 지운 항목이 목록에 돌아오고 updated_at이 새로 찍히며 outbox에 오른다', async () => {
+  const item = await addItem(db, { kind: 'task', text: '운동' }, MON);
+  await deleteItem(db, item.id, MON);
+  await db.runAsync('DELETE FROM outbox', []);
+  await restoreItem(db, item.id, TUE);
+  expect((await listItemsForDate(db, '2026-10-05')).map((i) => i.id)).toEqual([item.id]);
+  expect(await db.getFirstAsync('SELECT deleted_at, updated_at FROM items WHERE id = ?', [item.id])).toEqual({
+    deleted_at: null,
+    updated_at: TUE.toISOString(),
+  });
+  expect(await outboxKeys()).toEqual([item.id]);
+});
+
+test('restoreItem: 지우지 않은 항목이나 없는 항목은 거부한다', async () => {
+  const item = await addItem(db, { kind: 'task', text: '운동' }, MON);
+  await expect(restoreItem(db, item.id, MON)).rejects.toThrow('되돌릴 항목을 찾을 수 없습니다');
+  await expect(restoreItem(db, 'nope', MON)).rejects.toThrow('되돌릴 항목을 찾을 수 없습니다');
 });

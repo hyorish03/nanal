@@ -1,8 +1,7 @@
 import { memo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { ItemKind, TaskStatus } from '../../items/repo';
-import { deleteQuestion } from '../../lib/josa';
-import { confirmDelete, promptText } from '../../ui/dialogs';
+import { promptText } from '../../ui/dialogs';
 import { Highlight } from '../../ui/Highlight';
 import { Popover, useAnchor } from '../../ui/Popover';
 import { StatusSymbol } from '../../ui/StatusSymbol';
@@ -107,7 +106,7 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
           style={dimPressed(styles.menuItem)}
           onPress={() => {
             menu.close();
-            confirmDelete('항목 지우기', deleteQuestion(item.text), () => onDelete(id));
+            onDelete(id); // 묻지 않는다. 화면이 '되돌리기'를 잠깐 띄운다
           }}
         >
           <Txt style={[styles.menuText, styles.danger, styles.swatchText]}>×</Txt>

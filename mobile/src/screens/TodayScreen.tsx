@@ -12,6 +12,7 @@ import {
   MAX_PRIORITY_PER_DAY,
   migrateToToday,
   migrateToTomorrow,
+  restoreItem,
   setPriority,
   updateItemText,
 } from '../items/repo';
@@ -31,6 +32,7 @@ import { Composer } from './today/Composer';
 import { voiceAvailable } from '../voice/available';
 import { dimPressed } from '../ui/press';
 import { CHIP_H } from '../ui/Chip';
+import { Toast, type ToastSpec } from '../ui/Toast';
 import { useEvent } from '../ui/useEvent';
 
 // 개발용·출시 빌드에서만 말로 적기 시트를 불러온다(Expo Go에서는 네이티브 모듈이 없어 import 시 오류).
@@ -51,6 +53,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const [organizeInput, setOrganizeInput] = useState<{ text: string; auto: boolean }>({ text: '', auto: false });
   const afterVoice = useRef<{ text: string; auto: boolean } | null>(null); // 말로 적기 시트가 내려간 뒤 열 정리 시트
   const [notice, setNotice] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastSpec | null>(null);
   const busy = useRef(false);
   const reorder = useRef(false); // 상태·중요를 바꿨거나 포스트잇을 정리했다: 다음에 불러온 목록을 넣을 때만 자리 이동을 애니메이션한다
   const reduce = useReduceMotion();
@@ -148,13 +151,26 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const onAdvance = useEvent((id: string) => reordering(() => advanceStatus(db, id)));
   const onTogglePriority = useEvent((id: string, on: boolean) => reordering(() => setPriority(db, id, on)));
   const onEdit = useEvent((id: string, text: string) => run(() => updateItemText(db, id, text)));
-  const onDelete = useEvent((id: string) => run(() => deleteItem(db, id)));
+  // 지우기는 묻지 않고 바로 지운 뒤, 잠깐 '되돌리기'를 띄운다
+  const removeWithUndo = async (id: string) => {
+    const ok = await reordering(() => deleteItem(db, id));
+    if (ok) {
+      setToast({
+        key: Date.now(),
+        message: '지웠어요',
+        action: { label: '되돌리기', onPress: () => void reordering(() => restoreItem(db, id)) },
+      });
+    }
+    return ok;
+  };
+  const onDelete = useEvent((id: string) => removeWithUndo(id));
+  const hideToast = useCallback((key: number) => setToast((t) => (t?.key === key ? null : t)), []);
   const onCapture = useEvent(() => openCapture());
 
   const settle = (item: Item, how: SettleHow) =>
-    reordering(() =>
-      how === 'today' ? migrateToToday(db, item.id) : how === 'tomorrow' ? migrateToTomorrow(db, item.id) : deleteItem(db, item.id),
-    );
+    how === 'delete'
+      ? removeWithUndo(item.id)
+      : reordering(() => (how === 'today' ? migrateToToday(db, item.id) : migrateToTomorrow(db, item.id)));
 
   const priorityCount = items.filter((i) => i.priority && (i.status === 'open' || i.status === 'doing')).length;
   const priorityFull = priorityCount >= MAX_PRIORITY_PER_DAY;
@@ -296,6 +312,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           }}
         />
       )}
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }
