@@ -25,8 +25,9 @@ export const MAX_PRIORITY_PER_DAY = 3;
 const NEXT_STATUS: Partial<Record<TaskStatus, TaskStatus>> = { open: 'doing', doing: 'done', done: 'open' };
 const COLUMNS = 'id, date, kind, text, status, priority, migrated_from, created_at, updated_at, deleted_at';
 // 진행 중 → 중요 → 나머지(입력 순) → 끝냄·옮김
-const ORDER = `CASE WHEN status = 'doing' THEN 0 WHEN status IN ('done', 'migrated') THEN 3
-  WHEN priority = 1 THEN 1 ELSE 2 END, created_at`;
+// 진행 중 → 할 일·메모 → 끝냄. 진행 중과 할 일 안에서는 형광펜(중요)이 먼저.
+const ORDER = `CASE WHEN status = 'doing' THEN 1 - priority WHEN status IN ('done', 'migrated') THEN 4
+  ELSE 3 - priority END, created_at`;
 
 const toItem = (row: ItemRow): Item => ({ ...row, priority: row.priority === 1 });
 

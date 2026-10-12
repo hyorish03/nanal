@@ -151,6 +151,18 @@ test('listItemsForDate 정렬: 진행 중 → 중요 → 나머지 → 끝냄', 
   expect((await listItemsForDate(db, '2026-10-05')).map((i) => i.text)).toEqual(['e', 'd', 'b', 'c', 'a']);
 });
 
+test('listItemsForDate 정렬: 진행 중 안에서도, 할 일 안에서도 중요가 먼저', async () => {
+  const a = await addItem(db, { kind: 'task', text: 'a' }, new Date(2026, 9, 5, 9, 0));
+  const b = await addItem(db, { kind: 'task', text: 'b' }, new Date(2026, 9, 5, 9, 1));
+  await addItem(db, { kind: 'task', text: 'c' }, new Date(2026, 9, 5, 9, 2));
+  const d = await addItem(db, { kind: 'task', text: 'd' }, new Date(2026, 9, 5, 9, 3));
+  await advanceStatus(db, a.id, MON); // a: doing
+  await advanceStatus(db, b.id, MON); // b: doing
+  await setPriority(db, b.id, true, MON); // b: doing + 중요
+  await setPriority(db, d.id, true, MON); // d: open + 중요
+  expect((await listItemsForDate(db, '2026-10-05')).map((i) => i.text)).toEqual(['b', 'a', 'd', 'c']);
+});
+
 test('migrateToTomorrow: 원래는 migrated, 내일 날짜로 새 할 일', async () => {
   const old = await addItem(db, { kind: 'task', text: '운동' }, MON);
   await setPriority(db, old.id, true, MON);
