@@ -200,6 +200,9 @@
 - 개발용 빌드 필요(Expo Go 불가).
 - 구현(계획 C): Edge Function `organize-voice`가 Claude Haiku 4.5(`claude-haiku-4-5`)의 구조화 출력으로 `{items: [{kind, text, date}]}`를 받고 서버에서 다시 검증한다(모르는 종류·빈 글 버림, 지난·잘못된·1년 넘게 먼 날짜는 오늘로, 최대 10개). 글은 저장하지 않고 로그에도 남기지 않는다. 횟수는 모델을 부르기 전에 센다.
 - 음성 인식 전까지는 오늘 화면의 "정리해서 넣기"(연필 버튼, 마이크 자리)에서 글을 써서 같은 흐름을 쓴다. 계획 D의 마이크는 받아 적은 글을 이 시트에 넘긴다.
+- 구현(계획 D): `expo-speech-recognition`으로 한국어 받아 적기(계속 듣기, 중간 결과, 문장부호). 기기 인식을 지원하면 기기 인식만 쓰고, 아니면 Apple 서버 인식(인터넷 필요). 음성 파일은 저장하지 않는다(`persist: false`).
+- 개발용·출시 빌드에서는 입력줄의 연필 자리에 마이크가 있고, Expo Go에서는 연필(글로 정리)이다. 권한이 없거나 인식이 안 되면 "글로 적기"로 같은 정리 시트를 연다.
+- 다 말하면 받아 적은 글로 바로 정리하고 "이렇게 정리했어요"를 보여준다.
 
 ### 11.6 위젯 (2차, 개발용 빌드 + Swift WidgetKit)
 - 잠금화면: 직사각형(다음 할 일 + 완료 버튼), 원형(남은 수, 오늘 기분), 컨트롤 버튼(말로 적기, 한 줄 적기, iOS 18+).
@@ -207,6 +210,12 @@
 - 잠금화면 "다음 할 일" 선택 규칙: 진행 중 → 형광펜(중요) → 오늘 목록 순서. 밀린 일은 개수로만.
 - 데이터: SQLite를 App Group 공유 폴더로 옮겨 앱과 위젯이 같은 DB 사용. 위젯 변경도 outbox에 기록하고 동기화는 앱이 한다.
 - 위젯 안 텍스트 입력과 녹음은 iOS에서 불가 → 앱을 해당 화면으로 연다.
+- 구현(계획 D): `@bacons/apple-targets`로 `mobile/targets/widget`(Swift)을 위젯 타깃으로 붙인다. `ios/`는 만들어 쓰고 버린다(CNG).
+- 번들 ID `com.hyorish03.nanal`(위젯 `.widget`), App Group `group.com.hyorish03.nanal`. 앱 DB는 `<App Group>/nanal/daily-log.db`로 한 번 옮긴다(임시 이름으로 복사 → 표마다 행 수·스키마 버전 확인 → 이름 바꾸기, 원본은 남김). 공유 폴더가 없으면 원래 자리를 쓰고 위젯은 "앱을 한 번 열어 주세요".
+- 위젯 SQL은 `src/widget/sql.ts`와 `targets/widget/SharedSQL.swift`에 같은 글자로 두고 jest가 비교한다. 상태 바꾸기는 앱 기호 탭과 같이 한 단계씩(잠금화면 버튼도 두 번 누르면 완료). 위젯에서 바꾼 것은 outbox에 남고 앱이 열릴 때 동기화한다.
+- 앱이 화면을 다시 그릴 때마다 위젯을 새로 고친다. 위젯은 30분마다, 새벽 4시 경계에 새로 고친다.
+- 컨트롤(iOS 18): 말로 적기 `nanal://voice`, 한 줄 적기 `nanal://today?focus=1`.
+- 실제 아이폰에 위젯을 넣으려면 유료 Apple Developer Program이 필요하다(App Groups).
 
 ### 11.7 데이터 모델 변경 요약
 - `items.status`: `open | doing | done | migrated` (`dropped` 제거). 로컬·서버 CHECK와 기존 `dropped` 행 처리(→ soft delete) 마이그레이션 필요.
