@@ -20,21 +20,76 @@ struct NanalProvider: TimelineProvider {
   }
 }
 
+struct NanalLockWidget: Widget {
+  var body: some WidgetConfiguration {
+    StaticConfiguration(kind: "NanalLock", provider: NanalProvider()) { entry in
+      LockEntryView(entry: entry).containerBackground(.clear, for: .widget)
+    }
+    .configurationDisplayName("나날 오늘 할 일")
+    .description("다음 할 일과 남은 수")
+    .supportedFamilies([.accessoryRectangular, .accessoryCircular])
+  }
+}
+
+struct LockEntryView: View {
+  @Environment(\.widgetFamily) private var family
+  let entry: NanalEntry
+
+  var body: some View {
+    if !entry.snapshot.available {
+      UnavailableView()
+    } else if family == .accessoryCircular {
+      LockRemainingView(s: entry.snapshot)
+    } else {
+      LockRectView(s: entry.snapshot)
+    }
+  }
+}
+
+struct NanalMoodWidget: Widget {
+  var body: some WidgetConfiguration {
+    StaticConfiguration(kind: "NanalMood", provider: NanalProvider()) { entry in
+      LockMoodView(s: entry.snapshot).containerBackground(.clear, for: .widget)
+    }
+    .configurationDisplayName("나날 오늘 기분")
+    .description("저녁 마무리에서 고른 기분")
+    .supportedFamilies([.accessoryCircular])
+  }
+}
+
 struct NanalHomeWidget: Widget {
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: "NanalHome", provider: NanalProvider()) { entry in
-      Text(entry.snapshot.available ? (entry.snapshot.next?.text ?? "오늘도 한 줄씩") : "앱을 한 번 열어 주세요")
-        .containerBackground(Color("$widgetBackground"), for: .widget)
+      HomeEntryView(entry: entry).containerBackground(Color.paper, for: .widget)
     }
     .configurationDisplayName("나날")
-    .description("오늘 할 일")
-    .supportedFamilies([.systemSmall])
+    .description("오늘 할 일과 기분")
+    .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+  }
+}
+
+struct HomeEntryView: View {
+  @Environment(\.widgetFamily) private var family
+  let entry: NanalEntry
+
+  var body: some View {
+    if !entry.snapshot.available {
+      UnavailableView()
+    } else {
+      switch family {
+      case .systemSmall: HomeSmallView(s: entry.snapshot)
+      case .systemLarge: HomeLargeView(s: entry.snapshot)
+      default: HomeMediumView(s: entry.snapshot)
+      }
+    }
   }
 }
 
 @main
 struct NanalWidgets: WidgetBundle {
   var body: some Widget {
+    NanalLockWidget()
+    NanalMoodWidget()
     NanalHomeWidget()
   }
 }
