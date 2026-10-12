@@ -1,4 +1,5 @@
 import { type PressableStateCallbackType, type StyleProp, StyleSheet, type ViewStyle } from 'react-native';
+import { colors } from './theme';
 
 // 누르는 동안의 모양. 애니메이션 없이 손가락이 닿는 순간 바뀌고, 떼면 돌아온다.
 type PressStyle = (state: PressableStateCallbackType) => StyleProp<ViewStyle>;
@@ -15,5 +16,5 @@ export function tintPressed(style: StyleProp<ViewStyle>): PressStyle {
 
 const styles = StyleSheet.create({
   dim: { opacity: 0.6 },
-  tint: { backgroundColor: 'rgba(42, 37, 32, 0.05)' },
+  tint: { backgroundColor: colors.pressTint },
 });

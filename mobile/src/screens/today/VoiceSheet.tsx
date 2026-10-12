@@ -221,5 +221,5 @@ const styles = StyleSheet.create({
   outline: { minHeight: 48, alignSelf: 'stretch', borderRadius: 24, borderWidth: 1, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   primary: { minHeight: 48, alignSelf: 'stretch', borderRadius: 24, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   primaryText: { color: colors.onDark },
-  privacy: { color: colors.faint, fontSize: 12, textAlign: 'center' },
+  privacy: { color: colors.muted, fontSize: 12, textAlign: 'center' },
 });

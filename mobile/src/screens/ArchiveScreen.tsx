@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 21, lineHeight: 30 },
   cardLine: { fontSize: 14, lineHeight: 30 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  filter: { minHeight: 44, paddingHorizontal: 12, borderRadius: 22, borderWidth: 1, borderColor: '#CFC3AE', justifyContent: 'center' },
+  filter: { minHeight: 44, paddingHorizontal: 12, borderRadius: 22, borderWidth: 1, borderColor: colors.chipBorder, justifyContent: 'center' },
   filterOn: { backgroundColor: colors.highlight, borderColor: colors.ink },
   filterText: { fontSize: 13 },
   entry: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.lineFaint, borderRadius: 4, padding: 12, gap: 6 },

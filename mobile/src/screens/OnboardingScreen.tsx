@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: 26, paddingTop: 12, paddingBottom: 24, gap: 20 },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dots: { flexDirection: 'row', gap: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#C9BCA5' },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.dotOff },
   dotOn: { width: 22, backgroundColor: colors.ink },
   skip: { minHeight: 44, paddingHorizontal: 6, justifyContent: 'center' },
   skipText: { fontSize: 14, color: colors.inkSoft },
