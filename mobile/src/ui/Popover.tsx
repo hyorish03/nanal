@@ -28,24 +28,24 @@ type Props = {
   children: ReactNode;
 };
 
-export function Popover({ anchor, align, width, label, onClose, children }: Props) {
+// 열렸을 때만 안쪽을 그린다. 닫힌 팝오버(목록 줄마다 하나씩)가 창 크기·동작 줄이기 구독을 들고 있지 않게.
+export function Popover(props: Props) {
+  if (!props.anchor) return null;
+  return <OpenPopover {...props} anchor={props.anchor} />;
+}
+
+function OpenPopover({ anchor, align, width, label, onClose, children }: Props & { anchor: Anchor }) {
   const screen = useWindowDimensions();
   const reduce = useReduceMotion();
   const appear = useRef(new Animated.Value(0)).current;
-  const shown = anchor !== null;
 
   // 버튼 쪽 모서리에서 살짝 커지며 나타난다. 닫을 때는 바로 사라진다(뒤이은 Alert은 따로 창을 띄우니 기다릴 필요가 없다).
   useEffect(() => {
-    if (!shown) return;
     const anim = Animated.timing(appear, { toValue: 1, duration: 150, easing: EASE_OUT, useNativeDriver: true });
     anim.start();
-    return () => {
-      anim.stop();
-      appear.setValue(0); // 다음에 열 때 첫 프레임부터 투명하게
-    };
-  }, [shown, appear]);
+    return () => anim.stop();
+  }, [appear]);
 
-  if (!anchor) return null;
   const left =
     align === 'left'
       ? Math.max(12, Math.min(anchor.x - 4, screen.width - width - 12))

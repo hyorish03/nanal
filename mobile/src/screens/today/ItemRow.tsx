@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import type { Item } from '../../items/repo';
+import type { ItemKind, TaskStatus } from '../../items/repo';
 import { deleteQuestion } from '../../lib/josa';
 import { confirmDelete } from '../../ui/dialogs';
 import { Highlight } from '../../ui/Highlight';
@@ -11,16 +11,22 @@ import { colors, fonts } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { dimPressed, tintPressed } from '../../ui/press';
 
+// 값은 원시값만, 함수는 화면이 한 번 만든 것(id를 받는다)만 받는다. 그래야 memo가 다른 줄의 변화에 다시 그리지 않는다.
 type Props = {
-  item: Item;
+  id: string;
+  kind: ItemKind;
+  text: string;
+  status: TaskStatus | null;
+  priority: boolean;
   priorityFull: boolean; // 오늘 중요 표시가 이미 3개
-  onAdvance: () => void;
-  onTogglePriority: () => void;
-  onDelete: () => void;
+  onAdvance: (id: string) => void;
+  onTogglePriority: (id: string, on: boolean) => void;
+  onDelete: (id: string) => void;
 };
 
-export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDelete }: Props) {
+export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status, priority, priorityFull, onAdvance, onTogglePriority, onDelete }: Props) {
   const menu = useAnchor();
+  const item = { kind: itemKind, status, priority, text };
   const kind = symbolKind(item);
   const advance = canAdvance(item);
   const markDisabled = !item.priority && priorityFull;
@@ -34,7 +40,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
         disabled={!advance}
         accessibilityRole={advance ? 'button' : 'text'}
         accessibilityLabel={itemA11yLabel(item)}
-        onPress={onAdvance}
+        onPress={() => onAdvance(id)}
       >
         <View style={styles.symbol}>
           <StatusSymbol kind={kind} />
@@ -68,7 +74,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
             onPress={() => {
               menu.close();
               setMarked(!item.priority);
-              onTogglePriority();
+              onTogglePriority(id, !item.priority);
             }}
           >
             <View style={styles.swatch} />
@@ -82,7 +88,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
           style={dimPressed(styles.menuItem)}
           onPress={() => {
             menu.close();
-            confirmDelete('항목 지우기', deleteQuestion(item.text), onDelete);
+            confirmDelete('항목 지우기', deleteQuestion(item.text), () => onDelete(id));
           }}
         >
           <Txt style={[styles.menuText, styles.danger, styles.swatchText]}>×</Txt>
@@ -91,7 +97,7 @@ export function ItemRow({ item, priorityFull, onAdvance, onTogglePriority, onDel
       </Popover>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   // 줄 노트처럼 줄마다 옅은 선을 긋는다. 여러 줄이면 첫 줄에 맞춰 위로 붙인다
