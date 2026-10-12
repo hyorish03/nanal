@@ -22,6 +22,7 @@ export type Item = {
 type ItemRow = Omit<Item, 'priority'> & { priority: number };
 
 export const MAX_PRIORITY_PER_DAY = 3;
+export const MAX_TEXT = 200; // 한 줄에 쓸 수 있는 글자 수
 const NEXT_STATUS: Partial<Record<TaskStatus, TaskStatus>> = { open: 'doing', doing: 'done', done: 'open' };
 const COLUMNS = 'id, date, kind, text, status, priority, migrated_from, created_at, updated_at, deleted_at';
 // 진행 중 → 중요 → 나머지(입력 순) → 끝냄·옮김
@@ -159,6 +160,17 @@ export function migrateToToday(db: Db, id: string, now = new Date()): Promise<It
 
 export function migrateToTomorrow(db: Db, id: string, now = new Date()): Promise<Item> {
   return migrateTo(db, id, (today) => addDays(today, 1), now);
+}
+
+export async function updateItemText(db: Db, id: string, text: string, now = new Date()): Promise<void> {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error('내용을 입력하세요');
+  if (Array.from(trimmed).length > MAX_TEXT) throw new Error(`${MAX_TEXT}자까지 쓸 수 있어요`);
+  await db.transaction(async (tx) => {
+    await requireItem(tx, id);
+    await tx.runAsync('UPDATE items SET text = ?, updated_at = ? WHERE id = ?', [trimmed, now.toISOString(), id]);
+    await markDirty(tx, 'items', id);
+  });
 }
 
 export async function deleteItem(db: Db, id: string, now = new Date()): Promise<void> {

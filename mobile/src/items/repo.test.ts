@@ -10,6 +10,7 @@ import {
   migrateToToday,
   migrateToTomorrow,
   setPriority,
+  updateItemText,
 } from './repo';
 
 const MON = new Date(2026, 9, 5, 9, 0); // 2026-10-05
@@ -194,4 +195,22 @@ test('addItem: 날짜를 줘도 created_at은 now에서 정하고, 없는 날짜
   expect(item.updated_at).toBe(MON.toISOString());
   await expect(addItem(db, { kind: 'task', text: 'x', date: '2026-02-30' }, MON)).rejects.toThrow('날짜 형식');
   await expect(addItem(db, { kind: 'task', text: 'x', date: '2026-10-5' }, MON)).rejects.toThrow('날짜 형식');
+});
+
+test('updateItemText: 앞뒤 공백을 지우고 고치며 outbox에 오른다', async () => {
+  const item = await addItem(db, { kind: 'task', text: '장보기' }, MON);
+  await db.runAsync('DELETE FROM outbox', []);
+  await updateItemText(db, item.id, '  우유 사기 ', TUE);
+  const row = await db.getFirstAsync<{ text: string; updated_at: string }>('SELECT text, updated_at FROM items WHERE id = ?', [item.id]);
+  expect(row).toEqual({ text: '우유 사기', updated_at: TUE.toISOString() });
+  expect(await outboxKeys()).toEqual([item.id]);
+});
+
+test('updateItemText: 빈 글, 200자 넘는 글, 지운 항목은 거부한다', async () => {
+  const item = await addItem(db, { kind: 'note', text: 'a' }, MON);
+  await expect(updateItemText(db, item.id, '   ', MON)).rejects.toThrow('내용을 입력하세요');
+  await expect(updateItemText(db, item.id, '가'.repeat(201), MON)).rejects.toThrow('200자까지');
+  await updateItemText(db, item.id, '가'.repeat(200), MON);
+  await deleteItem(db, item.id, MON);
+  await expect(updateItemText(db, item.id, 'b', MON)).rejects.toThrow('항목을 찾을 수 없습니다');
 });

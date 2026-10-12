@@ -13,6 +13,7 @@ import {
   migrateToToday,
   migrateToTomorrow,
   setPriority,
+  updateItemText,
 } from '../items/repo';
 import { formatLongDate, logicalDate } from '../lib/date';
 import { countRecordedDays } from '../stats/recordedDays';
@@ -146,6 +147,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   };
   const onAdvance = useEvent((id: string) => reordering(() => advanceStatus(db, id)));
   const onTogglePriority = useEvent((id: string, on: boolean) => reordering(() => setPriority(db, id, on)));
+  const onEdit = useEvent((id: string, text: string) => run(() => updateItemText(db, id, text)));
   const onDelete = useEvent((id: string) => run(() => deleteItem(db, id)));
   const onCapture = useEvent(() => openCapture());
 
@@ -168,10 +170,11 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         priorityFull={priorityFull}
         onAdvance={onAdvance}
         onTogglePriority={onTogglePriority}
+        onEdit={onEdit}
         onDelete={onDelete}
       />
     ),
-    [priorityFull, onAdvance, onTogglePriority, onDelete],
+    [priorityFull, onAdvance, onTogglePriority, onEdit, onDelete],
   );
 
   // 포스트잇과 입력칸을 목록 머리로 둬서 후보가 많아도 함께 스크롤된다. 컴포넌트 타입이 아닌 엘리먼트라 입력칸이 다시 마운트되지 않는다.

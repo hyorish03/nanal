@@ -2,7 +2,7 @@ import { memo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { ItemKind, TaskStatus } from '../../items/repo';
 import { deleteQuestion } from '../../lib/josa';
-import { confirmDelete } from '../../ui/dialogs';
+import { confirmDelete, promptText } from '../../ui/dialogs';
 import { Highlight } from '../../ui/Highlight';
 import { Popover, useAnchor } from '../../ui/Popover';
 import { StatusSymbol } from '../../ui/StatusSymbol';
@@ -21,10 +21,11 @@ type Props = {
   priorityFull: boolean; // 오늘 중요 표시가 이미 3개
   onAdvance: (id: string) => void;
   onTogglePriority: (id: string, on: boolean) => void;
+  onEdit: (id: string, text: string) => void;
   onDelete: (id: string) => void;
 };
 
-export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status, priority, priorityFull, onAdvance, onTogglePriority, onDelete }: Props) {
+export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status, priority, priorityFull, onAdvance, onTogglePriority, onEdit, onDelete }: Props) {
   const menu = useAnchor();
   const item = { kind: itemKind, status, priority, text };
   const kind = symbolKind(item);
@@ -90,6 +91,17 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
             </Txt>
           </Pressable>
         )}
+        <Pressable
+          accessibilityRole="menuitem"
+          style={dimPressed(styles.menuItem)}
+          onPress={() => {
+            menu.close();
+            promptText('고치기', text, (next) => onEdit(id, next));
+          }}
+        >
+          <Txt style={[styles.menuText, styles.swatchText]}>✎</Txt>
+          <Txt style={styles.menuText}>고치기</Txt>
+        </Pressable>
         <Pressable
           accessibilityRole="menuitem"
           style={dimPressed(styles.menuItem)}
