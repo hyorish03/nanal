@@ -6,17 +6,42 @@ import { BUILTIN_TEMPLATES, MAX_TEMPLATE_QUESTIONS, type TemplateDef, type Templ
 type TemplateRow = { id: string; name: string; questions: string; created_at: string };
 export type TemplateInput = { name: string; questions: string[] };
 
+// 글자 수 한도(이모지·한글 모두 한 글자로 센다). 입력 칸의 maxLength도 이 값을 쓴다.
+export const MAX_TEMPLATE_NAME = 24;
+export const MAX_TEMPLATE_QUESTION = 80;
+const length = (s: string) => [...s].length;
+
 function normalize(input: TemplateInput): { name: string; questions: TemplateQuestion[] } {
   const name = input.name.trim();
   if (!name) throw new Error('템플릿 이름을 적어 주세요');
+  if (length(name) > MAX_TEMPLATE_NAME) throw new Error(`템플릿 이름은 ${MAX_TEMPLATE_NAME}자까지예요`);
   const texts = input.questions.map((q) => q.trim()).filter(Boolean);
   if (texts.length === 0) throw new Error('질문을 하나 이상 적어 주세요');
   if (texts.length > MAX_TEMPLATE_QUESTIONS) throw new Error('질문은 3개까지예요');
+  if (texts.some((t) => length(t) > MAX_TEMPLATE_QUESTION)) throw new Error(`질문은 ${MAX_TEMPLATE_QUESTION}자까지예요`);
   return { name, questions: texts.map((text, i) => ({ key: `q${i + 1}`, text })) };
 }
 
+// 동기화로 깨진 값이 들어와도 화면이 멈추지 않게, 읽을 수 없는 질문 목록은 자유 질문 하나로 대신한다.
+const FALLBACK_QUESTIONS: TemplateQuestion[] = [{ key: 'q1', text: '자유롭게 쓰기' }];
+
+function parseQuestions(raw: string): TemplateQuestion[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      const questions = parsed.filter(
+        (q): q is TemplateQuestion => typeof q === 'object' && q !== null && typeof q.key === 'string' && typeof q.text === 'string',
+      );
+      if (questions.length > 0) return questions;
+    }
+  } catch {
+    // 아래 대체 질문으로
+  }
+  return FALLBACK_QUESTIONS;
+}
+
 const toDef = (row: TemplateRow): TemplateDef => ({
-  id: row.id, name: row.name, builtin: false, questions: JSON.parse(row.questions) as TemplateQuestion[],
+  id: row.id, name: row.name, builtin: false, questions: parseQuestions(row.questions),
 });
 
 function assertCustom(id: string) {
