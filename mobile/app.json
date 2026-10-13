@@ -11,13 +11,16 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.hyorish03.nanal",
       "infoPlist": {
-        "CADisableMinimumFrameDurationOnPhone": true
+        "CADisableMinimumFrameDurationOnPhone": true,
+        "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.hyorish03.nanal"
         ]
-      }
+      },
+      "appleTeamId": "X6PJBPS67D",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
