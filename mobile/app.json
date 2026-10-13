@@ -9,14 +9,14 @@
     "scheme": "nanal",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hyorish03.nanal",
+      "bundleIdentifier": "com.hyorish03.nanal.app",
       "infoPlist": {
         "CADisableMinimumFrameDurationOnPhone": true,
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
         "com.apple.security.application-groups": [
-          "group.com.hyorish03.nanal"
+          "group.com.hyorish03.nanal.app"
         ]
       },
       "appleTeamId": "8V5VNMF9JM",

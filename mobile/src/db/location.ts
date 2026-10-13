@@ -1,7 +1,7 @@
 import type { Tx } from './types';
 
 // 앱과 위젯이 같이 쓰는 DB 위치(스펙 11.6). Swift(targets/widget/NanalDB.swift)도 같은 값을 쓴다.
-export const APP_GROUP = 'group.com.hyorish03.nanal';
+export const APP_GROUP = 'group.com.hyorish03.nanal.app';
 export const DB_DIR = 'nanal';
 export const DB_NAME = 'daily-log.db';
 export const DB_PART_NAME = 'daily-log.db.part';

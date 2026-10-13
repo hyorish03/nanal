@@ -10,7 +10,7 @@ enum PendingAction {
   // "동작|기록한 시각(ms)": 오래된 동작은 앱이 버린다
   static func store(_ action: String) {
     let now = Int(Date().timeIntervalSince1970 * 1000)
-    UserDefaults(suiteName: "group.com.hyorish03.nanal")?.set("\(action)|\(now)", forKey: key)
+    UserDefaults(suiteName: "group.com.hyorish03.nanal.app")?.set("\(action)|\(now)", forKey: key)
   }
 }
 
