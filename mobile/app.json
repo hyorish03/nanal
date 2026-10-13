@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.hyorish03.nanal.app",
       "infoPlist": {
         "CADisableMinimumFrameDurationOnPhone": true,
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "나날은 사진 보관함을 읽거나 저장하지 않아요. 앱에 포함된 파일 기능 때문에 표시되는 항목이에요."
       },
       "entitlements": {
         "com.apple.security.application-groups": [
@@ -20,7 +21,7 @@
         ]
       },
       "appleTeamId": "8V5VNMF9JM",
-      "buildNumber": "1"
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
