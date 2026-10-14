@@ -20,12 +20,13 @@ function Glyph({ symbol }: { symbol: LegendEntry['symbol'] }) {
 }
 
 // (i) 팝오버 안의 기호 설명. 지금 고른 입력 종류는 고른 칩과 같은 바탕으로 표시한다.
-export function SymbolLegend({ kind, onClose }: { kind: ItemKind; onClose: () => void }) {
+// 넓은 배치의 오른쪽 칸에 늘 펴 둘 때는 kind·onClose 없이 쓴다(닫기 버튼이 없다).
+export function SymbolLegend({ kind, onClose }: { kind?: ItemKind; onClose?: () => void }) {
   return (
     <View style={styles.box}>
       <Txt variant="hand">기호는 이렇게 읽어요</Txt>
       {LEGEND.map((g) => (
-        <View key={g.name} style={[styles.row, g.kind === kind && styles.current]}>
+        <View key={g.name} style={[styles.row, kind !== undefined && g.kind === kind && styles.current]}>
           <View style={styles.glyph}>
             <Glyph symbol={g.symbol} />
           </View>
@@ -37,11 +38,13 @@ export function SymbolLegend({ kind, onClose }: { kind: ItemKind; onClose: () =>
           </View>
         </View>
       ))}
-      <Pressable accessibilityRole="button" style={dimPressed(styles.ok)} onPress={onClose}>
-        <Txt variant="medium" style={styles.okText}>
-          닫기
-        </Txt>
-      </Pressable>
+      {onClose && (
+        <Pressable accessibilityRole="button" style={dimPressed(styles.ok)} onPress={onClose}>
+          <Txt variant="medium" style={styles.okText}>
+            닫기
+          </Txt>
+        </Pressable>
+      )}
     </View>
   );
 }

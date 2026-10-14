@@ -25,7 +25,7 @@ import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { ItemRow } from './today/ItemRow';
-import { MarginRule, NOTE_MARGIN, RULE_GAP, RuledFill } from './today/NotebookPage';
+import { MarginRule, NOTE_MARGIN, RuledFill, useRuleGap } from './today/NotebookPage';
 import { Ribbon } from './today/Ribbon';
 import type { LinkAction } from '../lib/deepLink';
 import { OrganizeSheet } from './today/OrganizeSheet';
@@ -37,6 +37,10 @@ import { CHIP_H } from '../ui/Chip';
 import { haptic } from '../ui/haptics';
 import { Toast, type ToastSpec } from '../ui/Toast';
 import { useEvent } from '../ui/useEvent';
+import { usePane } from '../ui/pane';
+import { useLayoutClass, WIDE } from '../ui/responsive';
+import { useSpace } from '../ui/typeScale';
+import { PANEL_W, TodayPanel } from './today/TodayPanel';
 
 // 개발용·출시 빌드에서만 말로 적기 시트를 불러온다(Expo Go에서는 네이티브 모듈이 없어 import 시 오류).
 const VoiceSheet: typeof import('./today/VoiceSheet').VoiceSheet | null = voiceAvailable
@@ -66,6 +70,14 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const [headerH, setHeaderH] = useState(0);
   const [keyboardUp, setKeyboardUp] = useState(false); // 맺음말은 페이지 맨 아래 자리라 키보드를 따라 올라오지 않는다
   const [eveningW, setEveningW] = useState(0); // 책갈피 끈을 하루 마무리 버튼 왼쪽에 매달려고 잰다
+  // 아이패드·Mac: 사이드바가 하루 마무리·지난 기록을 맡고, 공책은 읽기 좋은 폭으로 가운데에 모은다.
+  // 창이 충분히 넓으면(wide) 넘어온 일·끝낸 일 수·기호 설명을 오른쪽 칸으로 뺀다.
+  const pane = usePane();
+  const layout = useLayoutClass();
+  const roomy = pane.sidebar;
+  const panel = roomy && layout === 'wide' && pane.width >= PANEL_MIN;
+  const s = useSpace();
+  const ruleGap = useRuleGap();
 
   // 표지가 다 펼쳐진 뒤에만 true가 된다(Main이 Cover의 onOpened로 알려 준다). 그래서 기다리지 않고 바로 포커스한다.
   useEffect(() => {
@@ -191,6 +203,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
   const priorityCount = items.filter((i) => i.priority && (i.status === 'open' || i.status === 'doing')).length;
   const priorityFull = priorityCount >= MAX_PRIORITY_PER_DAY;
+  const tasks = items.filter((i) => i.kind === 'task' && i.status !== 'migrated');
+  const doneCount = tasks.filter((i) => i.status === 'done').length;
 
   const renderItem = useCallback<ListRenderItem<Item>>(
     ({ item }) => (
@@ -213,15 +227,15 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   // 포스트잇과 입력칸을 목록 머리로 둬서 후보가 많아도 함께 스크롤된다. 컴포넌트 타입이 아닌 엘리먼트라 입력칸이 다시 마운트되지 않는다.
   const listHeader = (
     <View style={styles.listHeader} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}>
-      {candidates.length > 0 && <PostIt candidates={candidates} onSettle={settle} onSettleAll={settleAll} />}
+      {candidates.length > 0 && !panel && <PostIt candidates={candidates} onSettle={settle} onSettleAll={settleAll} />}
 
       <Composer inputRef={inputRef} voice={VoiceSheet !== null} onCapture={onCapture} onSubmit={submit} />
     </View>
   );
 
-  return (
-    <View style={styles.container}>
-      <Paper />
+  // 날짜 머리 + 공책 한 쪽. 휴대폰에서는 화면에 바로, 넓은 배치에서는 가운데 칸에 놓는다
+  const notebook = (
+    <>
       {/* 머리 빈 곳을 누르면 키보드가 내려간다. 알림 줄은 머리 아래 여백에 겹쳐 띄워 목록을 밀지 않는다.
           스크린 리더가 날짜 → 하루 마무리 → 지난 기록 순서로 읽도록 날짜를 먼저 그리고, 화면에서는 뒤집어 쌓아 버튼을 위에 둔다 */}
       <Pressable accessible={false} style={styles.header} onPress={Keyboard.dismiss}>
@@ -238,19 +252,21 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           </Txt>
           <Txt variant="hand">기록한 날 {recordedDays}일</Txt>
         </View>
-        <View style={styles.headerActions}>
-          <Pressable
-            accessibilityRole="button"
-            hitSlop={CHIP_SLOP}
-            style={dimPressed(styles.evening)}
-            onPress={onOpenEvening}
-            onLayout={(e) => setEveningW(e.nativeEvent.layout.width)}
-          >
-            <Txt variant="medium" style={styles.eveningText}>
-              하루 마무리
-            </Txt>
-          </Pressable>
-        </View>
+        {!roomy && (
+          <View style={styles.headerActions}>
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={CHIP_SLOP}
+              style={dimPressed(styles.evening)}
+              onPress={onOpenEvening}
+              onLayout={(e) => setEveningW(e.nativeEvent.layout.width)}
+            >
+              <Txt variant="medium" style={styles.eveningText}>
+                하루 마무리
+              </Txt>
+            </Pressable>
+          </View>
+        )}
         {(error || notice) && (
           <Txt
             style={[styles.message, error ? styles.error : styles.notice]}
@@ -261,10 +277,10 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           </Txt>
         )}
       </Pressable>
-
+  
       {/* 지난 기록 책갈피 끈: 하루 마무리 버튼 왼쪽, 화면 맨 위에 매달린다 */}
-      {onOpenArchive && eveningW > 0 && <Ribbon onPress={onOpenArchive} style={{ right: SCREEN_X + eveningW + RIBBON_GAP }} />}
-
+      {!roomy && onOpenArchive && eveningW > 0 && <Ribbon onPress={onOpenArchive} style={{ right: SCREEN_X + eveningW + RIBBON_GAP }} />}
+  
       {/* 공책 한 쪽: 여백선은 목록 뒤에 깔리고, 빈 줄은 목록 꼬리에서 함께 스크롤된다 */}
       <View style={styles.page}>
         <MarginRule scrollY={scrollY} startY={headerH} />
@@ -282,10 +298,10 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           ListEmptyComponent={
             // 빈 날은 첫 두 줄에 흐리게 적어 두고, 그 아래로 빈 줄이 이어진다. 스크린 리더는 한 번에 읽는다
             <View accessible accessibilityLabel={`${EMPTY_TITLE}. ${EMPTY_HINT}`}>
-              <View style={styles.emptyRow}>
+              <View style={[styles.emptyRow, { minHeight: ruleGap }]}>
                 <Txt style={styles.empty}>{EMPTY_TITLE}</Txt>
               </View>
-              <View style={styles.emptyRow}>
+              <View style={[styles.emptyRow, { minHeight: ruleGap }]}>
                 <Txt style={styles.emptyHint}>{EMPTY_HINT}</Txt>
               </View>
             </View>
@@ -303,6 +319,22 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           renderItem={renderItem}
         />
       </View>
+    </>
+  );
+
+  return (
+    <View style={[styles.container, roomy && styles.containerRoomy]}>
+      <Paper />
+      {roomy ? (
+        <View style={[styles.roomy, { paddingTop: s.xl, gap: WIDE.gutter }]}>
+          <View style={[styles.column, { gap: s.xl }]}>{notebook}</View>
+          {panel && (
+            <TodayPanel candidates={candidates} onSettle={settle} onSettleAll={settleAll} done={doneCount} total={tasks.length} />
+          )}
+        </View>
+      ) : (
+        notebook
+      )}
       <OrganizeSheet
         db={db}
         visible={organizeOpen}
@@ -343,6 +375,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 // 머리 버튼도 칩처럼 보이는 높이만 낮추고, 누르는 영역은 hitSlop으로 44pt를 지킨다
 const CHIP_SLOP = { top: 5, bottom: 5 };
 const RIBBON_GAP = 16;
+// 오른쪽 칸을 둘 만한 폭: 바깥 여백 + 공책 최소 480 + 칸 사이 + 오른쪽 칸
+const PANEL_MIN = WIDE.pageX * 2 + 480 + WIDE.gutter + PANEL_W;
 const LOAD_FAILED = '오늘 기록을 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요';
 const EMPTY_TITLE = '아직 적은 줄이 없어요';
 const EMPTY_HINT = '위 칸에 한 줄 적어 볼까요?';
@@ -350,6 +384,10 @@ const REORDER = LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut,
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, paddingHorizontal: SCREEN_X, paddingTop: 12, gap: 24 },
+  containerRoomy: { paddingHorizontal: WIDE.pageX, paddingTop: 0 },
+  // 공책 칸(읽기 폭까지)과 오른쪽 칸을 한 줄로 놓고 가운데에 모은다
+  roomy: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
+  column: { flex: 1, maxWidth: WIDE.readingWidth },
   // 버튼은 맨 위 오른쪽 도구줄, 그 아래 날짜를 한 줄 전체 너비로(날짜를 먼저 그리므로 뒤집어 쌓는다)
   header: { flexDirection: 'column-reverse', gap: 10, zIndex: 1 },
   message: { position: 'absolute', top: '100%', left: 0, right: 0, fontSize: 13, lineHeight: 18 },
@@ -375,7 +413,6 @@ const styles = StyleSheet.create({
   listHeader: { gap: 26, paddingBottom: 20 },
   // 여백선 오른쪽 글 자리에서 시작하는 한 줄(줄 높이와 같은 50pt)
   emptyRow: {
-    minHeight: RULE_GAP,
     justifyContent: 'center',
     paddingLeft: NOTE_MARGIN - SCREEN_X + 8,
     borderBottomWidth: StyleSheet.hairlineWidth,

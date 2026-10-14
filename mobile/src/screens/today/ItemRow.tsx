@@ -9,6 +9,8 @@ import { advanceAction, canAdvance, itemA11yHint, itemA11yLabel, symbolKind } fr
 import { colors, fonts } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { dimPressed, tintPressed } from '../../ui/press';
+import { useTextScale } from '../../ui/typeScale';
+import { ROW_PAD_WIDE, ruleGapFor } from './NotebookPage';
 
 // 값은 원시값만, 함수는 화면이 한 번 만든 것(id를 받는다)만 받는다. 그래야 memo가 다른 줄의 변화에 다시 그리지 않는다.
 type Props = {
@@ -26,6 +28,9 @@ type Props = {
 
 export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status, priority, priorityFull, onAdvance, onTogglePriority, onEdit, onDelete }: Props) {
   const menu = useAnchor();
+  // 넓은 배치에서는 글자가 커진 만큼 줄 높이도 공책 줄 간격(useRuleGap)에 맞춰 넓힌다
+  const k = useTextScale();
+  const roomy = k.wide ? { line: Math.round(24 * k.ownScale), gap: ruleGapFor(k) } : null;
   const item = { kind: itemKind, status, priority, text };
   const kind = symbolKind(item);
   const advance = canAdvance(item);
@@ -70,14 +75,14 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
       accessibilityActions={actions}
       onAccessibilityAction={onAction}
     >
-      <View style={styles.main}>
+      <View style={[styles.main, roomy && styles.mainWide]}>
         {/* 상태는 기호만 눌러 바꾼다. 글 자리는 비워 둔다(나중에 눌러서 고치기) */}
         {advance ? (
-          <Pressable style={tintPressed(styles.symbol)} hitSlop={SYMBOL_SLOP} onPress={() => onAdvance(id)}>
+          <Pressable style={tintPressed([styles.symbol, roomy && { height: roomy.line }])} hitSlop={SYMBOL_SLOP} onPress={() => onAdvance(id)}>
             <StatusSymbol kind={kind} />
           </Pressable>
         ) : (
-          <View style={styles.symbol}>
+          <View style={[styles.symbol, roomy && { height: roomy.line }]}>
             <StatusSymbol kind={kind} />
           </View>
         )}
@@ -98,7 +103,7 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
         accessibilityRole="button"
         accessibilityLabel={`${item.text}, 더보기`}
         accessibilityState={{ expanded: menu.anchor !== null }}
-        style={dimPressed(styles.more)}
+        style={dimPressed([styles.more, roomy && { height: roomy.gap }])}
         onPress={menu.open}
       >
         <Txt style={styles.moreText}>⋯</Txt>
@@ -152,6 +157,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.ruled },
   rowOpen: { backgroundColor: '#EDE4D2' }, // 메뉴가 열린 줄
   main: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 13 },
+  mainWide: { paddingVertical: ROW_PAD_WIDE },
   symbol: { width: 18, height: 24, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, alignItems: 'flex-start' },
   text: { fontSize: 16, lineHeight: 24, flexShrink: 1 },
