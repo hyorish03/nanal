@@ -7,6 +7,7 @@ import { addMonths, formatMonth, monthOf } from '../../lib/date';
 import { dimPressed } from '../../ui/press';
 import { colors } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
+import { inkNeedsLightText } from './ink';
 import { InkDot } from './InkDot';
 import { textBox } from './metrics';
 
@@ -28,7 +29,8 @@ export function MonthCalendar({ month, today, selected, byDate, large, onPick, o
   const isCurrentMonth = month >= monthOf(today);
   const s = large ? big : small;
   const numBox = textBox(large ? 36 : 30);
-  const [inkMin, inkMax] = large ? [10, 17] : [7, 12];
+  // 날짜 뒤 잉크 지름(기분 1→5). 휴대폰은 칸 폭(약 49pt)에 거의 꽉 차게
+  const [inkMin, inkMax] = (large ? [24, 56] : [18, 44]).map(textBox);
 
   return (
     <View style={s.root}>
@@ -67,6 +69,7 @@ export function MonthCalendar({ month, today, selected, byDate, large, onPick, o
               const on = date === selected;
               const isToday = date === today;
               const word = moodWord(sum?.mood ?? null);
+              const light = inkNeedsLightText(sum?.mood ?? null); // 가장 진한 잉크 위에서는 숫자를 밝게
               const d = Number(date.slice(8));
               return (
                 <Pressable
@@ -78,17 +81,18 @@ export function MonthCalendar({ month, today, selected, byDate, large, onPick, o
                   style={dimPressed([styles.cell, s.dayCell, on && styles.dayOn])}
                   onPress={() => onPick(date)}
                 >
-                  {/* 글씨를 키우면 동그라미도 따라 커진다(숫자가 잘리지 않게) */}
-                  <View style={[styles.dayNumBox, { minWidth: numBox, minHeight: numBox, borderRadius: numBox / 2 }, isToday && styles.todayRing]}>
-                    <Txt
-                      variant={isToday ? 'medium' : 'body'}
-                      maxFontSizeMultiplier={1.4}
-                      style={[s.dayNum, isToday && styles.today, future && styles.future]}
-                    >
-                      {d}
-                    </Txt>
-                  </View>
-                  <InkDot mood={sum?.mood ?? null} min={inkMin} max={inkMax} />
+                  {/* 글씨를 키우면 동그라미도 따라 커진다(숫자가 잘리지 않게). 잉크는 숫자 뒤에 번진다 */}
+                  <InkDot mood={sum?.mood ?? null} min={inkMin} max={inkMax}>
+                    <View style={[styles.dayNumBox, { minWidth: numBox, minHeight: numBox, borderRadius: numBox / 2 }, isToday && styles.todayRing, isToday && light && styles.todayRingLight]}>
+                      <Txt
+                        variant={isToday ? 'medium' : 'body'}
+                        maxFontSizeMultiplier={1.4}
+                        style={[s.dayNum, isToday && styles.today, future && styles.future, light && styles.onInk]}
+                      >
+                        {d}
+                      </Txt>
+                    </View>
+                  </InkDot>
                   <View style={[styles.ring, s.ring, sum?.hasReflection && styles.ringOn]} />
                 </Pressable>
               );
@@ -96,7 +100,7 @@ export function MonthCalendar({ month, today, selected, byDate, large, onPick, o
           </View>
         ))}
       </View>
-      <Txt style={s.legend}>잉크가 크고 진할수록 기분이 좋았던 날이에요. 작은 고리는 회고를 남긴 날이에요.</Txt>
+      <Txt style={s.legend}>날짜 뒤 잉크가 크고 진할수록 기분이 좋았던 날이에요. 숫자 아래 작은 고리는 회고를 남긴 날이에요.</Txt>
     </View>
   );
 }
@@ -114,6 +118,8 @@ const styles = StyleSheet.create({
   todayRing: { borderColor: colors.navy },
   today: { color: colors.navy },
   future: { color: colors.line },
+  onInk: { color: colors.onDark },
+  todayRingLight: { borderColor: colors.onDark },
   // 회고 표시는 속이 빈 고리로, 속이 찬 잉크 자국과 섞이지 않게
   ring: { borderWidth: 1.25, borderColor: 'transparent' },
   ringOn: { borderColor: colors.navy },

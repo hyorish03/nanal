@@ -20,6 +20,7 @@ import { useReduceMotion } from '../ui/useReduceMotion';
 import { dimPressed } from '../ui/press';
 import { PageHeader } from '../ui/PageHeader';
 import { useLayoutClass, WIDE } from '../ui/responsive';
+import { inkNeedsLightText } from './archive/ink';
 import { InkDot } from './archive/InkDot';
 
 type Props = { db: Db; month: string; version: number; onChanged: () => void; onClose: () => void };
@@ -215,8 +216,19 @@ function ReviewResult({
                     >
                       {date && (
                         <>
-                          <InkDot mood={d?.mood ?? null} min={large ? 10 : 7} max={large ? 18 : 12} />
-                          <Txt style={[styles.dayNum, large && styles.dayNumLarge]}>{Number(date.slice(8))}</Txt>
+                          {/* 날짜 뒤에 잉크가 번진다. 잉크 위 숫자는 대비를 위해 먹색, 가장 진한 날은 밝게 */}
+                          <InkDot mood={d?.mood ?? null} min={large ? 16 : 12} max={large ? 38 : 28}>
+                            <Txt
+                              style={[
+                                styles.dayNum,
+                                large && styles.dayNumLarge,
+                                d?.mood != null && styles.dayNumOnInk,
+                                inkNeedsLightText(d?.mood ?? null) && styles.dayNumLight,
+                              ]}
+                            >
+                              {Number(date.slice(8))}
+                            </Txt>
+                          </InkDot>
                           <View style={[styles.dot, large && styles.dotLarge, d?.lethargy && styles.dotOn]} />
                         </>
                       )}
@@ -226,7 +238,7 @@ function ReviewResult({
               </View>
             ))}
           </View>
-          <Txt style={[styles.legend, large && styles.legendLarge]}>잉크가 크고 진할수록 기분이 좋았던 날, ●는 무기력했던 날</Txt>
+          <Txt style={[styles.legend, large && styles.legendLarge]}>날짜 뒤 잉크가 크고 진할수록 기분이 좋았던 날, ●는 무기력했던 날</Txt>
         </Section>
       </FadeIn>
 
@@ -350,6 +362,8 @@ const styles = StyleSheet.create({
   weekdayLarge: { fontSize: 13, paddingBottom: 4 },
   dayNum: { fontSize: 11, color: colors.muted },
   dayNumLarge: { fontSize: 14 },
+  dayNumOnInk: { color: colors.ink }, // muted는 옅은 잉크 위에서도 대비가 4.5:1에 못 미친다
+  dayNumLight: { color: colors.onDark },
   dot: { width: 4, height: 4, borderRadius: 2 },
   dotLarge: { width: 5, height: 5, borderRadius: 2.5 },
   dotOn: { backgroundColor: colors.navy },

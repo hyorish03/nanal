@@ -26,3 +26,10 @@ export function ruleFor(layout: LayoutClass, onMac = ON_MAC): Rule {
 export function useRule(): Rule {
   return ruleFor(useLayoutClass());
 }
+
+// 회고 카드에 적을 자리로 기본 몇 줄을 비워 둘지. 모두 합쳐 5줄 이상, 답 하나에는 2줄 이상.
+// 질문이 하나면 5줄, 둘이면 3줄씩, 셋 이상이면 2줄씩. 글이 길어지면 칸이 늘어난다.
+export const ANSWER_LINES_TOTAL = 5;
+export function answerLines(questions: number): number {
+  return Math.max(2, Math.ceil(ANSWER_LINES_TOTAL / Math.max(1, questions)));
+}

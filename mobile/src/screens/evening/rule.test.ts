@@ -1,5 +1,5 @@
 import { MAC_TEXT_SCALE } from '../../ui/desktop';
-import { ruleFor } from './rule';
+import { answerLines, ruleFor } from './rule';
 
 describe('ruleFor', () => {
   it('휴대폰은 지금 눈금 그대로', () => {
@@ -18,5 +18,24 @@ describe('ruleFor', () => {
       const r = ruleFor(l, true);
       expect(r.line).toBe(Math.round(r.lineHeight * MAC_TEXT_SCALE));
     }
+  });
+});
+
+describe('answerLines', () => {
+  it('질문이 하나면 5줄을 비워 둔다', () => {
+    expect(answerLines(1)).toBe(5);
+  });
+
+  it('질문이 여럿이면 합쳐 5줄 이상, 답마다 2줄 이상', () => {
+    for (const n of [2, 3, 4, 6]) {
+      expect(answerLines(n)).toBeGreaterThanOrEqual(2);
+      expect(answerLines(n) * n).toBeGreaterThanOrEqual(5);
+    }
+    expect(answerLines(2)).toBe(3);
+    expect(answerLines(3)).toBe(2);
+  });
+
+  it('질문이 없어도 0줄이 되지 않는다', () => {
+    expect(answerLines(0)).toBe(5);
   });
 });
