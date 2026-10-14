@@ -1,16 +1,21 @@
-import { memo, useState } from 'react';
-import { type AccessibilityActionEvent, Pressable, StyleSheet, View } from 'react-native';
-import type { ItemKind, TaskStatus } from '../../items/repo';
-import { promptText } from '../../ui/dialogs';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { type AccessibilityActionEvent, Animated, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { type ItemKind, MAX_TEXT, type TaskStatus } from '../../items/repo';
+import { haptic } from '../../ui/haptics';
 import { Highlight } from '../../ui/Highlight';
+import { EASE_OUT } from '../../ui/motion';
 import { Popover, useAnchor } from '../../ui/Popover';
 import { StatusSymbol } from '../../ui/StatusSymbol';
 import { advanceAction, canAdvance, itemA11yHint, itemA11yLabel, symbolKind } from '../../ui/symbols';
 import { colors, fonts } from '../../ui/theme';
-import { Txt } from '../../ui/Txt';
+import { MAX_FONT_SCALE, Txt, txtStyle } from '../../ui/Txt';
 import { dimPressed, tintPressed } from '../../ui/press';
 import { useTextScale } from '../../ui/typeScale';
+import { useEvent } from '../../ui/useEvent';
+import { useReduceMotion } from '../../ui/useReduceMotion';
 import { ROW_PAD_WIDE, ruleGapFor } from './NotebookPage';
+import { ACTION_W, dragTo, markAt, openRow, settleLeft, swipeActionsFor, type Zone, zoneAt } from './swipe';
 
 // 값은 원시값만, 함수는 화면이 한 번 만든 것(id를 받는다)만 받는다. 그래야 memo가 다른 줄의 변화에 다시 그리지 않는다.
 type Props = {
@@ -22,17 +27,24 @@ type Props = {
   priorityFull: boolean; // 오늘 중요 표시가 이미 3개
   onAdvance: (id: string) => void;
   onTogglePriority: (id: string, on: boolean) => void;
-  onEdit: (id: string, text: string) => void;
+  onEdit: (id: string, text: string) => Promise<boolean>; // 저장됐는지 돌려준다(안 됐으면 원래 글로 되돌린다)
   onPostpone: (id: string) => void;
   onDelete: (id: string) => void;
+  onPriorityFull: () => void; // 중요가 다 찬 날 형광펜 쪽으로 밀었다
+  onRevealEdit: (id: string, bottom: number) => void; // 고치는 줄의 아래 끝(창 기준). 키보드에 가리면 화면이 목록을 굴린다
 };
 
-export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status, priority, priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDelete }: Props) {
+export const ItemRow = memo(function ItemRow(props: Props) {
+  const { id, kind: itemKind, text, status, priority, priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDelete } = props;
   const menu = useAnchor();
+  const reduce = useReduceMotion();
   // 넓은 배치에서는 글자가 커진 만큼 줄 높이도 공책 줄 간격(useRuleGap)에 맞춰 넓힌다
   const k = useTextScale();
   const roomy = k.wide ? { line: Math.round(24 * k.ownScale), gap: ruleGapFor(k) } : null;
-  const item = { kind: itemKind, status, priority, text };
+  // 고쳐서 저장하는 동안(목록을 다시 불러오기 전) 새 글을 먼저 보여준다
+  const [pending, setPending] = useState<string | null>(null);
+  useEffect(() => setPending(null), [text]);
+  const item = { kind: itemKind, status, priority, text: pending ?? text };
   const kind = symbolKind(item);
   const advance = canAdvance(item);
   const markDisabled = !item.priority && priorityFull;
@@ -40,16 +52,162 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
   const [marked, setMarked] = useState(false); // 이 줄에 방금 형광펜을 칠했다(그때만 긋는 애니메이션)
   const next = advanceAction(item);
   const canMark = item.kind === 'task' && (status === 'open' || status === 'doing');
+  const togglePriority = () => {
+    setMarked(!item.priority);
+    onTogglePriority(id, !item.priority);
+  };
+
+  // ── 밀기: ← 미루기·지우기 버튼, → 형광펜 ──
+  const swipe = swipeActionsFor(item);
+  const actionW = Math.round(ACTION_W * k.ownScale);
+  const actionsW = swipe.left.length * actionW;
+  const blocked = swipe.mark && markDisabled;
+  const drag = useRef(new Animated.Value(0)).current; // 줄이 옆으로 간 거리. 손가락을 따라 JS에서 바로 넣는다
+  const width = useRef(0);
+  const isOpen = useRef(false); // 버튼이 열려 있다
+  const g = useRef<{ base: number; zone: Zone }>({ base: 0, zone: null });
+  const [zone, setZone] = useState<Zone>(null); // 지금 놓으면 일어날 일(띠·버튼 모양을 바꾼다)
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(leaveTimer.current), []);
+
+  const settle = (to: number) => Animated.timing(drag, { toValue: to, duration: 200, easing: EASE_OUT, useNativeDriver: false }).start();
+  const closeSwipe = useEvent(() => {
+    isOpen.current = false;
+    openRow.closed(id);
+    settle(0);
+  });
+  const openSwipe = () => {
+    isOpen.current = true;
+    openRow.opened(id, closeSwipe);
+    settle(-actionsW);
+  };
+  // 끝까지 밀어 지운다. 줄이 밀려 나간 뒤 지우고, 지우지 못했으면 잠시 뒤 제자리로 돌아온다
+  const swipeDelete = () => {
+    isOpen.current = false;
+    openRow.closed(id);
+    const go = () => {
+      onDelete(id);
+      leaveTimer.current = setTimeout(() => drag.setValue(0), 1000);
+    };
+    if (reduce) return go();
+    Animated.timing(drag, { toValue: -width.current, duration: 160, easing: EASE_OUT, useNativeDriver: false }).start(go);
+  };
+  // 중요가 다 찼다: 칠하지 않고 통 튕겨 돌아온다(동작 줄이기면 그냥 돌아온다)
+  const refuseMark = () => {
+    haptic.warning();
+    props.onPriorityFull();
+    if (reduce) return settle(0);
+    Animated.sequence([
+      Animated.timing(drag, { toValue: 0, duration: 140, easing: EASE_OUT, useNativeDriver: false }),
+      Animated.timing(drag, { toValue: 10, duration: 90, easing: EASE_OUT, useNativeDriver: false }),
+      Animated.timing(drag, { toValue: 0, duration: 160, easing: EASE_OUT, useNativeDriver: false }),
+    ]).start();
+  };
+
+  const shape = () => ({ width: width.current, actionsW, mark: swipe.mark, blocked, wasOpen: g.current.base < 0 });
+  const onStart = useEvent(() => {
+    drag.stopAnimation();
+    clearTimeout(leaveTimer.current);
+    g.current = { base: isOpen.current ? -actionsW : 0, zone: null };
+  });
+  const onUpdate = useEvent((e: { translationX: number }) => {
+    const x = dragTo(g.current.base + e.translationX, shape());
+    drag.setValue(x);
+    const z = zoneAt(x, shape());
+    if (z !== g.current.zone) {
+      g.current.zone = z;
+      if (z) haptic.select(); // 놓으면 일이 일어나는 선을 넘는 순간 한 번
+      setZone(z);
+    }
+  });
+  const onEnd = useEvent((e: { translationX: number; velocityX: number }, success: boolean) => {
+    const raw = g.current.base + e.translationX;
+    const x = dragTo(raw, shape());
+    g.current.zone = null;
+    setZone(null);
+    if (!success) return isOpen.current ? openSwipe() : closeSwipe();
+    if (x > 0) {
+      // 형광펜 쪽. 다 찬 날은 덜 따라오므로 손가락이 간 거리로 본다
+      if (raw >= markAt(width.current)) {
+        if (blocked) return refuseMark();
+        togglePriority();
+      }
+      return settle(0);
+    }
+    const how = settleLeft(x, e.velocityX, shape());
+    if (how === 'delete') swipeDelete();
+    else if (how === 'open') openSwipe();
+    else closeSwipe();
+  });
+
+  // ── 제자리에서 고치기: 글을 누르면 그 자리가 같은 모양의 입력칸이 된다 ──
+  // 'menu': 메뉴(Modal)가 닫히는 중이라 포커스를 조금 늦게 준다
+  const [editing, setEditing] = useState<false | 'tap' | 'menu'>(false);
+  const [draft, setDraft] = useState('');
+  const input = useRef<TextInput>(null);
+  const finished = useRef(false); // 완료 키와 포커스 잃기가 잇달아 와도 한 번만 저장한다
+  const row = useRef<View>(null);
+  const edit = (from: 'tap' | 'menu' = 'tap') => {
+    closeSwipe();
+    finished.current = false;
+    setDraft(item.text);
+    setEditing(from);
+  };
+  const finishEdit = () => {
+    if (finished.current) return;
+    finished.current = true;
+    setEditing(false);
+    // 붙여 넣은 줄바꿈은 띄어쓰기로. 비우면 지우지 않고 원래 글로 돌아간다
+    const t = draft.replace(/\s*\n\s*/g, ' ').trim();
+    if (!t || t === item.text) return;
+    setPending(t);
+    onEdit(id, t).then((ok) => {
+      if (!ok) setPending(null);
+    });
+  };
+  useEffect(() => {
+    if (!editing) return;
+    // 키보드가 다 올라와 화면이 줄어든 뒤에 이 줄이 가리는지 본다
+    const reveal = () => row.current?.measureInWindow((_x, y, _w, h) => props.onRevealEdit(id, y + h));
+    const sub = Keyboard.addListener('keyboardDidShow', reveal);
+    const timers = [Keyboard.isVisible() ? setTimeout(reveal, 50) : undefined];
+    if (editing === 'menu') timers.push(setTimeout(() => input.current?.focus(), MENU_FOCUS_DELAY));
+    return () => {
+      sub.remove();
+      timers.forEach((t) => t && clearTimeout(t));
+    };
+    // 고치기를 시작할 때 한 번
+  }, [editing]);
+
+  const swipeable = !editing;
+  const pan = useMemo(
+    () =>
+      Gesture.Pan()
+        .runOnJS(true) // Reanimated 없이 RN Animated로 그린다
+        .enabled(swipeable)
+        .activeOffsetX([-12, 12]) // 옆으로 뚜렷하게 밀 때만 가져가고
+        .failOffsetY([-10, 10]) // 위아래로 먼저 움직이면 목록 스크롤에 넘긴다
+        .onStart(onStart)
+        .onUpdate(onUpdate)
+        .onEnd(onEnd),
+    [swipeable, onStart, onUpdate, onEnd],
+  );
+  // 버튼이 열린 줄을 누르면 하려던 일 대신 닫기만 한다
+  const unlessOpen = (fn: () => void) => () => (isOpen.current ? closeSwipe() : fn());
   // 메뉴를 닫고 고른 일을 한다
   const pick = (fn: () => void) => () => {
     menu.close();
     fn();
   };
-  const togglePriority = () => {
-    setMarked(!item.priority);
-    onTogglePriority(id, !item.priority);
+  const openMenu = () => {
+    closeSwipe();
+    menu.open();
   };
-  const edit = () => promptText('고치기', text, (edited) => onEdit(id, edited));
+  // 드러난 버튼을 누르면 그 일을 하고 줄을 닫는다
+  const tapAction = (fn: () => void) => () => {
+    closeSwipe();
+    fn();
+  };
 
   // 스크린 리더에서는 줄 하나가 한 요소다. 두 번 누르면 상태가 넘어가고, 나머지는 동작 목록(위아래로 쓸기)에 있다
   const actions = [
@@ -68,49 +226,134 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
     else if (name === 'delete') onDelete(id);
   };
 
+  const variant = kind === 'note' ? 'hand' : 'body';
+  const textStyle = [kind === 'note' ? styles.note : styles.text, done && styles.done];
+  // 밀린 거리 → 왼쪽에서 자라는 형광펜 띠의 폭, 오른쪽 버튼 칸의 폭
+  const stripW = drag.interpolate({ inputRange: [0, FAR], outputRange: [0, FAR], extrapolate: 'clamp' });
+  const buttonsW = drag.interpolate({ inputRange: [-FAR, 0], outputRange: [FAR, 0], extrapolate: 'clamp' });
+  // 칠하기 / 이미 칠했으면 지우개 / 다 찼으면 글 없는 흐린 띠(조금만 따라오고, 놓으면 토스트가 알린다)
+  const stripLabel = blocked ? null : item.priority ? '형광펜 지우기' : '중요';
+
   return (
     <View
+      ref={row}
       style={[styles.row, menu.anchor !== null && styles.rowOpen]}
-      accessible
+      // 고치는 동안에는 입력칸을 스크린 리더가 따로 읽도록 줄을 한 요소로 묶지 않는다
+      accessible={!editing}
       accessibilityRole={advance ? 'button' : undefined}
       accessibilityLabel={itemA11yLabel(item)}
       accessibilityHint={itemA11yHint(item)}
       accessibilityActions={actions}
       onAccessibilityAction={onAction}
+      onTouchStart={() => openRow.touch(id)}
+      onLayout={(e) => {
+        width.current = e.nativeEvent.layout.width;
+      }}
     >
-      <View style={[styles.main, roomy && styles.mainWide]}>
-        {/* 상태는 기호만 눌러 바꾼다. 글 자리는 비워 둔다(나중에 눌러서 고치기) */}
-        {advance ? (
-          <Pressable style={tintPressed([styles.symbol, roomy && { height: roomy.line }])} hitSlop={SYMBOL_SLOP} onPress={() => onAdvance(id)}>
-            <StatusSymbol kind={kind} />
-          </Pressable>
-        ) : (
-          <View style={[styles.symbol, roomy && { height: roomy.line }]}>
-            <StatusSymbol kind={kind} />
-          </View>
-        )}
-        {/* 글을 길게 누르면 ⋯와 같은 메뉴가 뜬다 */}
-        <Pressable accessible={false} style={styles.body} onLongPress={menu.open}>
-          <Highlight on={item.priority && !done} animate={marked}>
-            <Txt
-              variant={kind === 'note' ? 'hand' : 'body'}
-              style={[kind === 'note' ? styles.note : styles.text, done && styles.done]}
-            >
-              {item.text}
+      {swipe.mark && (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.strip, (blocked || item.priority) && styles.stripErase, zone === 'mark' && styles.stripArmed, { width: stripW }]}
+        >
+          {stripLabel && (
+            <Txt numberOfLines={1} style={styles.stripText}>
+              {stripLabel}
             </Txt>
-          </Highlight>
+          )}
+        </Animated.View>
+      )}
+      <Animated.View style={[styles.buttons, { width: buttonsW }]}>
+        {swipe.left.includes('postpone') && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="내일로 미루기"
+            style={dimPressed([styles.button, styles.postpone, zone === 'delete' && styles.buttonGone])}
+            onPress={tapAction(() => onPostpone(id))}
+          >
+            <StatusSymbol kind="migrated" size={14} />
+            <Txt numberOfLines={1} style={styles.buttonText}>
+              미루기
+            </Txt>
+          </Pressable>
+        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="지우기"
+          style={dimPressed([styles.button, styles.remove])}
+          onPress={tapAction(() => onDelete(id))}
+        >
+          <Txt style={[styles.buttonText, styles.onDanger]}>×</Txt>
+          <Txt numberOfLines={1} style={[styles.buttonText, styles.onDanger]}>
+            지우기
+          </Txt>
         </Pressable>
-      </View>
-      <Pressable
-        ref={menu.ref}
-        accessibilityRole="button"
-        accessibilityLabel={`${item.text}, 더보기`}
-        accessibilityState={{ expanded: menu.anchor !== null }}
-        style={dimPressed([styles.more, roomy && { height: roomy.gap }])}
-        onPress={menu.open}
-      >
-        <Txt style={styles.moreText}>⋯</Txt>
-      </Pressable>
+      </Animated.View>
+      <GestureDetector gesture={pan}>
+        <Animated.View style={[styles.front, { transform: [{ translateX: drag }] }]}>
+          <View style={[styles.main, roomy && styles.mainWide]}>
+            {/* 상태는 기호만 눌러 바꾼다 */}
+            {advance ? (
+              <Pressable
+                style={tintPressed([styles.symbol, roomy && { height: roomy.line }])}
+                hitSlop={SYMBOL_SLOP}
+                onPress={unlessOpen(() => onAdvance(id))}
+              >
+                <StatusSymbol kind={kind} />
+              </Pressable>
+            ) : (
+              <View style={[styles.symbol, roomy && { height: roomy.line }]}>
+                <StatusSymbol kind={kind} />
+              </View>
+            )}
+            {editing ? (
+              // 글과 같은 글꼴·크기·줄 높이·색이라 눌러도 자리가 움직이지 않는다. 완료나 다른 곳을 누르면 저장한다
+              <View style={styles.body}>
+                <TextInput
+                  ref={input}
+                  style={[txtStyle(k, variant, textStyle), styles.input]}
+                  value={draft}
+                  onChangeText={setDraft}
+                  autoFocus={editing === 'tap'}
+                  onFocus={() => input.current?.setSelection(draft.length, draft.length)}
+                  multiline
+                  scrollEnabled={false}
+                  lineBreakStrategyIOS="hangul-word"
+                  maxFontSizeMultiplier={MAX_FONT_SCALE}
+                  maxLength={MAX_TEXT}
+                  returnKeyType="done"
+                  submitBehavior="blurAndSubmit"
+                  onSubmitEditing={finishEdit}
+                  onBlur={finishEdit}
+                  accessibilityLabel="고치기"
+                />
+              </View>
+            ) : (
+              // 글을 누르면 그 자리에서 고치고, 길게 누르면 ⋯와 같은 메뉴가 뜬다
+              <Pressable accessible={false} style={styles.body} onPress={unlessOpen(() => edit())} onLongPress={openMenu}>
+                <Highlight on={item.priority && !done} animate={marked}>
+                  <Txt variant={variant} style={textStyle}>
+                    {item.text}
+                  </Txt>
+                </Highlight>
+              </Pressable>
+            )}
+          </View>
+          {/* 고치는 동안에는 자리만 지키고 누를 수 없다 */}
+          <Pressable
+            ref={menu.ref}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.text}, 더보기`}
+            accessibilityState={{ expanded: menu.anchor !== null }}
+            accessibilityElementsHidden={!!editing}
+            importantForAccessibility={editing ? 'no-hide-descendants' : 'auto'}
+            disabled={!!editing}
+            style={dimPressed([styles.more, roomy && { height: roomy.gap }, !!editing && styles.hidden])}
+            onPress={unlessOpen(menu.open)}
+          >
+            <Txt style={styles.moreText}>⋯</Txt>
+          </Pressable>
+        </Animated.View>
+      </GestureDetector>
       <Popover anchor={menu.anchor} align="right" width={220} label={`${item.text}, 메뉴`} onClose={menu.close}>
         {next && (
           <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => onAdvance(id))}>
@@ -143,11 +386,8 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
             <Txt style={styles.menuText}>내일로 미루기</Txt>
           </Pressable>
         )}
-        <Pressable
-          accessibilityRole="button"
-          style={dimPressed(styles.menuItem)}
-          onPress={pick(edit)}
-        >
+        {/* 메뉴가 닫힌 뒤 그 자리에서 고친다 */}
+        <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => edit('menu'))}>
           <Txt style={[styles.menuText, styles.swatchText]}>✎</Txt>
           <Txt style={styles.menuText}>고치기</Txt>
         </Pressable>
@@ -163,11 +403,19 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
 
 // 기호는 18pt지만 누르는 영역은 줄 높이(50)와 왼쪽 여백까지 넓혀 44pt를 넘긴다
 const SYMBOL_SLOP = { top: 13, bottom: 13, left: 14, right: 8 };
+// 메뉴(Modal)가 다 닫힌 뒤에 입력칸에 포커스를 준다. 닫히는 중에 주면 iOS가 포커스를 거둬 갈 수 있다
+const MENU_FOCUS_DELAY = 350;
+// 밀린 거리 → 띠·버튼 폭. 어떤 줄 폭보다도 넉넉한 끝값
+const FAR = 4000;
+const ERASER = '#EDE4D2'; // 메뉴가 열린 줄과 같은 옅은 종이색
 
 const styles = StyleSheet.create({
   // 줄 노트처럼 줄마다 옅은 선을 긋는다. 여러 줄이면 첫 줄에 맞춰 위로 붙인다
+  // 줄은 자르지 않는다(기호의 누르는 영역이 줄 밖까지 나간다). 밀려 나간 글은 공책 칸(page)이 자른다
   row: { flexDirection: 'row', alignItems: 'flex-start', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.ruled },
-  rowOpen: { backgroundColor: '#EDE4D2' }, // 메뉴가 열린 줄
+  rowOpen: { backgroundColor: ERASER }, // 메뉴가 열린 줄
+  // 앞면(기호·글·⋯)은 투명해서 여백선이 비친다. 밀려 비운 자리에만 띠·버튼이 드러난다
+  front: { flex: 1, flexDirection: 'row', alignItems: 'flex-start' },
   main: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 13 },
   mainWide: { paddingVertical: ROW_PAD_WIDE },
   symbol: { width: 18, height: 24, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
@@ -175,8 +423,36 @@ const styles = StyleSheet.create({
   text: { fontSize: 16, lineHeight: 24, flexShrink: 1 },
   note: { fontFamily: fonts.hand, fontSize: 22, lineHeight: 28, flexShrink: 1 },
   done: { color: colors.muted, textDecorationLine: 'line-through' },
+  // 입력칸의 기본 여백을 없애 글과 같은 자리에 글자가 놓이게 한다
+  input: { alignSelf: 'stretch', padding: 0, paddingTop: 0, paddingBottom: 0, margin: 0 },
+  hidden: { opacity: 0 },
   more: { width: 44, height: 50, alignItems: 'center', justifyContent: 'center' },
   moreText: { fontSize: 18, color: colors.faint },
+  // 형광펜 띠: 줄 가운데에 마커 한 획처럼, 끝이 살짝 둥글다. 놓으면 칠해지는 거리부터 진해진다
+  strip: {
+    position: 'absolute',
+    left: 0,
+    top: 8,
+    bottom: 8,
+    backgroundColor: colors.highlight,
+    opacity: 0.55,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  stripErase: { backgroundColor: ERASER },
+  stripArmed: { opacity: 1 },
+  stripText: { fontSize: 14, color: colors.inkSoft, paddingHorizontal: 10 },
+  // 왼쪽으로 밀면 오른쪽 끝에서 드러나는 버튼들. 지우기가 맨 바깥이다
+  buttons: { position: 'absolute', right: 0, top: 0, bottom: 0, flexDirection: 'row', overflow: 'hidden' },
+  button: { flexGrow: 1, flexBasis: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, overflow: 'hidden' },
+  buttonGone: { flexGrow: 0, width: 0 }, // 끝까지 밀면 지우기가 칸을 다 차지한다
+  postpone: { backgroundColor: colors.endpaper },
+  remove: { backgroundColor: colors.danger },
+  buttonText: { fontSize: 14 },
+  onDanger: { color: colors.onDark },
   menuItem: { minHeight: 44, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   swatch: { width: 18, height: 8, backgroundColor: colors.highlight },
   swatchText: { width: 18, textAlign: 'center', alignItems: 'center' },

@@ -5,6 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardResize } from './src/ui/KeyboardResize';
 import { userMessage } from './src/lib/userError';
@@ -88,12 +89,15 @@ export default function App() {
   else body = <Main db={db} userId={userId} />;
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <View style={styles.root}>
-        <KeyboardResize>{body}</KeyboardResize>
-      </View>
-    </SafeAreaProvider>
+    // 오늘 목록 줄 밀기(react-native-gesture-handler)가 앱 맨 바깥의 이 뷰를 기준으로 손가락을 읽는다
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <View style={styles.root}>
+          <KeyboardResize>{body}</KeyboardResize>
+        </View>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
