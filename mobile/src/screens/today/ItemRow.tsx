@@ -28,14 +28,15 @@ type Props = {
   onAdvance: (id: string) => void;
   onTogglePriority: (id: string, on: boolean) => void;
   onEdit: (id: string, text: string) => Promise<boolean>; // 저장됐는지 돌려준다(안 됐으면 원래 글로 되돌린다)
-  onPostpone: (id: string) => void;
+  onPostpone: (id: string) => void; // 언제로 미룰지 고르는 시트를 연다
+  onDrop: (id: string) => void; // 안 하기: 지우지 않고 줄을 긋는다
   onDelete: (id: string) => void;
   onPriorityFull: () => void; // 중요가 다 찬 날 형광펜 쪽으로 밀었다
   onRevealEdit: (id: string, bottom: number) => void; // 고치는 줄의 아래 끝(창 기준). 키보드에 가리면 화면이 목록을 굴린다
 };
 
 export const ItemRow = memo(function ItemRow(props: Props) {
-  const { id, kind: itemKind, text, status, priority, priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDelete } = props;
+  const { id, kind: itemKind, text, status, priority, priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDrop, onDelete } = props;
   const menu = useAnchor();
   const reduce = useReduceMotion();
   // 넓은 배치에서는 글자가 커진 만큼 줄 높이도 공책 줄 간격(useRuleGap)에 맞춰 넓힌다
@@ -55,6 +56,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
   const advance = canAdvance(item);
   const markDisabled = !item.priority && priorityFull;
   const done = kind === 'done';
+  const dropped = kind === 'dropped';
   const [marked, setMarked] = useState(false); // 이 줄에 방금 형광펜을 칠했다(그때만 긋는 애니메이션)
   const next = advanceAction(item);
   const canMark = item.kind === 'task' && (status === 'open' || status === 'doing');
@@ -63,7 +65,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
     onTogglePriority(id, !item.priority);
   };
 
-  // ── 밀기: ← 미루기·지우기 버튼, → 형광펜 ──
+  // ── 밀기: ← 미루기·안 하기·지우기 버튼, → 형광펜 ──
   const swipe = swipeActionsFor(item);
   const actionW = Math.round(ACTION_W * k.ownScale);
   const actionsW = swipe.left.length * actionW;
@@ -221,7 +223,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
   const actions = [
     ...(advance ? [{ name: 'activate' }, { name: 'advance', label: '상태 바꾸기' }] : []),
     ...(canMark && !markDisabled ? [{ name: 'priority', label: item.priority ? '중요 표시 지우기' : '중요 표시하기' }] : []),
-    ...(canMark ? [{ name: 'postpone', label: '내일로 미루기' }] : []),
+    ...(canMark ? [{ name: 'postpone', label: '미루기' }, { name: 'drop', label: '안 하기' }] : []),
     { name: 'edit', label: '고치기' },
     { name: 'delete', label: '지우기' },
   ];
@@ -230,12 +232,13 @@ export const ItemRow = memo(function ItemRow(props: Props) {
     if (name === 'activate' || name === 'advance') onAdvance(id);
     else if (name === 'priority') togglePriority();
     else if (name === 'postpone') onPostpone(id);
+    else if (name === 'drop') onDrop(id);
     else if (name === 'edit') edit();
     else if (name === 'delete') onDelete(id);
   };
 
   const variant = kind === 'note' ? 'hand' : 'body';
-  const textStyle = [kind === 'note' ? styles.note : styles.text, done && styles.done];
+  const textStyle = [kind === 'note' ? styles.note : styles.text, done && styles.done, dropped && styles.dropped];
   // 밀린 거리 → 왼쪽에서 자라는 형광펜 띠의 폭, 오른쪽 버튼 칸의 폭
   const stripW = drag.interpolate({ inputRange: [0, FAR], outputRange: [0, FAR], extrapolate: 'clamp' });
   const buttonsW = drag.interpolate({ inputRange: [-FAR, 0], outputRange: [FAR, 0], extrapolate: 'clamp' });
@@ -274,13 +277,27 @@ export const ItemRow = memo(function ItemRow(props: Props) {
         {swipe.left.includes('postpone') && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="내일로 미루기"
+            accessibilityLabel="미루기"
+            accessibilityHint="언제로 미룰지 골라요"
             style={dimPressed([styles.button, styles.postpone, zone === 'delete' && styles.buttonGone])}
             onPress={tapAction(() => onPostpone(id))}
           >
             <StatusSymbol kind="migrated" size={14} />
             <Txt numberOfLines={1} style={styles.buttonText}>
               미루기
+            </Txt>
+          </Pressable>
+        )}
+        {swipe.left.includes('drop') && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="안 하기"
+            style={dimPressed([styles.button, styles.drop, zone === 'delete' && styles.buttonGone])}
+            onPress={tapAction(() => onDrop(id))}
+          >
+            <StatusSymbol kind="dropped" size={14} />
+            <Txt numberOfLines={1} style={styles.buttonText}>
+              안 하기
             </Txt>
           </Pressable>
         )}
@@ -385,13 +402,27 @@ export const ItemRow = memo(function ItemRow(props: Props) {
             </Txt>
           </Pressable>
         )}
-        {/* 끝나지 않은 할 일만. 오늘 줄은 › 옮긴 일로 남고 내일 장에 새 줄이 생긴다 */}
+        {/* 끝나지 않은 할 일만. 미루기는 날짜를 고르는 시트를 열고, 오늘 줄은 › 옮긴 일로 남아 고른 날 장에 새 줄이 생긴다 */}
         {canMark && (
-          <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => onPostpone(id))}>
+          <Pressable
+            accessibilityRole="button"
+            style={dimPressed(styles.menuItem)}
+            // 메뉴(Modal)가 다 내려간 뒤에 시트(Modal)를 띄운다. 겹쳐 띄우면 iOS가 시트를 띄우지 못할 수 있다
+            onPress={pick(() => setTimeout(() => onPostpone(id), MENU_SHEET_DELAY))}
+          >
             <View style={styles.swatchText}>
               <StatusSymbol kind="migrated" size={14} />
             </View>
-            <Txt style={styles.menuText}>내일로 미루기</Txt>
+            <Txt style={styles.menuText}>미루기</Txt>
+          </Pressable>
+        )}
+        {/* 안 하기: 지우지 않고 줄을 그어 남긴다. 되돌리려면 기호를 누르거나 메뉴의 '다시 하기' */}
+        {canMark && (
+          <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => onDrop(id))}>
+            <View style={styles.swatchText}>
+              <StatusSymbol kind="dropped" size={14} />
+            </View>
+            <Txt style={styles.menuText}>안 하기</Txt>
           </Pressable>
         )}
         {/* 메뉴가 닫힌 뒤 그 자리에서 고친다 */}
@@ -413,6 +444,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
 const SYMBOL_SLOP = { top: 13, bottom: 13, left: 14, right: 8 };
 // 메뉴(Modal)가 다 닫힌 뒤에 입력칸에 포커스를 준다. 닫히는 중에 주면 iOS가 포커스를 거둬 갈 수 있다
 const MENU_FOCUS_DELAY = 350;
+const MENU_SHEET_DELAY = 250;
 // 밀린 거리 → 띠·버튼 폭. 어떤 줄 폭보다도 넉넉한 끝값
 const FAR = 4000;
 const ERASER = '#EDE4D2'; // 메뉴가 열린 줄과 같은 옅은 종이색
@@ -431,6 +463,8 @@ const styles = StyleSheet.create({
   text: { fontSize: 16, lineHeight: 24, flexShrink: 1 },
   note: { fontFamily: fonts.hand, fontSize: 22, lineHeight: 28, flexShrink: 1 },
   done: { color: colors.muted, textDecorationLine: 'line-through' },
+  // 안 하기로 한 일: 끝낸 일보다 한 단계 더 흐리게 줄을 긋는다(16pt라 faint도 읽힌다)
+  dropped: { color: colors.faint, textDecorationLine: 'line-through' },
   // 입력칸의 기본 여백을 없애 글과 같은 자리에 글자가 놓이게 한다
   input: { alignSelf: 'stretch', padding: 0, paddingTop: 0, paddingBottom: 0, margin: 0 },
   hidden: { opacity: 0 },
@@ -458,6 +492,7 @@ const styles = StyleSheet.create({
   button: { flexGrow: 1, flexBasis: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, overflow: 'hidden' },
   buttonGone: { flexGrow: 0, width: 0 }, // 끝까지 밀면 지우기가 칸을 다 차지한다
   postpone: { backgroundColor: colors.endpaper },
+  drop: { backgroundColor: colors.lineSoft },
   remove: { backgroundColor: colors.danger },
   buttonText: { fontSize: 14 },
   onDanger: { color: colors.onDark },

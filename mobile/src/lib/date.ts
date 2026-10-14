@@ -33,6 +33,12 @@ export function formatLongDate(date: string): string {
   return `${m}월 ${d}일 ${WEEKDAYS[weekdayOf(date)]}요일`;
 }
 
+// '10월 20일(월)': 미루기 시트·토스트처럼 짧게 날짜와 요일을 함께 적을 때
+export function formatDayWithWeekday(date: string): string {
+  const { m, d } = partsOf(date);
+  return `${m}월 ${d}일(${WEEKDAYS[weekdayOf(date)]})`;
+}
+
 export function formatShortDate(date: string): string {
   const { m, d } = partsOf(date);
   return `${m}/${d}`;

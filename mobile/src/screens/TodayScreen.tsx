@@ -6,20 +6,23 @@ import {
   addItem,
   advanceStatus,
   deleteItem,
+  dropItem,
   type Item,
   type ItemKind,
   listItemsForDate,
   listMigrationCandidates,
   MAX_PRIORITY_PER_DAY,
   migrateAllToToday,
+  migrateToDate,
   migrateToToday,
   migrateToTomorrow,
   restoreItem,
   setPriority,
+  undoDrop,
   undoMigration,
   updateItemText,
 } from '../items/repo';
-import { formatLongDate, logicalDate } from '../lib/date';
+import { formatDayWithWeekday, formatLongDate, logicalDate } from '../lib/date';
 import { countRecordedDays } from '../stats/recordedDays';
 import { userMessage } from '../lib/userError';
 import { colors, SCREEN_X } from '../ui/theme';
@@ -34,6 +37,7 @@ import type { LinkAction } from '../lib/deepLink';
 import { OrganizeSheet } from './today/OrganizeSheet';
 import { PostIt, POSTIT_SHOWN, type SettleHow } from './today/PostIt';
 import { Composer } from './today/Composer';
+import { PostponeSheet } from './today/PostponeSheet';
 import { voiceAvailable } from '../voice/available';
 import { dimPressed } from '../ui/press';
 import { CHIP_H } from '../ui/Chip';
@@ -68,6 +72,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const [notice, setNotice] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastSpec | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [postponing, setPostponing] = useState<{ id: string; prev: 'open' | 'doing' } | null>(null); // 언제로 미룰지 고르는 줄
   const email = useAccountEmail();
   const busy = useRef(false);
   const reorder = useRef(false); // 상태·중요를 바꿨거나 포스트잇을 정리했다: 다음에 불러온 목록을 넣을 때만 자리 이동을 애니메이션한다
@@ -202,20 +207,42 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     return ok;
   };
   const onDelete = useEvent((id: string) => removeWithUndo(id));
-  // 미루기도 바로 옮긴 뒤 '되돌리기'를 띄운다. 되돌리면 미루기 전 상태(할 일·진행 중)로 돌아간다
-  const onPostpone = useEvent(async (id: string) => {
+  // 미루기는 언제로 미룰지 먼저 묻는다(시트). 고르면 바로 옮긴 뒤 '되돌리기'를 띄운다. 되돌리면 미루기 전 상태(할 일·진행 중)로 돌아간다
+  const onPostpone = useEvent((id: string) => {
     const prev = items.find((i) => i.id === id)?.status;
     if (prev !== 'open' && prev !== 'doing') return;
+    Keyboard.dismiss();
+    setPostponing({ id, prev });
+  });
+  const postponeTo = async (date: string) => {
+    const target = postponing;
+    setPostponing(null);
+    if (!target) return;
     let createdId = '';
     const ok = await reordering(async () => {
-      createdId = (await migrateToTomorrow(db, id)).id;
+      createdId = (await migrateToDate(db, target.id, date)).id;
     });
     if (ok && createdId) {
       haptic.light();
       setToast({
         key: Date.now(),
-        message: '내일로 미뤘어요',
-        action: { label: '되돌리기', onPress: () => void reordering(() => undoMigration(db, createdId, prev)) },
+        message: `${formatDayWithWeekday(date)}로 미뤘어요`,
+        action: { label: '되돌리기', onPress: () => void reordering(() => undoMigration(db, createdId, target.prev)) },
+      });
+    }
+  };
+  // 안 하기: 지우지 않고 줄을 긋는다. 바로 '되돌리기'를 띄우고, 나중에는 기호를 눌러 다시 할 일로 돌린다
+  const onDrop = useEvent(async (id: string) => {
+    let prev: 'open' | 'doing' = 'open';
+    const ok = await reordering(async () => {
+      prev = await dropItem(db, id);
+    });
+    if (ok) {
+      haptic.light();
+      setToast({
+        key: Date.now(),
+        message: '안 하기로 했어요',
+        action: { label: '되돌리기', onPress: () => void reordering(() => undoDrop(db, id, prev)) },
       });
     }
   });
@@ -246,7 +273,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
   const priorityCount = items.filter((i) => i.priority && (i.status === 'open' || i.status === 'doing')).length;
   const priorityFull = priorityCount >= MAX_PRIORITY_PER_DAY;
-  const tasks = items.filter((i) => i.kind === 'task' && i.status !== 'migrated');
+  // 다른 날로 옮긴 원래 줄과 안 하기로 한 일은 '할 일 N개 중 M개'에서 뺀다
+  const tasks = items.filter((i) => i.kind === 'task' && i.status !== 'migrated' && i.status !== 'dropped');
   const doneCount = tasks.filter((i) => i.status === 'done').length;
 
   const renderItem = useCallback<ListRenderItem<Item>>(
@@ -262,12 +290,13 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         onTogglePriority={onTogglePriority}
         onEdit={onEdit}
         onPostpone={onPostpone}
+        onDrop={onDrop}
         onDelete={onDelete}
         onPriorityFull={onPriorityFull}
         onRevealEdit={onRevealEdit}
       />
     ),
-    [priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDelete, onPriorityFull, onRevealEdit],
+    [priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDrop, onDelete, onPriorityFull, onRevealEdit],
   );
 
   // 포스트잇만 목록 머리에 둬서 후보가 많아도 함께 스크롤된다. 입력칸은 목록 위에 고정한다
@@ -436,6 +465,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           }}
         />
       )}
+      <PostponeSheet visible={postponing !== null} today={today} onPick={(date) => void postponeTo(date)} onClose={() => setPostponing(null)} />
       <Toast toast={toast} onHide={hideToast} />
       <AccountSheet
         visible={accountOpen}

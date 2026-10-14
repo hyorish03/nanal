@@ -27,6 +27,7 @@ export type Editing = { id: string; answers: Record<string, string> };
 type Props = {
   date: string;
   day: DaySummary | undefined;
+  future?: boolean; // 오늘 뒤의 날: 미뤄 둔 할 일만 보여 준다(기분·회고는 아직 없다)
   items: Item[];
   reflections: Reflection[];
   editing: Editing | null;
@@ -49,7 +50,7 @@ function answersOf(r: Reflection): string[] {
 
 // 고른 날의 기분, 할 일, 회고. 회고는 길게 누르거나 ⋯로 고치고 지운다.
 export function DayDetail(p: Props) {
-  const { day, editing, large } = p;
+  const { day, editing, large, future = false } = p;
   const shown = p.items.slice(0, DAY_ITEMS_MAX);
   const hidden = p.items.length - shown.length;
   const rule = textBox(large ? 32 : CARD_RULE);
@@ -61,9 +62,16 @@ export function DayDetail(p: Props) {
         <Txt variant="title" accessibilityRole="header" style={[styles.title, large && styles.titleLarge]}>
           {formatLongDate(p.date)}
         </Txt>
-        <Txt style={[styles.mood, large && styles.moodLarge]}>{day?.mood ? `기분 · ${moodWord(day.mood)}` : '기분 기록 없음'}</Txt>
+        {!future && (
+          <Txt style={[styles.mood, large && styles.moodLarge]}>{day?.mood ? `기분 · ${moodWord(day.mood)}` : '기분 기록 없음'}</Txt>
+        )}
       </View>
-      <Txt style={[styles.sub, large && styles.subLarge]}>{dayTasksLine(day)}</Txt>
+      <Txt style={[styles.sub, large && styles.subLarge]}>{dayTasksLine(day, future)}</Txt>
+      {future && shown.length > 0 && (
+        <Txt variant="hand" accessibilityRole="header" style={styles.planned}>
+          이날 할 일
+        </Txt>
+      )}
 
       {shown.length > 0 && (
         <View style={styles.items}>
@@ -74,7 +82,9 @@ export function DayDetail(p: Props) {
                 <View style={[styles.symbol, { width: textBox(SYMBOL_COL), height: lineBox }]}>
                   <StatusSymbol kind={k} size={textBox(SYMBOL)} />
                 </View>
-                <Txt style={[styles.itemText, k === 'done' && styles.itemDone, k === 'migrated' && styles.itemMoved]}>{it.text}</Txt>
+                <Txt style={[styles.itemText, k === 'done' && styles.itemDone, k === 'migrated' && styles.itemMoved, k === 'dropped' && styles.itemDropped]}>
+                  {it.text}
+                </Txt>
               </View>
             );
           })}
@@ -83,7 +93,7 @@ export function DayDetail(p: Props) {
       )}
 
       <View style={styles.reflections}>
-        {p.reflections.length === 0 ? (
+        {future && p.reflections.length === 0 ? null : p.reflections.length === 0 ? (
           <Txt style={styles.muted}>이 날은 회고가 없어요</Txt>
         ) : (
           p.reflections.map((r) =>
@@ -165,6 +175,8 @@ const styles = StyleSheet.create({
   itemText: { flex: 1, fontSize: 16, lineHeight: ITEM_LINE },
   itemDone: { textDecorationLine: 'line-through', color: colors.muted },
   itemMoved: { color: colors.muted },
+  itemDropped: { textDecorationLine: 'line-through', color: colors.faint },
+  planned: { marginBottom: 6 },
   reflections: { gap: 12 },
   muted: { fontSize: 14, lineHeight: 20, color: colors.muted },
   error: { color: colors.danger, fontSize: 14, marginTop: 8 },

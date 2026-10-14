@@ -1,6 +1,6 @@
 import { migrate } from '../db/schema';
 import { setMood } from '../days/repo';
-import { addItem, advanceStatus, deleteItem, migrateToToday, setPriority } from '../items/repo';
+import { addItem, advanceStatus, deleteItem, dropItem, migrateToToday, setPriority } from '../items/repo';
 import { countRecordedDays } from '../stats/recordedDays';
 import { openTestDb } from '../../test/sqlite';
 import { pickNext, readWidgetSnapshot, widgetAdvance } from './sql';
@@ -145,5 +145,19 @@ describe('widgetAdvance', () => {
       expect(await widgetAdvance(db, id, 'open', NOW)).toBe(false);
       expect(await outboxVersion(db, id)).toBe(before);
     }
+  });
+});
+
+describe('안 하기로 한 일(dropped)', () => {
+  it('위젯 목록·개수에서 빠지고, 위젯에서 상태를 바꿀 수 없다', async () => {
+    const db = await setup();
+    const keep = await addItem(db, { kind: 'task', text: '빨래' }, NOW);
+    const drop = await addItem(db, { kind: 'task', text: '대청소' }, NOW);
+    await dropItem(db, drop.id, NOW);
+
+    const snap = await readWidgetSnapshot(db, TODAY);
+    expect(snap.items.map((i) => i.id)).toEqual([keep.id]);
+    expect(snap.counts).toEqual({ open: 1, doing: 0, done: 0 });
+    expect(await widgetAdvance(db, drop.id, 'open', NOW)).toBe(false);
   });
 });

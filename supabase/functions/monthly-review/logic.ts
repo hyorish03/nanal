@@ -67,7 +67,8 @@ export function aggregateMonth(month: string, days: DayRow[], items: ItemRow[], 
     return {
       date,
       mood: moodBy.get(date) ?? null,
-      tasks: tasks.filter((t) => t.status !== 'migrated').length,
+      // 다른 날로 옮긴 원래 줄과 안 하기로 한 일(dropped)은 할 일 수에서 뺀다(앱 archive/repo와 같은 기준)
+      tasks: tasks.filter((t) => t.status !== 'migrated' && t.status !== 'dropped').length,
       done: tasks.filter((t) => t.status === 'done').length,
       carried: tasks.filter((t) => t.status === 'migrated').length,
       lethargy: lethargySet.has(date),

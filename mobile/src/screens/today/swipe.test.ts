@@ -4,15 +4,16 @@ const W = 360; // 휴대폰 줄 폭쯤
 const AW = ACTION_W * 2;
 
 describe('swipeActionsFor', () => {
-  it('끝나지 않은 할 일은 미루기·지우기와 형광펜', () => {
-    expect(swipeActionsFor({ kind: 'task', status: 'open' })).toEqual({ left: ['postpone', 'delete'], mark: true });
-    expect(swipeActionsFor({ kind: 'task', status: 'doing' })).toEqual({ left: ['postpone', 'delete'], mark: true });
+  it('끝나지 않은 할 일은 미루기·안 하기·지우기와 형광펜', () => {
+    expect(swipeActionsFor({ kind: 'task', status: 'open' })).toEqual({ left: ['postpone', 'drop', 'delete'], mark: true });
+    expect(swipeActionsFor({ kind: 'task', status: 'doing' })).toEqual({ left: ['postpone', 'drop', 'delete'], mark: true });
   });
 
-  it('끝낸 일·옮긴 일·메모는 지우기만, 형광펜 없음', () => {
+  it('끝낸 일·옮긴 일·안 하기로 한 일·메모는 지우기만, 형광펜 없음', () => {
     for (const item of [
       { kind: 'task' as const, status: 'done' as const },
       { kind: 'task' as const, status: 'migrated' as const },
+      { kind: 'task' as const, status: 'dropped' as const },
       { kind: 'note' as const, status: null },
     ]) {
       expect(swipeActionsFor(item)).toEqual({ left: ['delete'], mark: false });
@@ -86,5 +87,15 @@ describe('openRow', () => {
     expect(b).toHaveBeenCalledTimes(1);
     openRow.touchOutside();
     expect(b).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('버튼 세 개(미루기·안 하기·지우기)', () => {
+  it('좁은 휴대폰 줄에서도 세 버튼이 다 드러난 뒤에야 끝까지 밀어 지우기가 된다', () => {
+    const three = ACTION_W * 3;
+    const narrow = 327; // 375pt 화면 - 좌우 여백
+    expect(fullAt(narrow, three)).toBeGreaterThan(three);
+    expect(fullAt(narrow, three)).toBeLessThan(narrow); // 줄 폭 안에서 닿을 수 있다
+    expect(settleLeft(-three, 0, { width: narrow, actionsW: three, wasOpen: false })).toBe('open');
   });
 });

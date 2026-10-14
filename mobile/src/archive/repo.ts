@@ -6,8 +6,9 @@ export type DaySummary = {
   mood: number | null;
   hasReflection: boolean;
   tasksDone: number;
-  tasksTotal: number; // 다른 날로 옮겨 간 원래 항목은 빼고 센다
+  tasksTotal: number; // 다른 날로 옮겨 간 원래 항목과 안 하기로 한 일은 빼고 센다
   tasksMigrated: number; // 그날 적었다가 다른 날로 옮긴 할 일
+  tasksDropped: number; // 안 하기로 한 일(줄을 그어 남긴 일)
 };
 
 // 한 달('YYYY-MM') 중 기록이 있는 날의 요약. 기록한 날 세기(stats/recordedDays)와 같은 기준이다.
@@ -15,18 +16,28 @@ export type DaySummary = {
 export async function listMonthSummary(db: Db, month: string): Promise<DaySummary[]> {
   const from = `${month}-01`;
   const to = `${month}-31`;
-  const rows = await db.getAllAsync<{ date: string; mood: number | null; refl: number; done: number; total: number; migrated: number }>(
-    `SELECT date, MAX(mood) AS mood, MAX(refl) AS refl, SUM(done) AS done, SUM(total) AS total, SUM(migrated) AS migrated
+  const rows = await db.getAllAsync<{
+    date: string;
+    mood: number | null;
+    refl: number;
+    done: number;
+    total: number;
+    migrated: number;
+    dropped: number;
+  }>(
+    `SELECT date, MAX(mood) AS mood, MAX(refl) AS refl, SUM(done) AS done, SUM(total) AS total,
+       SUM(migrated) AS migrated, SUM(dropped) AS dropped
      FROM (
        SELECT date, NULL AS mood, 0 AS refl,
          (kind = 'task' AND status = 'done') AS done,
-         (kind = 'task' AND status != 'migrated') AS total,
-         (kind = 'task' AND status = 'migrated') AS migrated
+         (kind = 'task' AND status NOT IN ('migrated', 'dropped')) AS total,
+         (kind = 'task' AND status = 'migrated') AS migrated,
+         (kind = 'task' AND status = 'dropped') AS dropped
        FROM items WHERE deleted_at IS NULL AND date BETWEEN ? AND ?
        UNION ALL
-       SELECT date, mood, 0, 0, 0, 0 FROM days WHERE deleted_at IS NULL AND mood IS NOT NULL AND date BETWEEN ? AND ?
+       SELECT date, mood, 0, 0, 0, 0, 0 FROM days WHERE deleted_at IS NULL AND mood IS NOT NULL AND date BETWEEN ? AND ?
        UNION ALL
-       SELECT date, NULL, 1, 0, 0, 0 FROM reflections WHERE deleted_at IS NULL AND date BETWEEN ? AND ?
+       SELECT date, NULL, 1, 0, 0, 0, 0 FROM reflections WHERE deleted_at IS NULL AND date BETWEEN ? AND ?
      )
      GROUP BY date
      ORDER BY date`,
@@ -39,7 +50,18 @@ export async function listMonthSummary(db: Db, month: string): Promise<DaySummar
     tasksDone: r.done,
     tasksTotal: r.total,
     tasksMigrated: r.migrated,
+    tasksDropped: r.dropped,
   }));
+}
+
+// 앞날로 미뤄 둔 할 일 중 가장 먼 날짜(없으면 null). 지난 기록 달력이 그 달까지 넘겨 볼 수 있게 한다.
+export async function lastPlannedDate(db: Db, today: string): Promise<string | null> {
+  const row = await db.getFirstAsync<{ last: string | null }>(
+    `SELECT MAX(date) AS last FROM items
+     WHERE kind = 'task' AND status IN ('open', 'doing') AND deleted_at IS NULL AND date > ?`,
+    [today],
+  );
+  return row?.last ?? null;
 }
 
 // 회고 모아보기의 한 장: 질문마다 그 답을 붙여 둔다(답이 빈 질문은 뺀다).

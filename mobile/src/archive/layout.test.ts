@@ -1,4 +1,4 @@
-import { calendarPaneWidth, dayTasksLine, isTwoPane } from './layout';
+import { calendarPaneWidth, dayTasksLine, hasPlanned, isTwoPane } from './layout';
 import type { DaySummary } from './repo';
 
 const day = (over: Partial<DaySummary>): DaySummary => ({
@@ -8,6 +8,7 @@ const day = (over: Partial<DaySummary>): DaySummary => ({
   tasksDone: 0,
   tasksTotal: 0,
   tasksMigrated: 0,
+  tasksDropped: 0,
   ...over,
 });
 
@@ -34,4 +35,17 @@ test('할 일 요약 문구', () => {
   expect(dayTasksLine(day({ tasksMigrated: 2 }))).toBe('다른 날로 넘긴 일만 있어요');
   expect(dayTasksLine(day({ tasksTotal: 3, tasksDone: 1 }))).toBe('할 일 3개 중 1개를 끝냈어요');
   expect(dayTasksLine(day({ tasksTotal: 3, tasksDone: 1, tasksMigrated: 1 }))).toBe('할 일 3개 중 1개를 끝냈어요, 1개는 다른 날로 넘겼어요');
+});
+
+test('안 하기로 한 일은 끝낸 일 수와 따로 적는다', () => {
+  expect(dayTasksLine(day({ tasksTotal: 2, tasksDone: 1, tasksDropped: 1 }))).toBe('할 일 2개 중 1개를 끝냈어요, 1개는 안 하기로 했어요');
+  expect(dayTasksLine(day({ tasksDropped: 2 }))).toBe('안 하기로 한 일만 있어요');
+});
+
+test('앞날: 미뤄 둔 할 일 수, 표시는 끝나지 않은 할 일이 있을 때만', () => {
+  expect(dayTasksLine(day({ tasksTotal: 2 }), true)).toBe('이날 할 일 2개가 기다리고 있어요');
+  expect(dayTasksLine(undefined, true)).toBe('아직 이날 할 일이 없어요');
+  expect(hasPlanned(day({ tasksTotal: 2 }))).toBe(true);
+  expect(hasPlanned(day({ tasksTotal: 1, tasksDone: 1 }))).toBe(false);
+  expect(hasPlanned(undefined)).toBe(false);
 });

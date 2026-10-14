@@ -4,7 +4,8 @@ import { newId } from '../lib/id';
 import { markDirty } from '../sync/outbox';
 
 export type ItemKind = 'task' | 'note';
-export type TaskStatus = 'open' | 'doing' | 'done' | 'migrated';
+// dropped: 안 하기로 한 일. 지우지 않고 줄을 그어 남긴다(끝낸 일로 세지 않는다)
+export type TaskStatus = 'open' | 'doing' | 'done' | 'migrated' | 'dropped';
 
 export type Item = {
   id: string;
@@ -23,7 +24,8 @@ type ItemRow = Omit<Item, 'priority'> & { priority: number };
 
 export const MAX_PRIORITY_PER_DAY = 3;
 export const MAX_TEXT = 200; // 한 줄에 쓸 수 있는 글자 수
-const NEXT_STATUS: Partial<Record<TaskStatus, TaskStatus>> = { open: 'doing', doing: 'done', done: 'open' };
+// 안 하기로 한 일은 기호를 누르면 다시 할 일로 돌아온다
+const NEXT_STATUS: Partial<Record<TaskStatus, TaskStatus>> = { open: 'doing', doing: 'done', done: 'open', dropped: 'open' };
 const COLUMNS = 'id, date, kind, text, status, priority, migrated_from, created_at, updated_at, deleted_at';
 // 종이 다이어리처럼 적은 순서 그대로. 상태를 바꾸거나 형광펜을 칠해도 줄이 자리를 옮기지 않는다
 const ORDER = 'created_at, id';
@@ -72,6 +74,8 @@ async function update(tx: Tx, id: string, fields: { status?: TaskStatus; priorit
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// addDays(date, 0) !== date: 2026-02-30처럼 없는 날짜를 거른다.
+const isDate = (date: string) => DATE_RE.test(date) && addDays(date, 0) === date;
 
 export async function addItem(
   db: Db,
@@ -83,8 +87,7 @@ export async function addItem(
   if (!text) throw new Error('내용을 입력하세요');
   const today = logicalDate(now);
   const date = input.date ?? today;
-  // addDays(date, 0) !== date: 2026-02-30처럼 없는 날짜를 거른다.
-  if (!DATE_RE.test(date) || addDays(date, 0) !== date) throw new Error('날짜 형식이 아닙니다');
+  if (!isDate(date)) throw new Error('날짜 형식이 아닙니다');
   if (date < today) throw new Error('지난 날짜에는 넣을 수 없어요');
   const ts = now.toISOString();
   const item: Item = {
@@ -134,8 +137,10 @@ async function migrateInTx(tx: Tx, id: string, target: (today: string) => string
   if (item.status !== 'open' && item.status !== 'doing') throw new Error('끝나지 않은 할 일만 옮길 수 있습니다');
   const today = logicalDate(now);
   const dest = target(today);
-  // 지난 일은 오늘·내일로, 오늘 일은 내일로. 같은 날이나 더 앞 날짜로는 옮기지 않는다
+  if (!isDate(dest)) throw new Error('날짜 형식이 아닙니다');
+  // 지난 일은 오늘·앞날로, 오늘 일은 앞날로. 같은 날이나 더 앞 날짜로는 옮기지 않는다
   if (item.date >= dest) throw new Error('이전 날짜의 할 일만 옮길 수 있습니다');
+  if (dest < today) throw new Error('지난 날짜로는 옮길 수 없어요');
   await update(tx, id, { status: 'migrated' }, now);
   const created: Item = {
     ...item,
@@ -169,8 +174,41 @@ export function migrateAllToToday(db: Db, ids: string[], now = new Date()): Prom
   });
 }
 
+// 날짜를 골라 미루기(퓨처 로그). 오늘보다 뒤, 원래 날짜보다 뒤인 날만. 그날이 오면 그날 장에 그냥 보인다
+export function migrateToDate(db: Db, id: string, date: string, now = new Date()): Promise<Item> {
+  return migrateTo(
+    db,
+    id,
+    (today) => {
+      if (isDate(date) && date <= today) throw new Error('오늘 뒤의 날짜로만 미룰 수 있어요');
+      return date;
+    },
+    now,
+  );
+}
+
+// 포스트잇의 '내일로 넘기기'(한 번에)
 export function migrateToTomorrow(db: Db, id: string, now = new Date()): Promise<Item> {
-  return migrateTo(db, id, (today) => addDays(today, 1), now);
+  return migrateToDate(db, id, addDays(logicalDate(now), 1), now);
+}
+
+// 안 하기: 끝나지 않은 할 일에 줄을 긋는다. 되돌리기·다시 하기를 위해 바꾸기 전 상태를 돌려준다
+export async function dropItem(db: Db, id: string, now = new Date()): Promise<'open' | 'doing'> {
+  return db.transaction(async (tx) => {
+    const item = await requireItem(tx, id);
+    if (item.status !== 'open' && item.status !== 'doing') throw new Error('끝나지 않은 할 일만 안 하기로 할 수 있어요');
+    await update(tx, id, { status: 'dropped' }, now);
+    return item.status;
+  });
+}
+
+// 안 하기를 바로 '되돌리기'했을 때: 줄 긋기 전 상태(할 일·진행 중)로
+export async function undoDrop(db: Db, id: string, prevStatus: 'open' | 'doing', now = new Date()): Promise<void> {
+  await db.transaction(async (tx) => {
+    const item = await requireItem(tx, id);
+    if (item.status !== 'dropped') throw new Error('안 하기로 한 일이 아니라 되돌릴 수 없습니다');
+    await update(tx, id, { status: prevStatus }, now);
+  });
 }
 
 // 미루고 바로 '되돌리기'를 눌렀을 때. 옮겨 만든 줄은 지우고, 원래 줄은 미루기 전 상태(open·doing)로 돌린다.

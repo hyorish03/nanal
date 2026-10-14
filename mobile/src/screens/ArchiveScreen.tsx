@@ -2,7 +2,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, type LayoutRectangle, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { calendarPaneWidth, isTwoPane } from '../archive/layout';
-import { type ArchiveEntry, type DaySummary, listMonthSummary, listReflectionFilters, listReflectionPage, type ReflectionFilter } from '../archive/repo';
+import { type ArchiveEntry, type DaySummary, lastPlannedDate, listMonthSummary, listReflectionFilters, listReflectionPage, type ReflectionFilter } from '../archive/repo';
 import type { Db } from '../db/types';
 import { listItemsForDate, type Item } from '../items/repo';
 import { logicalDate, monthOf } from '../lib/date';
@@ -53,6 +53,7 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
   const [month, setMonth] = useState(monthOf(today));
   const [selected, setSelected] = useState(today);
   const [summary, setSummary] = useState<DaySummary[]>([]);
+  const [lastPlanned, setLastPlanned] = useState<string | null>(null); // 앞날로 미뤄 둔 할 일 중 가장 먼 날
   const [dayReflections, setDayReflections] = useState<Reflection[]>([]);
   const [dayItems, setDayItems] = useState<Item[]>([]);
   const [filters, setFilters] = useState<ReflectionFilter[]>([]);
@@ -83,6 +84,16 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
       cancelled = true;
     };
   }, [db, reviewMonth, version]);
+
+  useEffect(() => {
+    let cancelled = false;
+    lastPlannedDate(db, today)
+      .then((d) => !cancelled && setLastPlanned(d))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [db, today, version]);
 
   useEffect(() => {
     let cancelled = false;
@@ -304,13 +315,23 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
   );
 
   const calendar = (
-    <MonthCalendar month={month} today={today} selected={selected} byDate={byDate} large={large} onPick={pickDate} onChangeMonth={changeMonth} />
+    <MonthCalendar
+      month={month}
+      today={today}
+      lastMonth={lastPlanned && lastPlanned > today ? monthOf(lastPlanned) : monthOf(today)}
+      selected={selected}
+      byDate={byDate}
+      large={large}
+      onPick={pickDate}
+      onChangeMonth={changeMonth}
+    />
   );
 
   const detail = (divided: boolean) => (
     <DayDetail
       date={selected}
       day={day}
+      future={selected > today}
       items={dayItems}
       reflections={dayReflections}
       editing={editing}

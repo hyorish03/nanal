@@ -1,6 +1,6 @@
 import type { Item } from '../items/repo';
 
-export type SymbolKind = 'open' | 'doing' | 'done' | 'migrated' | 'note';
+export type SymbolKind = 'open' | 'doing' | 'done' | 'migrated' | 'dropped' | 'note';
 
 type ItemLike = Pick<Item, 'kind' | 'status'>;
 
@@ -9,10 +9,10 @@ export function symbolKind(item: ItemLike): SymbolKind {
   return item.status ?? 'open';
 }
 
-// 기호를 탭하면 할 일 → 진행 중 → 끝낸 일 → 할 일로 돈다(스펙 11.2).
+// 기호를 탭하면 할 일 → 진행 중 → 끝낸 일 → 할 일로 돈다(스펙 11.2). 안 하기로 한 일은 탭하면 다시 할 일로.
 export function canAdvance(item: ItemLike): boolean {
   const k = symbolKind(item);
-  return k === 'open' || k === 'doing' || k === 'done';
+  return k === 'open' || k === 'doing' || k === 'done' || k === 'dropped';
 }
 
 const WORD: Record<SymbolKind, string> = {
@@ -20,6 +20,7 @@ const WORD: Record<SymbolKind, string> = {
   doing: '진행 중',
   done: '끝낸 일',
   migrated: '옮긴 일',
+  dropped: '안 하기로 한 일',
   note: '메모',
 };
 // 다음 상태로 넘기는 메뉴 문구
@@ -27,6 +28,7 @@ const ADVANCE: Partial<Record<SymbolKind, { label: string; to: SymbolKind }>> = 
   open: { label: '진행 중으로', to: 'doing' },
   doing: { label: '끝낸 일로', to: 'done' },
   done: { label: '다시 할 일로', to: 'open' },
+  dropped: { label: '다시 하기', to: 'open' },
 };
 
 export function advanceAction(item: ItemLike): { label: string; to: SymbolKind } | null {
@@ -37,6 +39,7 @@ const HINT: Partial<Record<SymbolKind, string>> = {
   open: '누르면 진행 중으로 바뀌어요',
   doing: '누르면 끝낸 일로 바뀌어요',
   done: '누르면 다시 할 일로 바뀌어요',
+  dropped: '누르면 다시 할 일로 바뀌어요',
 };
 
 // 스크린 리더가 읽는 이름: 글을 먼저, 그다음 상태와 중요("장보기, 할 일, 중요")
@@ -63,5 +66,6 @@ export const LEGEND: LegendEntry[] = [
   { symbol: 'done', name: '끝낸 일', desc: '동그라미가 채워지고 줄이 그어져요. 기호를 누르면 다시 할 일이 돼요' },
   { symbol: 'highlight', name: '형광펜은 중요한 일', desc: '줄을 오른쪽으로 밀거나 ⋯를 눌러 칠해요. 하루 3개까지예요' },
   { symbol: 'migrated', name: '옮긴 일', desc: '다른 날로 옮긴 일' },
-  { symbol: 'more', name: '더보기', desc: '글을 누르면 바로 고치고, 왼쪽으로 밀면 미루기·지우기. 줄 오른쪽 ⋯나 글을 길게 눌러 모든 동작을 골라요' },
+  { symbol: 'dropped', name: '안 하기로 한 일', desc: '지우지 않고 줄을 그어 남겨요. 기호를 누르면 다시 할 일이 돼요' },
+  { symbol: 'more', name: '더보기', desc: '글을 누르면 바로 고치고, 왼쪽으로 밀면 미루기·안 하기·지우기. 줄 오른쪽 ⋯나 글을 길게 눌러 모든 동작을 골라요' },
 ];

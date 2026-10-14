@@ -104,6 +104,27 @@ const MIGRATIONS = [
     deleted_at TEXT
   );
   `,
+  // v4: 안 하기(dropped). SQLite는 CHECK를 고칠 수 없어 items를 새로 만들어 옮긴다(행·색인 그대로).
+  `
+  CREATE TABLE items_v4 (
+    id TEXT PRIMARY KEY NOT NULL,
+    date TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('task', 'note')),
+    text TEXT NOT NULL CHECK (length(trim(text)) > 0),
+    status TEXT CHECK (status IN ('open', 'doing', 'done', 'migrated', 'dropped')),
+    priority INTEGER NOT NULL DEFAULT 0 CHECK (priority IN (0, 1)),
+    migrated_from TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    CHECK ((kind = 'task') = (status IS NOT NULL))
+  );
+  INSERT INTO items_v4 (id, date, kind, text, status, priority, migrated_from, created_at, updated_at, deleted_at)
+  SELECT id, date, kind, text, status, priority, migrated_from, created_at, updated_at, deleted_at FROM items;
+  DROP TABLE items;
+  ALTER TABLE items_v4 RENAME TO items;
+  CREATE INDEX items_date ON items (date);
+  `,
 ];
 
 // target은 테스트에서 이전 버전 데이터를 만들 때만 쓴다.
