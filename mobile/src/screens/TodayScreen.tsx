@@ -15,6 +15,7 @@ import {
   migrateToTomorrow,
   restoreItem,
   setPriority,
+  undoMigration,
   updateItemText,
 } from '../items/repo';
 import { formatLongDate, logicalDate } from '../lib/date';
@@ -193,11 +194,21 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     return ok;
   };
   const onDelete = useEvent((id: string) => removeWithUndo(id));
+  // 미루기도 바로 옮긴 뒤 '되돌리기'를 띄운다. 되돌리면 미루기 전 상태(할 일·진행 중)로 돌아간다
   const onPostpone = useEvent(async (id: string) => {
-    const ok = await reordering(() => migrateToTomorrow(db, id));
-    if (ok) {
+    const prev = items.find((i) => i.id === id)?.status;
+    if (prev !== 'open' && prev !== 'doing') return;
+    let createdId = '';
+    const ok = await reordering(async () => {
+      createdId = (await migrateToTomorrow(db, id)).id;
+    });
+    if (ok && createdId) {
       haptic.light();
-      setToast({ key: Date.now(), message: '내일로 미뤘어요' });
+      setToast({
+        key: Date.now(),
+        message: '내일로 미뤘어요',
+        action: { label: '되돌리기', onPress: () => void reordering(() => undoMigration(db, createdId, prev)) },
+      });
     }
   });
   const hideToast = useCallback((key: number) => setToast((t) => (t?.key === key ? null : t)), []);

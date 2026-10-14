@@ -45,6 +45,7 @@ export function noteLabel(step: NoteStep, date: string): string {
         '꺾쇠는 내일로 옮김. 은행 들르기.',
         '기호를 톡 누르면 할 일, 하는 중, 끝 순서로 바뀌어요.',
         '형광펜은 중요한 일, 하루 3개까지.',
+        '줄을 오른쪽으로 밀면 형광펜, 왼쪽으로 밀면 미루기와 지우기.',
       ].join(' ');
     case 2:
       return [

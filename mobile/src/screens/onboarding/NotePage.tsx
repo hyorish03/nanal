@@ -162,6 +162,7 @@ function Symbols() {
           은 중요한 일 · 하루 3개까지
         </NoteText>
       </Ink>
+      <Note i={14} r={10} text="줄을 밀면 → 형광펜 · ← 미루기·지우기" />
     </>
   );
 }

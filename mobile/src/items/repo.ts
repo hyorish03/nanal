@@ -173,6 +173,31 @@ export function migrateToTomorrow(db: Db, id: string, now = new Date()): Promise
   return migrateTo(db, id, (today) => addDays(today, 1), now);
 }
 
+// 미루고 바로 '되돌리기'를 눌렀을 때. 옮겨 만든 줄은 지우고, 원래 줄은 미루기 전 상태(open·doing)로 돌린다.
+export async function undoMigration(
+  db: Db,
+  createdId: string,
+  prevStatus: 'open' | 'doing',
+  now = new Date(),
+): Promise<void> {
+  const ts = now.toISOString();
+  await db.transaction(async (tx) => {
+    const created = await tx.getFirstAsync<ItemRow>(
+      `SELECT ${COLUMNS} FROM items WHERE id = ? AND deleted_at IS NULL`,
+      [createdId],
+    );
+    if (!created?.migrated_from) throw new Error(`되돌릴 옮긴 일을 찾을 수 없습니다: ${createdId}`);
+    const source = await tx.getFirstAsync<ItemRow>(
+      `SELECT ${COLUMNS} FROM items WHERE id = ? AND deleted_at IS NULL`,
+      [created.migrated_from],
+    );
+    if (!source || source.status !== 'migrated') throw new Error('원래 할 일이 옮긴 상태가 아니라 되돌릴 수 없습니다');
+    await tx.runAsync('UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?', [ts, ts, createdId]);
+    await markDirty(tx, 'items', createdId);
+    await update(tx, source.id, { status: prevStatus }, now);
+  });
+}
+
 export async function updateItemText(db: Db, id: string, text: string, now = new Date()): Promise<void> {
   const trimmed = text.trim();
   if (!trimmed) throw new Error('내용을 입력하세요');

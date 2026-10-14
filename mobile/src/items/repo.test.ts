@@ -12,6 +12,7 @@ import {
   migrateToTomorrow,
   restoreItem,
   setPriority,
+  undoMigration,
   updateItemText,
 } from './repo';
 
@@ -250,4 +251,41 @@ test('migrateAllToToday: 하나라도 못 옮기면 모두 그대로 둔다', as
   await expect(migrateAllToToday(db, [a.id, done.id], TUE)).rejects.toThrow('끝나지 않은 할 일만');
   expect(await listItemsForDate(db, '2026-10-06')).toHaveLength(0);
   expect((await listMigrationCandidates(db, '2026-10-06')).map((c) => c.id)).toEqual([a.id]);
+});
+
+test('undoMigration: 오늘 일을 내일로 미뤘다가 되돌리면 오늘 줄은 원래 상태로, 내일 줄은 사라진다', async () => {
+  const item = await addItem(db, { kind: 'task', text: '장보기' }, TUE);
+  const created = await migrateToTomorrow(db, item.id, TUE);
+  await db.runAsync('DELETE FROM outbox', []);
+  const later = new Date(2026, 9, 6, 9, 5);
+  await undoMigration(db, created.id, 'open', later);
+  const today = await listItemsForDate(db, '2026-10-06');
+  expect(today.map((i) => [i.id, i.status, i.updated_at])).toEqual([[item.id, 'open', later.toISOString()]]);
+  expect(await listItemsForDate(db, '2026-10-07')).toEqual([]);
+  expect((await outboxKeys()).sort()).toEqual([item.id, created.id].sort());
+});
+
+test('undoMigration: 진행 중이던 일은 진행 중으로 돌아간다', async () => {
+  const item = await addItem(db, { kind: 'task', text: '보고서' }, TUE);
+  await advanceStatus(db, item.id, TUE);
+  const created = await migrateToTomorrow(db, item.id, TUE);
+  await undoMigration(db, created.id, 'doing', TUE);
+  expect((await listItemsForDate(db, '2026-10-06')).map((i) => i.status)).toEqual(['doing']);
+});
+
+test('undoMigration: 두 번 되돌리거나 옮긴 일이 아니면 거부한다', async () => {
+  const item = await addItem(db, { kind: 'task', text: '운동' }, TUE);
+  const created = await migrateToTomorrow(db, item.id, TUE);
+  await undoMigration(db, created.id, 'open', TUE);
+  await expect(undoMigration(db, created.id, 'open', TUE)).rejects.toThrow('되돌릴 옮긴 일을 찾을 수 없습니다');
+  await expect(undoMigration(db, item.id, 'open', TUE)).rejects.toThrow('되돌릴 옮긴 일을 찾을 수 없습니다');
+  await expect(undoMigration(db, 'nope', 'open', TUE)).rejects.toThrow('되돌릴 옮긴 일을 찾을 수 없습니다');
+});
+
+test('undoMigration: 원래 줄이 이미 옮긴 상태가 아니면 거부하고 아무것도 바꾸지 않는다', async () => {
+  const item = await addItem(db, { kind: 'task', text: '운동' }, TUE);
+  const created = await migrateToTomorrow(db, item.id, TUE);
+  await db.runAsync("UPDATE items SET status = 'open' WHERE id = ?", [item.id]);
+  await expect(undoMigration(db, created.id, 'open', TUE)).rejects.toThrow('옮긴 상태가 아니라');
+  expect((await listItemsForDate(db, '2026-10-07')).map((i) => i.id)).toEqual([created.id]);
 });
