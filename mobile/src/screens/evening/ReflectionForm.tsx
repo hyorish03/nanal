@@ -7,10 +7,7 @@ import { RuledPaper } from '../../ui/RuledPaper';
 import { colors, fonts } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { macText } from '../../ui/desktop';
-
-// 줄 노트 간격. 선은 줄 상자 맨 아래에서 SIT만큼 올라와 글자 기준선 바로 밑에 그어진다.
-export const RULE = 32;
-export const SIT = 6;
+import { useRule } from './rule';
 
 type Props = {
   title?: string; // 고칠 때 맨 윗줄에 템플릿 이름
@@ -32,23 +29,27 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
   const button = useRef<View>(null);
   const focused = useRef<string | null>(null);
   const follow = (key: string) => keep(fields.get(key) ?? null, button.current);
+  // 선은 줄 상자 맨 아래에서 sit만큼 올라와 글자 기준선 바로 밑에 그어진다
+  const rule = useRule();
+  const formQ = { fontSize: rule.hand, lineHeight: rule.lineHeight };
+  const answer = { minHeight: rule.line * 2, fontSize: rule.body, lineHeight: rule.lineHeight };
 
   return (
-    <RuledPaper lineHeight={RULE} firstLineTop={top + RULE - SIT} style={[styles.form, { paddingTop: top }, style]}>
+    <RuledPaper lineHeight={rule.line} firstLineTop={top + rule.line - rule.sit} style={[styles.form, { paddingTop: top }, style]}>
       {title !== undefined && (
-        <Txt variant="hand" style={styles.formQ}>
+        <Txt variant="hand" style={formQ}>
           {title}
         </Txt>
       )}
       {questions.map((q) => (
         <View key={q.key} ref={(v) => void fields.set(q.key, v)}>
           {q.text !== '' && (
-            <Txt variant="hand" style={styles.formQ} accessible={false} importantForAccessibility="no">
+            <Txt variant="hand" style={formQ} accessible={false} importantForAccessibility="no">
               {q.text}
             </Txt>
           )}
           <TextInput
-            style={macText(styles.answer)}
+            style={macText([styles.answer, answer])}
             multiline
             maxLength={MAX_ANSWER_LENGTH}
             accessibilityLabel={q.text || title}
@@ -92,10 +93,9 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
 }
 
 const styles = StyleSheet.create({
-  // 질문과 답이 모두 RULE 간격으로 쌓여야 글자가 선 위에 앉는다(gap을 두지 않는다)
+  // 질문과 답이 모두 같은 줄 간격(rule)으로 쌓여야 글자가 선 위에 앉는다(gap을 두지 않는다)
   form: { paddingHorizontal: 16, paddingBottom: 14 },
-  formQ: { fontSize: 23, lineHeight: RULE },
-  answer: { minHeight: RULE * 2, fontSize: 15, lineHeight: RULE, fontFamily: fonts.body, color: colors.ink, padding: 0, textAlignVertical: 'top' },
+  answer: { fontFamily: fonts.body, color: colors.ink, padding: 0, textAlignVertical: 'top' },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 },
   cancel: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center' },
   cancelText: { fontSize: 15, color: colors.inkSoft },
