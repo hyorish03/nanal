@@ -3,7 +3,7 @@ import { CommonActions, DefaultTheme, NavigationContainer, StackActions, type Th
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, AppState, Keyboard, Linking, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Animated, AppState, Keyboard, LayoutAnimation, Linking, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import type { Db } from '../db/types';
@@ -24,7 +24,7 @@ import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
 import { type Pane, PaneContext } from '../ui/pane';
 import { useLayoutClass, WIDE } from '../ui/responsive';
-import { Sidebar, type SidebarKey } from '../ui/Sidebar';
+import { Sidebar, SidebarOpenButton, type SidebarKey } from '../ui/Sidebar';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { takePendingAction } from '../widget/pendingAction';
 import { reloadWidgets } from '../widget/reload';
@@ -33,6 +33,8 @@ import { EveningScreen } from './EveningScreen';
 import { MonthlyReviewScreen } from './MonthlyReviewScreen';
 import { OnboardingScreen } from './OnboardingScreen';
 import { TodayScreen } from './TodayScreen';
+
+const SIDEBAR_KEY = 'nanal.sidebarCollapsed';
 
 export function Main({ db, userId }: { db: Db; userId: string }) {
   const [claim, setClaim] = useState<'pending' | 'ok' | 'mismatch' | 'error'>('pending');
@@ -121,7 +123,22 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const reduce = useReduceMotion();
   // 아이패드·Mac(넓은 배치)에서는 왼쪽 사이드바가 오늘·하루 마무리·지난 기록을 바꾼다. 온보딩에는 없다.
   const wide = useLayoutClass() !== 'compact';
-  const sidebar = wide && screen === 'today';
+  // 아이패드·Mac에서 사이드바를 접어 둘 수 있다. 접은 상태는 기기에 기억한다(읽기 실패면 펼친 채로).
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(SIDEBAR_KEY)
+      .then((v) => setSidebarCollapsed(v === '1'))
+      .catch(() => {});
+  }, []);
+  const toggleSidebar = useCallback(() => {
+    if (!reduce) LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
+    setSidebarCollapsed((c) => {
+      AsyncStorage.setItem(SIDEBAR_KEY, c ? '0' : '1').catch(() => {});
+      return !c;
+    });
+  }, [reduce]);
+  const sidebar = wide && screen === 'today' && !sidebarCollapsed;
+  const canReopenSidebar = wide && screen === 'today' && sidebarCollapsed;
   const insets = useSafeAreaInsets();
   const { width: windowW } = useWindowDimensions();
   const pane = useMemo<Pane>(
@@ -249,7 +266,13 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
       <EveningBackdrop on={screen === 'today' && route === 'evening'} />
       <Paper />
       <View style={styles.shell}>
-        {sidebar && <Sidebar current={route === 'today' ? 'today' : route === 'evening' ? 'evening' : 'archive'} onSelect={selectSection} />}
+        {sidebar && (
+          <Sidebar
+            current={route === 'today' ? 'today' : route === 'evening' ? 'evening' : 'archive'}
+            onSelect={selectSection}
+            onCollapse={toggleSidebar}
+          />
+        )}
         <SafeAreaView style={styles.container} edges={sidebar ? ['top', 'bottom', 'right'] : undefined}>
           <ScreenEnter key={screen ?? 'none'} reduce={reduce}>
             {screen === 'onboarding' && (
@@ -335,6 +358,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
             )}
           </ScreenEnter>
         </SafeAreaView>
+        {canReopenSidebar && <SidebarOpenButton onPress={toggleSidebar} />}
       </View>
       <SyncBar pending={pending} error={error} />
       <Cover

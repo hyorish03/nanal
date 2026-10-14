@@ -10,14 +10,14 @@ import { useSpace } from './typeScale';
 
 export type SidebarKey = 'today' | 'evening' | 'archive';
 
-type Props = { current: SidebarKey; onSelect: (key: SidebarKey) => void };
+type Props = { current: SidebarKey; onSelect: (key: SidebarKey) => void; onCollapse?: () => void };
 
 const ICON = 20;
 const SPINE_W = 10; // 왼쪽 끝 남색 천 책등
 
 // 아이패드·Mac의 왼쪽 칸. 공책 왼쪽에 붙은 남색 책등과 면지 한 장에 오늘·하루 마무리·지난 기록을 적어 둔다.
 // 휴대폰의 하루 마무리 버튼과 지난 기록 책갈피 끈을 대신한다.
-export function Sidebar({ current, onSelect }: Props) {
+export function Sidebar({ current, onSelect, onCollapse }: Props) {
   const insets = useSafeAreaInsets();
   const s = useSpace();
   return (
@@ -27,9 +27,21 @@ export function Sidebar({ current, onSelect }: Props) {
         <Paper texture="cloth" />
       </View>
       <View style={[styles.inner, { paddingLeft: SPINE_W + s.md + insets.left, paddingRight: s.md, gap: s.xl }]}>
-        <Txt variant="title" accessibilityRole="header" style={styles.brand}>
-          나날
-        </Txt>
+        <View style={styles.head}>
+          <Txt variant="title" accessibilityRole="header" style={styles.brand}>
+            나날
+          </Txt>
+          {onCollapse && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="사이드바 접기"
+              onPress={onCollapse}
+              style={({ pressed }) => [styles.toggle, pressed && styles.rowHover]}
+            >
+              <PanelIcon />
+            </Pressable>
+          )}
+        </View>
         <View style={styles.list}>
           <Row label="오늘" icon={<TodayIcon />} selected={current === 'today'} onPress={() => onSelect('today')} />
           <Row label="하루 마무리" icon={<LampIcon />} selected={current === 'evening'} onPress={() => onSelect('evening')} />
@@ -58,6 +70,31 @@ function Row({ label, icon, selected, onPress }: { label: string; icon: ReactNod
         {label}
       </Txt>
     </Pressable>
+  );
+}
+
+// 사이드바를 접었을 때 본문 왼쪽 위에 남는 작은 버튼. 누르면 다시 편다.
+export function SidebarOpenButton({ onPress }: { onPress: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="사이드바 펴기"
+      onPress={onPress}
+      style={({ pressed }) => [styles.openButton, { top: insets.top + 8, left: insets.left + 12 }, pressed && styles.rowHover]}
+    >
+      <PanelIcon />
+    </Pressable>
+  );
+}
+
+// 왼쪽 칸이 있는 창(사이드바 접기·펴기)
+function PanelIcon() {
+  return (
+    <Svg width={ICON} height={ICON} viewBox="0 0 20 20" fill="none">
+      <Rect x={2.5} y={3.5} width={15} height={13} rx={2} stroke={colors.inkSoft} strokeWidth={1.4} />
+      <Line x1={7.5} y1={3.5} x2={7.5} y2={16.5} stroke={colors.inkSoft} strokeWidth={1.4} />
+    </Svg>
   );
 }
 
@@ -108,6 +145,9 @@ const styles = StyleSheet.create({
     borderRightColor: colors.navyDeep,
   },
   inner: { flex: 1 },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  toggle: { width: HIT, height: HIT, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  openButton: { position: 'absolute', zIndex: 5, width: HIT, height: HIT, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
   brand: { fontSize: 24, letterSpacing: 4, paddingHorizontal: 12, color: colors.navy },
   list: { gap: 2 },
   row: {

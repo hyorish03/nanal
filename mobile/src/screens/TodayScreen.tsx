@@ -74,7 +74,9 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   // 창이 충분히 넓으면(wide) 넘어온 일·끝낸 일 수·기호 설명을 오른쪽 칸으로 뺀다.
   const pane = usePane();
   const layout = useLayoutClass();
-  const roomy = pane.sidebar;
+  // 넓은 배치는 창 폭으로, 리본·하루 마무리 버튼은 사이드바가 안 보일 때(접었거나 휴대폰) 보인다
+  const roomy = layout !== 'compact';
+  const showNav = !pane.sidebar;
   const panel = roomy && layout === 'wide' && pane.width >= PANEL_MIN;
   const s = useSpace();
   const ruleGap = useRuleGap();
@@ -252,7 +254,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           </Txt>
           <Txt variant="hand">기록한 날 {recordedDays}일</Txt>
         </View>
-        {!roomy && (
+        {showNav && (
           <View style={styles.headerActions}>
             <Pressable
               accessibilityRole="button"
@@ -279,7 +281,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       </Pressable>
   
       {/* 지난 기록 책갈피 끈: 하루 마무리 버튼 왼쪽, 화면 맨 위에 매달린다 */}
-      {!roomy && onOpenArchive && eveningW > 0 && <Ribbon onPress={onOpenArchive} style={{ right: SCREEN_X + eveningW + RIBBON_GAP }} />}
+      {showNav && onOpenArchive && eveningW > 0 && <Ribbon onPress={onOpenArchive} style={{ right: SCREEN_X + eveningW + RIBBON_GAP }} />}
   
       {/* 공책 한 쪽: 여백선은 목록 뒤에 깔리고, 빈 줄은 목록 꼬리에서 함께 스크롤된다 */}
       <View style={styles.page}>
