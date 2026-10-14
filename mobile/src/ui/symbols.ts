@@ -4,6 +4,9 @@ export type SymbolKind = 'open' | 'doing' | 'done' | 'migrated' | 'dropped' | 'n
 
 type ItemLike = Pick<Item, 'kind' | 'status'>;
 
+// 줄이 놓인 곳. day: 하루 장(오늘·지난 날). someday: 언젠가 목록(진행 중이 없어 할 일 → 끝낸 일 → 할 일, 옮긴 일은 오늘로 옮긴 일)
+export type RowPlace = 'day' | 'someday';
+
 export function symbolKind(item: ItemLike): SymbolKind {
   if (item.kind === 'note') return 'note';
   return item.status ?? 'open';
@@ -31,8 +34,16 @@ const ADVANCE: Partial<Record<SymbolKind, { label: string; to: SymbolKind }>> = 
   dropped: { label: '다시 하기', to: 'open' },
 };
 
-export function advanceAction(item: ItemLike): { label: string; to: SymbolKind } | null {
-  return ADVANCE[symbolKind(item)] ?? null;
+// 언젠가에서만 다른 것
+const SOMEDAY_ADVANCE: Partial<Record<SymbolKind, { label: string; to: SymbolKind }>> = {
+  open: { label: '끝낸 일로', to: 'done' },
+};
+const SOMEDAY_HINT: Partial<Record<SymbolKind, string>> = { open: '누르면 끝낸 일로 바뀌어요' };
+const SOMEDAY_WORD: Partial<Record<SymbolKind, string>> = { migrated: '오늘로 옮긴 일' };
+
+export function advanceAction(item: ItemLike, place: RowPlace = 'day'): { label: string; to: SymbolKind } | null {
+  const k = symbolKind(item);
+  return (place === 'someday' ? SOMEDAY_ADVANCE[k] : undefined) ?? ADVANCE[k] ?? null;
 }
 
 const HINT: Partial<Record<SymbolKind, string>> = {
@@ -43,13 +54,16 @@ const HINT: Partial<Record<SymbolKind, string>> = {
 };
 
 // 스크린 리더가 읽는 이름: 글을 먼저, 그다음 상태와 중요("장보기, 할 일, 중요")
-export function itemA11yLabel(item: ItemLike & Pick<Item, 'priority' | 'text'>): string {
-  return `${item.text}, ${WORD[symbolKind(item)]}${item.priority ? ', 중요' : ''}`;
+export function itemA11yLabel(item: ItemLike & Pick<Item, 'priority' | 'text'>, place: RowPlace = 'day'): string {
+  const k = symbolKind(item);
+  const word = (place === 'someday' ? SOMEDAY_WORD[k] : undefined) ?? WORD[k];
+  return `${item.text}, ${word}${item.priority ? ', 중요' : ''}`;
 }
 
 // 눌렀을 때 일어날 일은 이름이 아니라 힌트로 따로 읽는다
-export function itemA11yHint(item: ItemLike): string | undefined {
-  return HINT[symbolKind(item)];
+export function itemA11yHint(item: ItemLike, place: RowPlace = 'day'): string | undefined {
+  const k = symbolKind(item);
+  return (place === 'someday' ? SOMEDAY_HINT[k] : undefined) ?? HINT[k];
 }
 
 export type LegendEntry = {

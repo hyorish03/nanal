@@ -40,3 +40,14 @@ test('안 하기로 한 일: 줄을 그어 남기고, 누르면 다시 할 일�
   expect(itemA11yHint(task('dropped'))).toBe('누르면 다시 할 일로 바뀌어요');
   expect(LEGEND.find((e) => e.symbol === 'dropped')?.desc).toContain('지우지 않고 줄을 그어 남겨요');
 });
+
+test('언젠가 줄: 진행 중 없이 끝낸 일로, 옮긴 일은 오늘로 옮긴 일', () => {
+  const t = (status: 'open' | 'done' | 'migrated' | 'dropped') => ({ kind: 'task' as const, status, priority: false, text: '책' });
+  expect(advanceAction(t('open'), 'someday')).toEqual({ label: '끝낸 일로', to: 'done' });
+  expect(advanceAction(t('done'), 'someday')).toEqual({ label: '다시 할 일로', to: 'open' });
+  expect(advanceAction(t('dropped'), 'someday')).toEqual({ label: '다시 하기', to: 'open' });
+  expect(advanceAction(t('migrated'), 'someday')).toBeNull();
+  expect(itemA11yHint(t('open'), 'someday')).toBe('누르면 끝낸 일로 바뀌어요');
+  expect(itemA11yLabel(t('migrated'), 'someday')).toBe('책, 오늘로 옮긴 일');
+  expect(itemA11yLabel(t('migrated'))).toBe('책, 옮긴 일');
+});

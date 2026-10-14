@@ -18,6 +18,7 @@ test.each([
   ['items', 'id'],
   ['reflections', 'id'],
   ['templates', 'id'],
+  ['someday', 'id'],
   ['days', 'user_id,date'],
   ['monthly_reviews', 'user_id,month'],
 ] as const)('%s는 onConflict %s로 올린다', async (table, onConflict) => {

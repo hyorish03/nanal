@@ -1,19 +1,30 @@
 import type { Item } from '../../items/repo';
+import type { RowPlace } from '../../ui/symbols';
 
 // 오늘 목록 줄 밀기의 규칙. 손가락 위치만 받아 정하는 순수한 부분이라 화면 없이 시험한다.
 
-export type SwipeAction = 'postpone' | 'drop' | 'delete';
+// today: 언젠가 목록의 '오늘 할 일로'(미루기 자리에 온다)
+export type SwipeAction = 'postpone' | 'today' | 'drop' | 'delete';
 
 type RowLike = Pick<Item, 'kind' | 'status'>;
 
 // 왼쪽으로 밀면 오른쪽에 드러나는 버튼(안쪽 → 바깥쪽): 미루기 · 안 하기 · 지우기. 지우기가 늘 맨 바깥이다(끝까지 밀면 지우기).
 // 오른쪽으로 밀어 형광펜을 칠하는 건 끝나지 않은 할 일만(메뉴의 중요 표시와 같다).
-export function swipeActionsFor(item: RowLike): { left: SwipeAction[]; mark: boolean } {
+// 언젠가 목록은 오늘 할 일로 · 지우기 둘만(안 하기는 메뉴에).
+export function swipeActionsFor(item: RowLike, place: RowPlace = 'day'): { left: SwipeAction[]; mark: boolean } {
   const unfinished = item.kind === 'task' && (item.status === 'open' || item.status === 'doing');
+  if (place === 'someday') return { left: unfinished ? ['today', 'delete'] : ['delete'], mark: unfinished };
   return { left: unfinished ? ['postpone', 'drop', 'delete'] : ['delete'], mark: unfinished };
 }
 
 export const ACTION_W = 80; // 버튼 하나의 폭(넓은 배치는 글자 배율만큼 키운다)
+// '오늘 할 일로'는 글이 길어 버튼 1.5개 폭을 쓴다. 나머지는 하나씩
+const ACTION_SPAN: Record<SwipeAction, number> = { postpone: 1, today: 1.5, drop: 1, delete: 1 };
+export const actionSpan = (a: SwipeAction) => ACTION_SPAN[a];
+// 왼쪽으로 밀어 드러나는 버튼 칸 전체 폭
+export function actionsWidth(actions: SwipeAction[], actionW: number): number {
+  return Math.round(actions.reduce((w, a) => w + ACTION_SPAN[a], 0) * actionW);
+}
 export const FULL_RATIO = 0.6; // 줄 폭의 이만큼 넘게 밀면 놓자마자 지운다
 const MARK_RATIO = 0.3; // 오른쪽으로 이만큼 밀면 형광펜
 const MARK_MIN = 72;

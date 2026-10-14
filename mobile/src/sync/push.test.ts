@@ -4,6 +4,7 @@ import { migrate } from '../db/schema';
 import type { Db } from '../db/types';
 import { addItem, advanceStatus, dropItem } from '../items/repo';
 import { setMood } from '../days/repo';
+import { addSomeday, moveSomedayToToday } from '../someday/repo';
 import { markDirty, pendingCount } from './outbox';
 import { push } from './push';
 
@@ -93,3 +94,23 @@ test('서버가 아직 안 하기(dropped)를 모르면: items는 outbox에 남�
 });
 
 const listLocal = (id: string) => db.getFirstAsync<{ status: string }>('SELECT status FROM items WHERE id = ?', [id]);
+
+test('서버에 아직 someday 표가 없으면: someday만 outbox에 남고, 함께 만든 오늘 할 일은 올라간다', async () => {
+  const fake = createFakeRemote();
+  const s = await addSomeday(db, '언젠가 할 일', NOW);
+  const created = await moveSomedayToToday(db, s.id, NOW);
+  const upsert = fake.remote.upsert;
+  fake.remote.upsert = async (table, rows) => {
+    if (table === 'someday') throw new Error('someday 업로드 실패: relation "public.someday" does not exist');
+    await upsert(table, rows);
+  };
+  await expect(push(db, fake.remote)).rejects.toThrow('someday');
+  expect(fake.store.items.get(created.id)).toMatchObject({ text: '언젠가 할 일', status: 'open' });
+  expect(await db.getAllAsync('SELECT table_name, row_key FROM outbox', [])).toEqual([{ table_name: 'someday', row_key: s.id }]);
+
+  // 서버 마이그레이션 뒤: 그대로 올라간다(priority는 boolean으로)
+  fake.remote.upsert = upsert;
+  await push(db, fake.remote);
+  expect(fake.store.someday.get(s.id)).toMatchObject({ status: 'migrated', migrated_to: created.id, priority: false });
+  expect(await pendingCount(db)).toBe(0);
+});

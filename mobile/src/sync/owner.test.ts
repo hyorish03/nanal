@@ -1,6 +1,7 @@
 import { openTestDb } from '../../test/sqlite';
 import { migrate } from '../db/schema';
 import { addItem } from '../items/repo';
+import { addSomeday } from '../someday/repo';
 import { claimOwner, wipeLocalData } from './owner';
 
 test('처음 claim하면 ok', async () => {
@@ -29,8 +30,10 @@ test('wipeLocalData: 기록·보낼 목록·소유자를 비워 다른 계정이
   await migrate(db);
   await claimOwner(db, 'user-a');
   await addItem(db, { kind: 'task', text: 'a' });
+  await addSomeday(db, '언젠가');
   await wipeLocalData(db);
   expect(await db.getAllAsync('SELECT id FROM items', [])).toEqual([]);
+  expect(await db.getAllAsync('SELECT id FROM someday', [])).toEqual([]);
   expect(await db.getAllAsync('SELECT row_key FROM outbox', [])).toEqual([]);
   expect(await claimOwner(db, 'user-b')).toBe('ok');
 });

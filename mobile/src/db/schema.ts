@@ -125,6 +125,19 @@ const MIGRATIONS = [
   ALTER TABLE items_v4 RENAME TO items;
   CREATE INDEX items_date ON items (date);
   `,
+  // v5: 언젠가(날짜 없는 할 일 한 목록). 오늘 할 일로 옮기면 지우지 않고 migrated로 남기고, 만든 할 일의 id를 migrated_to에 적는다
+  `
+  CREATE TABLE someday (
+    id TEXT PRIMARY KEY NOT NULL,
+    text TEXT NOT NULL CHECK (length(trim(text)) > 0),
+    status TEXT NOT NULL CHECK (status IN ('open', 'done', 'migrated', 'dropped')),
+    priority INTEGER NOT NULL DEFAULT 0 CHECK (priority IN (0, 1)),
+    migrated_to TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT
+  );
+  `,
 ];
 
 // target은 테스트에서 이전 버전 데이터를 만들 때만 쓴다.

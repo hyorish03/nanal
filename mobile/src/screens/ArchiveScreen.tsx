@@ -23,6 +23,7 @@ import { confirmDelete, showActionSheet } from '../ui/dialogs';
 import { DayDetail, type Editing } from './archive/DayDetail';
 import { EntryCard } from './archive/EntryCard';
 import { MonthCalendar } from './archive/MonthCalendar';
+import { SomedayList } from './archive/SomedayList';
 import { hasAnswer } from './evening/draft';
 import { useKeepVisible } from './evening/useKeepVisible';
 
@@ -34,11 +35,12 @@ type Props = {
   onOpenMonthRitual?: () => void; // 월초 정리를 1일이 아니어도 열 수 있는 입구
   onChanged?: () => void;
 };
-type Tab = 'calendar' | 'collection';
+type Tab = 'calendar' | 'collection' | 'someday';
 
 const TABS = [
   ['calendar', '달력'],
   ['collection', '회고 모아보기'],
+  ['someday', '언젠가'], // 날짜 없이 언젠가 할 일 한 목록(SomedayList)
 ] as const;
 const PAGE = 20; // 회고 모아보기를 한 번에 읽는 개수
 const LOAD_ERROR = '기록을 불러오지 못했어요. 잠시 뒤에 다시 해 주세요';
@@ -283,14 +285,14 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
     <>
       <PageHeader title="지난 기록" onBack={onClose} />
 
-      <View style={[styles.tabs, large && styles.tabsLarge]}>
+      <View accessibilityRole="tablist" style={[styles.tabs, large && styles.tabsLarge]}>
         {TABS.map(([key, label], i) => {
           const on = tab === key;
           return (
             <Pressable
               key={key}
-              accessibilityRole="button"
-              accessibilityLabel={`${label}, 탭, ${i + 1}/${TABS.length}`}
+              accessibilityRole="tab"
+              accessibilityLabel={`${label}, ${i + 1}/${TABS.length}`}
               accessibilityState={{ selected: on }}
               style={dimPressed([styles.tab, on && styles.tabOn])}
               onPress={() => setTab(key)}
@@ -382,6 +384,23 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
   const measure = (w: number) => {
     if (Math.abs(w - width) > 1) setWidth(w);
   };
+
+  // 언젠가: 모아보기와 같은 자리·폭. 줄 밀기와 스크롤을 조율하는 목록과 되돌리기 토스트는 SomedayList가 가진다
+  if (tab === 'someday') {
+    return (
+      <View style={styles.flex} onLayout={(e) => measure(e.nativeEvent.layout.width)}>
+        <Paper />
+        {fixedHead}
+        <SomedayList
+          db={db}
+          version={version}
+          head={!large && head}
+          contentStyle={[styles.container, column, large && styles.listLarge, styles.somedayContent]}
+          onChanged={onChanged}
+        />
+      </View>
+    );
+  }
 
   if (tab === 'collection') {
     return (
@@ -485,8 +504,9 @@ const styles = StyleSheet.create({
   pane: { paddingTop: 8, paddingBottom: 40, gap: 20 },
   detailPane: { maxWidth: WIDE.readingWidth },
   listHead: { gap: 14 },
+  somedayContent: { gap: 0, flexGrow: 1 }, // 줄 사이를 띄우지 않는다(공책 줄)
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
-  tabsLarge: { maxWidth: 420 },
+  tabsLarge: { maxWidth: 520 },
   tab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabOn: { borderBottomColor: colors.navy },
   tabText: { fontSize: 15 },

@@ -12,9 +12,9 @@ test('테이블을 만들고 두 번 실행해도 안전하다', async () => {
     [],
   );
   expect(tables.map((t) => t.name)).toEqual([
-    'days', 'items', 'monthly_reviews', 'outbox', 'reflections', 'sync_state', 'templates',
+    'days', 'items', 'monthly_reviews', 'outbox', 'reflections', 'someday', 'sync_state', 'templates',
   ]);
-  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 4 });
+  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 5 });
 });
 
 test('task는 status가 필요하고, 그 외 종류는 status가 없어야 한다', async () => {
@@ -65,7 +65,7 @@ test('v1 데이터를 v2로 옮긴다: 일정은 할 일, 놓아준 일은 삭�
 
   await migrate(db);
 
-  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 4 });
+  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 5 });
   expect(await db.getAllAsync('SELECT id, kind, status, priority, deleted_at FROM items ORDER BY id', [])).toEqual([
     { id: 'dr', kind: 'task', status: 'open', priority: 0, deleted_at: TS2 },
     { id: 'ev', kind: 'task', status: 'open', priority: 0, deleted_at: null },
@@ -115,7 +115,7 @@ test('v3 → v4: items를 새로 만들어도 행·우선순위·삭제 표시·
   }
   await db.runAsync("INSERT INTO outbox (table_name, row_key) VALUES ('items', 'a')", []);
 
-  await migrate(db);
+  await migrate(db, 4);
 
   expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 4 });
   expect(await db.getAllAsync(`SELECT ${cols} FROM items ORDER BY id`, [])).toEqual(rows);
@@ -131,4 +131,35 @@ test('v3 → v4: items를 새로 만들어도 행·우선순위·삭제 표시·
   await expect(ins('e', 'task', 'gone')).rejects.toThrow();
   await expect(ins('f', 'note', 'dropped')).rejects.toThrow();
   await expect(ins('g', 'event', null)).rejects.toThrow();
+});
+
+test('v4 → v5: 언젠가 표를 더해도 기존 기록·outbox·동기화 위치가 그대로이고, 언젠가 제약을 지킨다', async () => {
+  const db = openTestDb();
+  await migrate(db, 4);
+  const cols = 'id, date, kind, text, status, priority, migrated_from, created_at, updated_at, deleted_at';
+  const item = { id: 'a', date: '2026-10-06', kind: 'task', text: '보고서', status: 'dropped', priority: 1, migrated_from: null, created_at: TS, updated_at: TS, deleted_at: null };
+  await db.runAsync(`INSERT INTO items (${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, Object.values(item));
+  await db.runAsync('INSERT INTO days (date, mood, updated_at) VALUES (?, ?, ?)', ['2026-10-06', 4, TS]);
+  await db.runAsync("INSERT INTO outbox (table_name, row_key) VALUES ('items', 'a')", []);
+  await db.runAsync("INSERT INTO sync_state (table_name, cursor) VALUES ('owner', 'u1')", []);
+
+  await migrate(db);
+
+  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 5 });
+  expect(await db.getAllAsync(`SELECT ${cols} FROM items`, [])).toEqual([item]);
+  expect(await db.getAllAsync('SELECT date, mood FROM days', [])).toEqual([{ date: '2026-10-06', mood: 4 }]);
+  expect(await db.getAllAsync('SELECT table_name, row_key FROM outbox', [])).toEqual([{ table_name: 'items', row_key: 'a' }]);
+  expect(await db.getAllAsync('SELECT cursor FROM sync_state', [])).toEqual([{ cursor: 'u1' }]);
+  expect(await db.getAllAsync('SELECT id FROM someday', [])).toEqual([]);
+
+  const ins = (id: string, text: string, status: string | null, priority = 0) =>
+    db.runAsync('INSERT INTO someday (id, text, status, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [
+      id, text, status, priority, TS, TS,
+    ]);
+  await expect(ins('s1', '책 읽기', 'open')).resolves.toBeDefined();
+  await expect(ins('s2', '여행', 'migrated', 1)).resolves.toBeDefined();
+  await expect(ins('s3', '  ', 'open')).rejects.toThrow();
+  await expect(ins('s4', 'x', 'doing')).rejects.toThrow(); // 언젠가에는 진행 중이 없다
+  await expect(ins('s5', 'x', null)).rejects.toThrow();
+  await expect(ins('s6', 'x', 'open', 2)).rejects.toThrow();
 });

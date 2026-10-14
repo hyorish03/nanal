@@ -5,7 +5,9 @@ import { migrate } from '../db/schema';
 import type { Db } from '../db/types';
 import { addItem, listItemsForDate } from '../items/repo';
 import { pendingCount } from './outbox';
-import { pull } from './pull';
+import { pull, PullPartlyFailed } from './pull';
+import { listSomeday } from '../someday/repo';
+import { TABLE_NAMES } from './tables';
 
 let db: Db;
 beforeEach(async () => {
@@ -222,4 +224,32 @@ test('month를 키로 쓰는 monthly_reviews도 키셋 커서로 받아 반영�
     [],
   );
   expect(JSON.parse(cursor!.cursor).key).toMatch(/^2026-0\d$/);
+});
+
+test('someday도 동기화 표에 들어 있고, 서버 행을 받아 priority를 0/1로 넣는다', async () => {
+  expect(TABLE_NAMES).toContain('someday');
+  const fake = createFakeRemote();
+  fake.serverWrite('someday', {
+    id: 'sd-1', user_id: 'u1', text: '언젠가', status: 'open', priority: true, migrated_to: null,
+    created_at: '2026-10-06T00:00:00+00:00', updated_at: '2026-10-06T00:00:00+00:00', deleted_at: null,
+  });
+  expect(await pull(db, fake.remote)).toBe(true);
+  expect(await listSomeday(db)).toMatchObject([{ id: 'sd-1', text: '언젠가', priority: true }]);
+});
+
+test('한 표를 받지 못해도(서버에 아직 없는 표) 다른 표는 받고, 바뀐 게 있으면 PullPartlyFailed로 알린다', async () => {
+  const fake = createFakeRemote();
+  fake.serverWrite('items', serverItem({}));
+  const pullAfter = fake.remote.pullAfter;
+  fake.remote.pullAfter = async (table, cursor, limit) => {
+    if (table === 'someday') throw new Error('someday 다운로드 실패: relation "public.someday" does not exist');
+    return pullAfter(table, cursor, limit);
+  };
+  const error = await pull(db, fake.remote).catch((e) => e);
+  expect(error).toBeInstanceOf(PullPartlyFailed);
+  expect(error.message).toContain('someday 다운로드 실패');
+  expect(await listItemsForDate(db, '2026-10-06')).toHaveLength(1);
+  // 바뀐 게 없으면 원래 오류 그대로
+  await expect(pull(db, fake.remote)).rejects.toThrow('someday 다운로드 실패');
+  await expect(pull(db, fake.remote)).rejects.not.toBeInstanceOf(PullPartlyFailed);
 });

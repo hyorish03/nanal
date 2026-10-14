@@ -1,5 +1,5 @@
 import type { Db } from '../db/types';
-import { pull } from './pull';
+import { pull, PullPartlyFailed } from './pull';
 import { push } from './push';
 import type { Remote } from './remote';
 
@@ -23,6 +23,8 @@ export function createSyncEngine(db: Db, remote: Remote, onPulled?: () => void) 
         try {
           if (await pull(db, remote)) onPulled?.();
         } catch (e) {
+          // 받지 못한 표가 있어도 다른 표에서 받은 변경은 화면에 반영한다
+          if (e instanceof PullPartlyFailed) onPulled?.();
           if (!pushFailed) throw e;
           console.warn('pull failed after push failure', e);
         }

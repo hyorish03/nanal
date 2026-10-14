@@ -106,6 +106,28 @@ export async function addItem(
   return item;
 }
 
+// 다른 목록(언젠가)에서 오늘 장으로 옮겨 적을 때. 부르는 쪽 트랜잭션 안에서 열린 할 일 한 줄을 만든다
+export async function insertTaskInTx(tx: Tx, text: string, date: string, now: Date): Promise<Item> {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error('내용을 입력하세요');
+  if (!isDate(date)) throw new Error('날짜 형식이 아닙니다');
+  const ts = now.toISOString();
+  const item: Item = {
+    id: newId(),
+    date,
+    kind: 'task',
+    text: trimmed,
+    status: 'open',
+    priority: false,
+    migrated_from: null,
+    created_at: ts,
+    updated_at: ts,
+    deleted_at: null,
+  };
+  await insertItem(tx, item);
+  return item;
+}
+
 export async function advanceStatus(db: Db, id: string, now = new Date()): Promise<void> {
   await db.transaction(async (tx) => {
     const item = await requireItem(tx, id);

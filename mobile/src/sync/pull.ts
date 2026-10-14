@@ -60,55 +60,79 @@ function minusOverlap(sortable: string): string {
   return `${new Date(seconds).toISOString().slice(0, 19)}${sortable.slice(19)}`;
 }
 
+// 다른 표에서는 바뀐 것을 받았지만 어느 한 표를 받지 못했다. 화면은 다시 읽어야 하므로 changed를 함께 넘긴다.
+export class PullPartlyFailed extends Error {
+  constructor(readonly original: unknown) {
+    super(original instanceof Error ? original.message : String(original));
+    this.name = 'PullPartlyFailed';
+  }
+  readonly changed = true;
+}
+
+// 표마다 따로 받는다. 한 표를 받지 못해도(예: 서버 마이그레이션 전이라 아직 없는 표) 다른 표는 계속 받고,
+// 처음 난 오류는 끝에 다시 던진다(다른 표에서 바뀐 게 있으면 PullPartlyFailed로 감싼다).
+// 받지 못한 표의 커서는 그대로라 다음 동기화에 이어서 받는다.
 export async function pull(db: Db, remote: Remote, options: { pageSize?: number } = {}): Promise<boolean> {
   const pageSize = options.pageSize ?? PAGE;
   let changed = false;
+  let failed: { error: unknown } | null = null;
   for (const table of TABLE_NAMES) {
-    const state = await db.getFirstAsync<{ cursor: string }>('SELECT cursor FROM sync_state WHERE table_name = ?', [
-      table,
-    ]);
-    const stored = parseStoredCursor(state?.cursor);
-    let saved = stored;
-    let next: PullCursor | null = stored ? { syncedAt: minusOverlap(stored.syncedAt), key: null } : null;
+    try {
+      if (await pullTable(db, remote, table, pageSize)) changed = true;
+    } catch (e) {
+      failed ??= { error: e };
+    }
+  }
+  if (failed) throw changed ? new PullPartlyFailed(failed.error) : failed.error;
+  return changed;
+}
 
-    for (;;) {
-      const rows = await remote.pullAfter(table, next, pageSize);
-      // 한 페이지를 한 트랜잭션으로 반영한다. 사용자 쓰기와 섞이지 않는다.
-      // 데이터 오류로 건너뛴 행은 이후에 다시 시도하지 않는다(커서가 지나가며, 같은 행은 다시 해도 같은 오류이기 때문).
-      // 그 외 오류(디스크, 연결 등)는 일시적일 수 있으므로 던져서 페이지를 롤백하고 커서를 옮기지 않는다.
-      const pageChanged = await db.transaction(async (tx) => {
-        let any = false;
-        for (const r of rows) {
-          try {
-            if (await applyRemoteRow(tx, table, fromRemote(table, r))) any = true;
-          } catch (error) {
-            if (!isRowDataError(error)) throw error;
-            console.warn(`pull: ${table} 행을 건너뜀 (key=${String(r[TABLES[table].key])})`, error);
-          }
-        }
-        return any;
-      });
-      if (pageChanged) changed = true;
+async function pullTable(db: Db, remote: Remote, table: TableName, pageSize: number): Promise<boolean> {
+  let changed = false;
+  const state = await db.getFirstAsync<{ cursor: string }>('SELECT cursor FROM sync_state WHERE table_name = ?', [
+    table,
+  ]);
+  const stored = parseStoredCursor(state?.cursor);
+  let saved = stored;
+  let next: PullCursor | null = stored ? { syncedAt: minusOverlap(stored.syncedAt), key: null } : null;
 
-      if (rows.length > 0) {
-        const last = rows[rows.length - 1];
-        const lastCursor: StoredCursor = {
-          syncedAt: sortableTimestamp(String(last.synced_at)),
-          key: String(last[TABLES[table].key]),
-        };
-        next = lastCursor;
-        // 커서는 뒤로 가지 않는다. 반영이 멱등이므로 페이지마다 저장해도 안전하다.
-        if (!saved || isAfter(lastCursor, saved)) {
-          saved = lastCursor;
-          await db.runAsync(
-            `INSERT INTO sync_state (table_name, cursor) VALUES (?, ?)
-             ON CONFLICT (table_name) DO UPDATE SET cursor = excluded.cursor`,
-            [table, JSON.stringify(saved)],
-          );
+  for (;;) {
+    const rows = await remote.pullAfter(table, next, pageSize);
+    // 한 페이지를 한 트랜잭션으로 반영한다. 사용자 쓰기와 섞이지 않는다.
+    // 데이터 오류로 건너뛴 행은 이후에 다시 시도하지 않는다(커서가 지나가며, 같은 행은 다시 해도 같은 오류이기 때문).
+    // 그 외 오류(디스크, 연결 등)는 일시적일 수 있으므로 던져서 페이지를 롤백하고 커서를 옮기지 않는다.
+    const pageChanged = await db.transaction(async (tx) => {
+      let any = false;
+      for (const r of rows) {
+        try {
+          if (await applyRemoteRow(tx, table, fromRemote(table, r))) any = true;
+        } catch (error) {
+          if (!isRowDataError(error)) throw error;
+          console.warn(`pull: ${table} 행을 건너뜀 (key=${String(r[TABLES[table].key])})`, error);
         }
       }
-      if (rows.length < pageSize) break;
+      return any;
+    });
+    if (pageChanged) changed = true;
+
+    if (rows.length > 0) {
+      const last = rows[rows.length - 1];
+      const lastCursor: StoredCursor = {
+        syncedAt: sortableTimestamp(String(last.synced_at)),
+        key: String(last[TABLES[table].key]),
+      };
+      next = lastCursor;
+      // 커서는 뒤로 가지 않는다. 반영이 멱등이므로 페이지마다 저장해도 안전하다.
+      if (!saved || isAfter(lastCursor, saved)) {
+        saved = lastCursor;
+        await db.runAsync(
+          `INSERT INTO sync_state (table_name, cursor) VALUES (?, ?)
+           ON CONFLICT (table_name) DO UPDATE SET cursor = excluded.cursor`,
+          [table, JSON.stringify(saved)],
+        );
+      }
     }
+    if (rows.length < pageSize) break;
   }
   return changed;
 }

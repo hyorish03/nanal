@@ -106,3 +106,20 @@ test('push가 실패해도 pull은 진행하고 push 오류로 거절된다', as
   await expect(engine.sync()).rejects.toThrow('network down');
   expect(onPulled).toHaveBeenCalledTimes(1);
 });
+
+test('서버에 아직 없는 표 때문에 pull이 일부 실패해도, 다른 표에서 받은 변경은 onPulled로 알리고 오류로 거절된다', async () => {
+  const db = openTestDb();
+  await migrate(db);
+  const fake = createFakeRemote();
+  fake.serverWrite('days', { user_id: 'u1', date: '2026-10-06', mood: 3, updated_at: '2026-10-06T00:00:00Z', deleted_at: null });
+  const pullAfter = fake.remote.pullAfter;
+  fake.remote.pullAfter = async (table, cursor, limit) => {
+    if (table === 'someday') throw new Error('someday 다운로드 실패');
+    return pullAfter(table, cursor, limit);
+  };
+  const onPulled = jest.fn();
+  const engine = createSyncEngine(db, fake.remote, onPulled);
+
+  await expect(engine.sync()).rejects.toThrow('someday 다운로드 실패');
+  expect(onPulled).toHaveBeenCalledTimes(1);
+});

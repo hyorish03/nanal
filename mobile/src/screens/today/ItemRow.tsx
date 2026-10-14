@@ -7,7 +7,7 @@ import { Highlight } from '../../ui/Highlight';
 import { EASE_OUT } from '../../ui/motion';
 import { Popover, useAnchor } from '../../ui/Popover';
 import { StatusSymbol } from '../../ui/StatusSymbol';
-import { advanceAction, canAdvance, itemA11yHint, itemA11yLabel, symbolKind } from '../../ui/symbols';
+import { advanceAction, canAdvance, itemA11yHint, itemA11yLabel, type RowPlace, symbolKind } from '../../ui/symbols';
 import { colors, fonts } from '../../ui/theme';
 import { MAX_FONT_SCALE, Txt, txtStyle } from '../../ui/Txt';
 import { dimPressed, tintPressed } from '../../ui/press';
@@ -15,7 +15,7 @@ import { useTextScale } from '../../ui/typeScale';
 import { useEvent } from '../../ui/useEvent';
 import { useReduceMotion } from '../../ui/useReduceMotion';
 import { ROW_PAD_WIDE, RULE_GAP, ruleGapFor } from './NotebookPage';
-import { ACTION_W, dragTo, markAt, openRow, settleLeft, swipeActionsFor, type Zone, zoneAt } from './swipe';
+import { ACTION_W, actionSpan, actionsWidth, dragTo, markAt, openRow, settleLeft, swipeActionsFor, type Zone, zoneAt } from './swipe';
 
 // 값은 원시값만, 함수는 화면이 한 번 만든 것(id를 받는다)만 받는다. 그래야 memo가 다른 줄의 변화에 다시 그리지 않는다.
 type Props = {
@@ -33,10 +33,16 @@ type Props = {
   onDelete: (id: string) => void;
   onPriorityFull: () => void; // 중요가 다 찬 날 형광펜 쪽으로 밀었다
   onRevealEdit: (id: string, bottom: number) => void; // 고치는 줄의 아래 끝(창 기준). 키보드에 가리면 화면이 목록을 굴린다
+  // 언젠가 목록에서 쓸 때: 진행 중 없이 할 일 ↔ 끝낸 일, 미루기 자리에 '오늘 할 일로'(onPostpone이 바로 옮긴다),
+  // 밀면 오늘 할 일로·지우기만, 옮긴 줄은 흐리게. 기본(day)은 오늘 장 그대로다
+  place?: RowPlace;
 };
 
 export const ItemRow = memo(function ItemRow(props: Props) {
   const { id, kind: itemKind, text, status, priority, priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDrop, onDelete } = props;
+  const place = props.place ?? 'day';
+  const someday = place === 'someday';
+  const postponeLabel = someday ? '오늘 할 일로' : '미루기';
   const menu = useAnchor();
   const reduce = useReduceMotion();
   // 넓은 배치에서는 글자가 커진 만큼 줄 높이도 공책 줄 간격(useRuleGap)에 맞춰 넓힌다
@@ -58,7 +64,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
   const done = kind === 'done';
   const dropped = kind === 'dropped';
   const [marked, setMarked] = useState(false); // 이 줄에 방금 형광펜을 칠했다(그때만 긋는 애니메이션)
-  const next = advanceAction(item);
+  const next = advanceAction(item, place);
   const canMark = item.kind === 'task' && (status === 'open' || status === 'doing');
   const togglePriority = () => {
     setMarked(!item.priority);
@@ -66,9 +72,9 @@ export const ItemRow = memo(function ItemRow(props: Props) {
   };
 
   // ── 밀기: ← 미루기·안 하기·지우기 버튼, → 형광펜 ──
-  const swipe = swipeActionsFor(item);
+  const swipe = swipeActionsFor(item, place);
   const actionW = Math.round(ACTION_W * k.ownScale);
-  const actionsW = swipe.left.length * actionW;
+  const actionsW = actionsWidth(swipe.left, actionW);
   const blocked = swipe.mark && markDisabled;
   const drag = useRef(new Animated.Value(0)).current; // 줄이 옆으로 간 거리. 손가락을 따라 JS에서 바로 넣는다
   const width = useRef(0);
@@ -223,7 +229,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
   const actions = [
     ...(advance ? [{ name: 'activate' }, { name: 'advance', label: '상태 바꾸기' }] : []),
     ...(canMark && !markDisabled ? [{ name: 'priority', label: item.priority ? '중요 표시 지우기' : '중요 표시하기' }] : []),
-    ...(canMark ? [{ name: 'postpone', label: '미루기' }, { name: 'drop', label: '안 하기' }] : []),
+    ...(canMark ? [{ name: 'postpone', label: postponeLabel }, { name: 'drop', label: '안 하기' }] : []),
     { name: 'edit', label: '고치기' },
     { name: 'delete', label: '지우기' },
   ];
@@ -238,12 +244,64 @@ export const ItemRow = memo(function ItemRow(props: Props) {
   };
 
   const variant = kind === 'note' ? 'hand' : 'body';
-  const textStyle = [kind === 'note' ? styles.note : styles.text, done && styles.done, dropped && styles.dropped];
+  const textStyle = [
+    kind === 'note' ? styles.note : styles.text,
+    done && styles.done,
+    dropped && styles.dropped,
+    someday && kind === 'migrated' && styles.moved,
+  ];
   // 밀린 거리 → 왼쪽에서 자라는 형광펜 띠의 폭, 오른쪽 버튼 칸의 폭
   const stripW = drag.interpolate({ inputRange: [0, FAR], outputRange: [0, FAR], extrapolate: 'clamp' });
   const buttonsW = drag.interpolate({ inputRange: [-FAR, 0], outputRange: [FAR, 0], extrapolate: 'clamp' });
   // 칠하기 / 이미 칠했으면 지우개 / 다 찼으면 글 없는 흐린 띠(조금만 따라오고, 놓으면 토스트가 알린다)
   const stripLabel = blocked ? null : item.priority ? '형광펜 지우기' : '중요';
+
+  // ⋯ 메뉴 항목. 오늘 장: 중요 · 미루기 · 안 하기 · 고치기, 언젠가: 오늘 할 일로 · 형광펜 · 고치기 · 안 하기
+  const menuMark = canMark && (
+    <Pressable
+      accessibilityRole="button"
+      disabled={markDisabled}
+      accessibilityState={{ disabled: markDisabled }}
+      style={dimPressed(styles.menuItem)}
+      onPress={pick(togglePriority)}
+    >
+      <View style={styles.swatch} />
+      <Txt style={[styles.menuText, markDisabled && styles.menuDisabled]}>
+        {item.priority ? '중요 표시 지우기' : markDisabled ? '중요 표시는 하루 3개까지예요' : '중요 표시하기'}
+      </Txt>
+    </Pressable>
+  );
+  // 끝나지 않은 할 일만. 미루기는 날짜를 고르는 시트를 열고, 오늘 줄은 › 옮긴 일로 남아 고른 날 장에 새 줄이 생긴다.
+  // 언젠가의 '오늘 할 일로'는 묻지 않고 바로 옮긴다
+  const menuPostpone = canMark && (
+    <Pressable
+      accessibilityRole="button"
+      style={dimPressed(styles.menuItem)}
+      // 메뉴(Modal)가 다 내려간 뒤에 시트(Modal)를 띄운다. 겹쳐 띄우면 iOS가 시트를 띄우지 못할 수 있다
+      onPress={pick(() => (someday ? onPostpone(id) : setTimeout(() => onPostpone(id), MENU_SHEET_DELAY)))}
+    >
+      <View style={styles.swatchText}>
+        <StatusSymbol kind="migrated" size={14} />
+      </View>
+      <Txt style={styles.menuText}>{postponeLabel}</Txt>
+    </Pressable>
+  );
+  // 안 하기: 지우지 않고 줄을 그어 남긴다. 되돌리려면 기호를 누르거나 메뉴의 '다시 하기'
+  const menuDrop = canMark && (
+    <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => onDrop(id))}>
+      <View style={styles.swatchText}>
+        <StatusSymbol kind="dropped" size={14} />
+      </View>
+      <Txt style={styles.menuText}>안 하기</Txt>
+    </Pressable>
+  );
+  // 메뉴가 닫힌 뒤 그 자리에서 고친다
+  const menuEdit = (
+    <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => edit('menu'))}>
+      <Txt style={[styles.menuText, styles.swatchText]}>✎</Txt>
+      <Txt style={styles.menuText}>고치기</Txt>
+    </Pressable>
+  );
 
   return (
     <View
@@ -252,8 +310,8 @@ export const ItemRow = memo(function ItemRow(props: Props) {
       // 고치는 동안에는 입력칸을 스크린 리더가 따로 읽도록 줄을 한 요소로 묶지 않는다
       accessible={!editing}
       accessibilityRole={advance ? 'button' : undefined}
-      accessibilityLabel={itemA11yLabel(item)}
-      accessibilityHint={itemA11yHint(item)}
+      accessibilityLabel={itemA11yLabel(item, place)}
+      accessibilityHint={itemA11yHint(item, place)}
       accessibilityActions={actions}
       onAccessibilityAction={onAction}
       onTouchStart={() => openRow.touch(id)}
@@ -285,6 +343,21 @@ export const ItemRow = memo(function ItemRow(props: Props) {
             <StatusSymbol kind="migrated" size={14} />
             <Txt numberOfLines={1} style={styles.buttonText}>
               미루기
+            </Txt>
+          </Pressable>
+        )}
+        {/* 언젠가: 이 줄을 오늘 장에 옮겨 적는다(› 옮긴 일로 남는다) */}
+        {swipe.left.includes('today') && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="오늘 할 일로"
+            accessibilityHint="오늘 장에 옮겨 적어요"
+            style={dimPressed([styles.button, styles.postpone, { flexGrow: actionSpan('today') }, zone === 'delete' && styles.buttonGone])}
+            onPress={tapAction(() => onPostpone(id))}
+          >
+            <StatusSymbol kind="migrated" size={14} />
+            <Txt numberOfLines={1} style={styles.buttonText}>
+              오늘 할 일로
             </Txt>
           </Pressable>
         )}
@@ -388,48 +461,21 @@ export const ItemRow = memo(function ItemRow(props: Props) {
             <Txt style={styles.menuText}>{next.label}</Txt>
           </Pressable>
         )}
-        {canMark && (
-          <Pressable
-            accessibilityRole="button"
-            disabled={markDisabled}
-            accessibilityState={{ disabled: markDisabled }}
-            style={dimPressed(styles.menuItem)}
-            onPress={pick(togglePriority)}
-          >
-            <View style={styles.swatch} />
-            <Txt style={[styles.menuText, markDisabled && styles.menuDisabled]}>
-              {item.priority ? '중요 표시 지우기' : markDisabled ? '중요 표시는 하루 3개까지예요' : '중요 표시하기'}
-            </Txt>
-          </Pressable>
+        {someday ? (
+          <>
+            {menuPostpone}
+            {menuMark}
+            {menuEdit}
+            {menuDrop}
+          </>
+        ) : (
+          <>
+            {menuMark}
+            {menuPostpone}
+            {menuDrop}
+            {menuEdit}
+          </>
         )}
-        {/* 끝나지 않은 할 일만. 미루기는 날짜를 고르는 시트를 열고, 오늘 줄은 › 옮긴 일로 남아 고른 날 장에 새 줄이 생긴다 */}
-        {canMark && (
-          <Pressable
-            accessibilityRole="button"
-            style={dimPressed(styles.menuItem)}
-            // 메뉴(Modal)가 다 내려간 뒤에 시트(Modal)를 띄운다. 겹쳐 띄우면 iOS가 시트를 띄우지 못할 수 있다
-            onPress={pick(() => setTimeout(() => onPostpone(id), MENU_SHEET_DELAY))}
-          >
-            <View style={styles.swatchText}>
-              <StatusSymbol kind="migrated" size={14} />
-            </View>
-            <Txt style={styles.menuText}>미루기</Txt>
-          </Pressable>
-        )}
-        {/* 안 하기: 지우지 않고 줄을 그어 남긴다. 되돌리려면 기호를 누르거나 메뉴의 '다시 하기' */}
-        {canMark && (
-          <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => onDrop(id))}>
-            <View style={styles.swatchText}>
-              <StatusSymbol kind="dropped" size={14} />
-            </View>
-            <Txt style={styles.menuText}>안 하기</Txt>
-          </Pressable>
-        )}
-        {/* 메뉴가 닫힌 뒤 그 자리에서 고친다 */}
-        <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => edit('menu'))}>
-          <Txt style={[styles.menuText, styles.swatchText]}>✎</Txt>
-          <Txt style={styles.menuText}>고치기</Txt>
-        </Pressable>
         {/* 묻지 않는다. 화면이 '되돌리기'를 잠깐 띄운다 */}
         <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => onDelete(id))}>
           <Txt style={[styles.menuText, styles.danger, styles.swatchText]}>×</Txt>
@@ -465,6 +511,8 @@ const styles = StyleSheet.create({
   done: { color: colors.muted, textDecorationLine: 'line-through' },
   // 안 하기로 한 일: 끝낸 일보다 한 단계 더 흐리게 줄을 긋는다(16pt라 faint도 읽힌다)
   dropped: { color: colors.faint, textDecorationLine: 'line-through' },
+  // 언젠가에서 오늘로 옮긴 줄: 지우지 않고 흐리게 남긴다
+  moved: { color: colors.muted },
   // 입력칸의 기본 여백을 없애 글과 같은 자리에 글자가 놓이게 한다
   input: { alignSelf: 'stretch', padding: 0, paddingTop: 0, paddingBottom: 0, margin: 0 },
   hidden: { opacity: 0 },

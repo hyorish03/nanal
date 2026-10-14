@@ -1,4 +1,4 @@
-import { ACTION_W, dragTo, fullAt, markAt, openRow, settleLeft, swipeActionsFor, zoneAt } from './swipe';
+import { ACTION_W, actionsWidth, dragTo, fullAt, markAt, openRow, settleLeft, swipeActionsFor, zoneAt } from './swipe';
 
 const W = 360; // 휴대폰 줄 폭쯤
 const AW = ACTION_W * 2;
@@ -18,6 +18,20 @@ describe('swipeActionsFor', () => {
     ]) {
       expect(swipeActionsFor(item)).toEqual({ left: ['delete'], mark: false });
     }
+  });
+});
+
+describe('언젠가 목록', () => {
+  it('열린 줄은 오늘 할 일로·지우기와 형광펜, 나머지는 지우기만', () => {
+    expect(swipeActionsFor({ kind: 'task', status: 'open' }, 'someday')).toEqual({ left: ['today', 'delete'], mark: true });
+    for (const status of ['done', 'migrated', 'dropped'] as const) {
+      expect(swipeActionsFor({ kind: 'task', status }, 'someday')).toEqual({ left: ['delete'], mark: false });
+    }
+  });
+
+  it('오늘 할 일로 버튼은 1.5칸, 오늘 장의 버튼 폭은 그대로', () => {
+    expect(actionsWidth(['today', 'delete'], ACTION_W)).toBe(200);
+    expect(actionsWidth(['postpone', 'drop', 'delete'], ACTION_W)).toBe(ACTION_W * 3);
   });
 });
 
