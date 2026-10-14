@@ -30,18 +30,3 @@ export function confirmDelete(title: string, message: string | undefined, onConf
     { text: '지우기', style: 'destructive', onPress: onConfirm },
   ]);
 }
-
-// 한 줄을 고치는 입력 창(iOS). 처음 글을 채워 두고, 바뀐 글만 넘긴다.
-export function promptText(title: string, initial: string, onSubmit: (text: string) => void): void {
-  if (Platform.OS !== 'ios') return;
-  Alert.prompt(
-    title,
-    undefined,
-    [
-      { text: '취소', style: 'cancel' },
-      { text: '저장', isPreferred: true, onPress: (value?: string) => value !== undefined && value.trim() !== initial && onSubmit(value) },
-    ],
-    'plain-text',
-    initial,
-  );
-}

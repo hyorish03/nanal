@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Keyboard, LayoutAnimation, type ListRenderItem, Pressable, StyleSheet, type TextInput, View } from 'react-native';
+import { Animated, type FlatList, Keyboard, LayoutAnimation, type ListRenderItem, Pressable, StyleSheet, type TextInput, View } from 'react-native';
 import type { Db } from '../db/types';
 import {
   addItem,
@@ -26,6 +26,7 @@ import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { ItemRow } from './today/ItemRow';
+import { openRow } from './today/swipe';
 import { MarginRule, NOTE_MARGIN, RuledFill, useRuleGap } from './today/NotebookPage';
 import { Ribbon } from './today/Ribbon';
 import type { LinkAction } from '../lib/deepLink';
@@ -67,6 +68,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const reorder = useRef(false); // 상태·중요를 바꿨거나 포스트잇을 정리했다: 다음에 불러온 목록을 넣을 때만 자리 이동을 애니메이션한다
   const reduce = useReduceMotion();
   const inputRef = useRef<TextInput>(null);
+  const listRef = useRef<FlatList<Item>>(null);
+  const pageRef = useRef<View>(null);
   const scrollY = useRef(new Animated.Value(0)).current; // 여백선이 목록 머리를 따라 움직이게
   const [headerH, setHeaderH] = useState(0);
   const [keyboardUp, setKeyboardUp] = useState(false); // 맺음말은 페이지 맨 아래 자리라 키보드를 따라 올라오지 않는다
@@ -211,6 +214,21 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       });
     }
   });
+  // 형광펜 쪽으로 밀었는데 오늘 중요가 이미 다 찼다(진동은 줄이 준다)
+  const onPriorityFull = useEvent(() => setToast({ key: Date.now(), message: `중요는 하루 ${MAX_PRIORITY_PER_DAY}개까지예요` }));
+  // 제자리에서 고치는 줄이 줄어든 화면(키보드 위) 아래로 가리면, 그 줄이 목록 아래 끝에 오게 굴린다
+  const onRevealEdit = useEvent((id: string, bottom: number) => {
+    pageRef.current?.measureInWindow((_x, y, _w, h) => {
+      if (bottom <= y + h - REVEAL_GAP) return;
+      const index = items.findIndex((i) => i.id === id);
+      if (index < 0) return;
+      try {
+        listRef.current?.scrollToIndex({ index, viewPosition: 1, viewOffset: -REVEAL_GAP, animated: !reduce });
+      } catch {
+        // 아직 재지 못한 줄이면 굴리지 않는다
+      }
+    });
+  });
   const hideToast = useCallback((key: number) => setToast((t) => (t?.key === key ? null : t)), []);
   const onCapture = useEvent(() => openCapture());
 
@@ -240,9 +258,11 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         onEdit={onEdit}
         onPostpone={onPostpone}
         onDelete={onDelete}
+        onPriorityFull={onPriorityFull}
+        onRevealEdit={onRevealEdit}
       />
     ),
-    [priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDelete],
+    [priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDelete, onPriorityFull, onRevealEdit],
   );
 
   // 포스트잇과 입력칸을 목록 머리로 둬서 후보가 많아도 함께 스크롤된다. 컴포넌트 타입이 아닌 엘리먼트라 입력칸이 다시 마운트되지 않는다.
@@ -303,9 +323,10 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       {showNav && onOpenArchive && eveningW > 0 && <Ribbon onPress={onOpenArchive} style={{ right: SCREEN_X + eveningW + RIBBON_GAP }} />}
   
       {/* 공책 한 쪽: 여백선은 목록 뒤에 깔리고, 빈 줄은 목록 꼬리에서 함께 스크롤된다 */}
-      <View style={styles.page}>
+      <View ref={pageRef} style={styles.page}>
         <MarginRule scrollY={scrollY} startY={headerH} />
         <Animated.FlatList
+          ref={listRef}
           style={styles.list}
           data={items}
           keyExtractor={(i) => i.id}
@@ -316,6 +337,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
           ListHeaderComponent={listHeader}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
           scrollEventThrottle={16}
+          onScrollBeginDrag={openRow.closeAll} // 목록을 굴리면 밀어 연 줄을 닫는다
           ListEmptyComponent={
             // 빈 날은 첫 두 줄에 흐리게 적어 두고, 그 아래로 빈 줄이 이어진다. 스크린 리더는 한 번에 읽는다
             <View accessible accessibilityLabel={`${EMPTY_TITLE}. ${EMPTY_HINT}`}>
@@ -343,8 +365,9 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     </>
   );
 
+  // 밀어 연 줄 바깥 어디를 만져도 그 줄을 닫는다(줄 안의 만짐은 줄이 먼저 알려 둔다)
   return (
-    <View style={[styles.container, roomy && styles.containerRoomy]}>
+    <View style={[styles.container, roomy && styles.containerRoomy]} onTouchStart={openRow.touchOutside}>
       <Paper />
       {roomy ? (
         <View style={[styles.roomy, { paddingTop: s.xl, gap: WIDE.gutter }]}>
@@ -396,6 +419,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 // 머리 버튼도 칩처럼 보이는 높이만 낮추고, 누르는 영역은 hitSlop으로 44pt를 지킨다
 const CHIP_SLOP = { top: 5, bottom: 5 };
 const RIBBON_GAP = 16;
+const REVEAL_GAP = 12; // 고치는 줄을 목록 아래 끝에서 이만큼 띄운다
 // 오른쪽 칸을 둘 만한 폭: 바깥 여백 + 공책 최소 480 + 칸 사이 + 오른쪽 칸
 const PANEL_MIN = WIDE.pageX * 2 + 480 + WIDE.gutter + PANEL_W;
 const LOAD_FAILED = '오늘 기록을 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요';
