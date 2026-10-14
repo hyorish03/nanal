@@ -9,7 +9,9 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import type { Db } from '../db/types';
 import { type CoverOpening, markCoverOpened, readCoverOpening } from '../lib/coverOpening';
 import { consumeInitialUrl, type LinkAction, parseDeepLink } from '../lib/deepLink';
+import { logicalDate } from '../lib/date';
 import { hasSeenOnboarding, markOnboardingSeen } from '../lib/onboarding';
+import { listMonthLeftovers, markMonthRitual, readMonthRitualDue } from '../monthly/ritual';
 import { supabase } from '../supabase';
 import { claimOwner } from '../sync/owner';
 import { createSupabaseRemote } from '../sync/supabaseRemote';
@@ -32,6 +34,7 @@ import { reloadWidgets } from '../widget/reload';
 import { ArchiveScreen } from './ArchiveScreen';
 import { EveningScreen } from './EveningScreen';
 import { MonthlyReviewScreen } from './MonthlyReviewScreen';
+import { MonthRitualSheet } from './MonthRitualSheet';
 import { OnboardingScreen } from './OnboardingScreen';
 import { TodayScreen } from './TodayScreen';
 
@@ -118,6 +121,11 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const [coverOpening, setCoverOpening] = useState<CoverOpening>('turn');
   const [focusPending, setFocusPending] = useState(true); // 표지가 열린 뒤 입력칸 포커스는 한 번만
   const [linkAction, setLinkAction] = useState<LinkAction | null>(null);
+  const linkActionRef = useRef<LinkAction | null>(null);
+  linkActionRef.current = linkAction;
+  const [ritualOpen, setRitualOpen] = useState(false); // 월초 정리 시트
+  const [ritualChecked, setRitualChecked] = useState(false); // 첫 실행에 월초 정리를 따져 봤다(그 전에는 입력칸 키보드를 올리지 않는다)
+  const [resumeTick, setResumeTick] = useState(0); // 앱이 다시 앞으로 나올 때마다 하나씩(새 달이 됐을 수 있다)
   const screenRef = useRef<Screen | null>(null);
   screenRef.current = screen;
   const [route, setRoute] = useState<keyof StackParams>('today'); // 저녁 바탕을 켤지 정하려고 맨 위 화면을 따라간다
@@ -153,6 +161,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     if (screenRef.current === 'onboarding') return;
     // 하루 마무리·지난 기록·월간 돌아보기에 있었으면 오늘까지 꺼낸다
     if (nav.isReady() && nav.canGoBack()) nav.dispatch(StackActions.popToTop());
+    setRitualOpen(false); // 월초 정리 시트가 떠 있으면 내린다(포스트잇에 그대로 남는다)
     setCoverOpen(true);
     if (action === 'voice') setFocusPending(false); // 말로 적기 시트 뒤에서 키보드가 뜨지 않게
     setLinkAction(action);
@@ -231,10 +240,57 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   // 앱을 다시 열면 날짜(새벽 4시 경계)가 바뀌었을 수 있으므로 다시 그린다.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refresh();
+      if (state === 'active') {
+        refresh();
+        setResumeTick((n) => n + 1);
+      }
     });
     return () => sub.remove();
   }, [refresh]);
+
+  // 월초 정리(스펙 11.10): 새 달에 처음 표지가 다 펼쳐진 뒤, 지난달까지 끝내지 못한 일이 있으면 한 번 띄운다.
+  // 온보딩 중·표지가 펼쳐지기 전·위젯 동작(말로 적기 등)을 처리하는 중에는 따지지 않는다(다음 기회에 본다).
+  // 따져 본 달은 일이 없어도 남긴다. 그달 중간에 동기화로 지난 일이 내려와도 갑자기 뜨지 않게.
+  const onToday = screen === 'today';
+  useEffect(() => {
+    if (!onToday || !coverSettled) return;
+    if (linkActionRef.current) {
+      setRitualChecked(true);
+      return;
+    }
+    let alive = true;
+    const now = new Date();
+    readMonthRitualDue(AsyncStorage, now)
+      .then(async (due) => {
+        if (!due || !alive) return;
+        const leftovers = await listMonthLeftovers(db, logicalDate(now));
+        if (!alive) return;
+        await markMonthRitual(AsyncStorage, now);
+        if (!alive || leftovers.length === 0 || linkActionRef.current) return;
+        Keyboard.dismiss(); // 오늘 입력칸에 올라온 키보드가 시트 뒤에 남지 않게
+        setFocusPending(false); // 시트를 닫은 뒤 키보드가 저절로 올라오지 않게
+        setRitualOpen(true);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setRitualChecked(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [onToday, coverSettled, resumeTick, db]);
+
+  const openMonthRitual = useCallback(() => {
+    Keyboard.dismiss();
+    setRitualOpen(true);
+  }, []);
+  const closeMonthRitual = useCallback(() => setRitualOpen(false), []);
+  const openReviewFromRitual = useCallback(
+    (month: string) => {
+      if (nav.isReady()) nav.navigate('review', { month });
+    },
+    [nav],
+  );
 
   const onChanged = useCallback(() => {
     refresh();
@@ -319,7 +375,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                             Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
                             navigation.navigate('archive');
                           }}
-                          focusReady={coverSettled && focusPending}
+                          focusReady={coverSettled && ritualChecked && focusPending}
                           onFocused={() => setFocusPending(false)}
                           pendingAction={coverSettled ? linkAction : null}
                           onActionHandled={() => setLinkAction(null)}
@@ -346,6 +402,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                           version={version}
                           onClose={() => navigation.goBack()}
                           onOpenReview={(month) => navigation.navigate('review', { month })}
+                          onOpenMonthRitual={openMonthRitual}
                           onChanged={onChanged}
                         />
                       )}
@@ -363,6 +420,13 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                     </Stack.Screen>
                   </Stack.Navigator>
                 </NavigationContainer>
+                <MonthRitualSheet
+                  db={db}
+                  visible={ritualOpen}
+                  onClose={closeMonthRitual}
+                  onChanged={onChanged}
+                  onOpenReview={openReviewFromRitual}
+                />
               </PaneContext.Provider>
             )}
           </ScreenEnter>

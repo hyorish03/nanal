@@ -9,7 +9,8 @@ import { logicalDate, monthOf } from '../lib/date';
 import { userMessage } from '../lib/userError';
 import { deleteReflection, listReflections, type Reflection, updateReflection } from '../reflections/repo';
 import { monthLabel, reviewTargetMonth } from '../monthly/labels';
-import { getMonthlyReview } from '../monthly/repo';
+import { listMonthLeftovers } from '../monthly/ritual';
+import { canOfferReview, loadReviewOffer, type ReviewOffer } from '../monthly/reviewOffer';
 import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
@@ -25,14 +26,20 @@ import { MonthCalendar } from './archive/MonthCalendar';
 import { hasAnswer } from './evening/draft';
 import { useKeepVisible } from './evening/useKeepVisible';
 
-type Props = { db: Db; version: number; onClose: () => void; onOpenReview?: (month: string) => void; onChanged?: () => void };
+type Props = {
+  db: Db;
+  version: number;
+  onClose: () => void;
+  onOpenReview?: (month: string) => void;
+  onOpenMonthRitual?: () => void; // 월초 정리를 1일이 아니어도 열 수 있는 입구
+  onChanged?: () => void;
+};
 type Tab = 'calendar' | 'collection';
 
 const TABS = [
   ['calendar', '달력'],
   ['collection', '회고 모아보기'],
 ] as const;
-const REVIEW_MIN_DAYS = 7; // 돌아보기 배너는 지난달에 이만큼은 기록했을 때만 띄운다
 const PAGE = 20; // 회고 모아보기를 한 번에 읽는 개수
 const LOAD_ERROR = '기록을 불러오지 못했어요. 잠시 뒤에 다시 해 주세요';
 
@@ -44,7 +51,7 @@ function useFocusedVersion(version: number): number {
   return seen.current;
 }
 
-export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, onChanged }: Props) {
+export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, onOpenMonthRitual, onChanged }: Props) {
   const focusedVersion = useFocusedVersion(rawVersion);
   const [tick, setTick] = useState(0); // 여기서 회고를 고치거나 지우면 바로 다시 읽는다
   const version = `${focusedVersion}:${tick}`; // 아래 읽기들이 다시 돌 기준
@@ -68,21 +75,22 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
   const busy = useRef(false);
 
   const reviewMonth = reviewTargetMonth(today);
-  const [hasReview, setHasReview] = useState(false);
-  const [reviewDays, setReviewDays] = useState(0);
+  const [reviewOffer, setReviewOffer] = useState<ReviewOffer>({ hasReview: false, recordedDays: 0 });
+  const hasReview = reviewOffer.hasReview;
+  const [leftovers, setLeftovers] = useState(0); // 지난달까지 끝내지 못한 일 수(월초 정리 입구를 보일지)
 
   useEffect(() => {
     let cancelled = false;
-    getMonthlyReview(db, reviewMonth)
-      .then((r) => !cancelled && setHasReview(r !== null))
+    loadReviewOffer(db, reviewMonth)
+      .then((o) => !cancelled && setReviewOffer(o))
       .catch(() => {});
-    listMonthSummary(db, reviewMonth)
-      .then((s) => !cancelled && setReviewDays(s.length))
+    listMonthLeftovers(db, today)
+      .then((l) => !cancelled && setLeftovers(l.length))
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [db, reviewMonth, version]);
+  }, [db, reviewMonth, today, version]);
 
   useEffect(() => {
     let cancelled = false;
@@ -256,7 +264,7 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
       { label: '지우기', destructive: true, onPress: () => askDeleteReflection(r) },
     ]);
 
-  const showBanner = !!onOpenReview && (hasReview || reviewDays >= REVIEW_MIN_DAYS);
+  const showBanner = !!onOpenReview && canOfferReview(reviewOffer);
   // 넓은 화면의 글 칸: 두 칸이면 왼쪽 여백에 붙이고, 한 칸이면 가운데에 읽기 폭으로 모은다
   const column = large ? [styles.page, !twoPane && styles.centered] : null;
 
@@ -300,6 +308,21 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
         {monthLabel(reviewMonth)} 돌아보기 {hasReview ? '보기' : '만들기'}
       </Txt>
       <Txt style={styles.reviewBannerSub}>{hasReview ? '지난달 흐름을 다시 읽어요' : '한 달의 기분과 회고를 같이 읽어 봐요'}</Txt>
+    </Pressable>
+  );
+
+  // 이번 달을 보고 있고 지난달에서 넘어온 일이 있으면, 달력 바로 위에 월초 정리 입구를 조용히 둔다
+  const ritualLink = onOpenMonthRitual && leftovers > 0 && month === monthOf(today) && (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`지난달 정리하기, 넘어온 일 ${leftovers}개`}
+      hitSlop={{ top: 4, bottom: 4 }}
+      style={dimPressed(styles.ritualLink)}
+      onPress={onOpenMonthRitual}
+    >
+      <Txt variant="small" style={styles.ritualLinkText}>
+        지난달 정리하기 · {leftovers}개
+      </Txt>
     </Pressable>
   );
 
@@ -379,6 +402,7 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
         <View style={styles.panes}>
           <ScrollView style={{ width: calendarWidth, flexGrow: 0 }} contentContainerStyle={styles.pane}>
             {banner}
+            {ritualLink}
             {calendar}
           </ScrollView>
           <ScrollView
@@ -419,6 +443,7 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
       >
         {!large && head}
         {banner}
+        {ritualLink}
         {calendar}
         {detail(true)}
       </ScrollView>
@@ -449,6 +474,8 @@ const styles = StyleSheet.create({
   reviewBanner: { minHeight: 64, padding: 14, gap: 2, borderRadius: 6, backgroundColor: colors.navy },
   reviewBannerTitle: { color: colors.onDark, fontSize: 16 },
   reviewBannerSub: { color: colors.coverText, fontSize: 13 },
+  ritualLink: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  ritualLinkText: { color: colors.navy, textDecorationLine: 'underline' },
   small: { fontSize: 13, color: colors.inkSoft },
   muted: { fontSize: 14, color: colors.muted },
   filters: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 10 },
