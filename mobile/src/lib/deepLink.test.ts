@@ -1,4 +1,4 @@
-import { consumeInitialUrl, parseDeepLink, parsePendingAction, resetInitialUrlForTest } from './deepLink';
+import { consumeInitialUrl, parseAuthLink, parseDeepLink, parsePendingAction, resetInitialUrlForTest } from './deepLink';
 
 describe('parseDeepLink', () => {
   it('말로 적기를 연다', () => {
@@ -18,6 +18,26 @@ describe('parseDeepLink', () => {
     expect(parseDeepLink('https://example.com/voice')).toBeNull();
     expect(parseDeepLink('nanal://settings')).toBeNull();
     expect(parseDeepLink('nanal://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081')).toBeNull();
+  });
+});
+
+describe('parseAuthLink', () => {
+  it('인증 메일에서 돌아온 주소', () => {
+    expect(parseAuthLink('nanal://auth/confirmed')).toBe('confirmed');
+    expect(parseAuthLink('nanal://auth/confirmed#access_token=x&type=signup')).toBe('confirmed');
+    expect(parseAuthLink('nanal://auth/confirmed?code=abc')).toBe('confirmed');
+  });
+  it('만료되거나 이미 쓴 링크', () => {
+    expect(parseAuthLink('nanal://auth/confirmed#error=access_denied&error_code=otp_expired')).toBe('failed');
+  });
+  it('다른 주소는 아니다', () => {
+    expect(parseAuthLink(null)).toBeNull();
+    expect(parseAuthLink('nanal://today')).toBeNull();
+    expect(parseAuthLink('nanal://auth')).toBeNull();
+  });
+  it('위젯 동작(parseDeepLink)으로는 읽히지 않는다', () => {
+    expect(parseDeepLink('nanal://auth/confirmed')).toBeNull();
+    expect(parseDeepLink('nanal://auth/confirmed#access_token=x')).toBeNull();
   });
 });
 
