@@ -185,8 +185,10 @@ export const ItemRow = memo(function ItemRow(props: Props) {
       Gesture.Pan()
         .runOnJS(true) // Reanimated 없이 RN Animated로 그린다
         .enabled(swipeable)
-        .activeOffsetX([-12, 12]) // 옆으로 뚜렷하게 밀 때만 가져가고
-        .failOffsetY([-10, 10]) // 위아래로 먼저 움직이면 목록 스크롤에 넘긴다
+        // 옆으로 조금만 밀어도 가져간다. 줄이 낮아 손가락이 위아래로 조금 흔들리는 건 봐주고,
+        // 위아래로 뚜렷하게 움직일 때만 목록 스크롤에 넘긴다(예전 ±10은 비스듬히 밀면 자주 놓쳤다)
+        .activeOffsetX([-8, 8])
+        .failOffsetY([-22, 22])
         .onStart(onStart)
         .onUpdate(onUpdate)
         .onEnd(onEnd),

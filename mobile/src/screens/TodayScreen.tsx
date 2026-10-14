@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, type FlatList, Keyboard, LayoutAnimation, type ListRenderItem, Pressable, StyleSheet, type TextInput, View } from 'react-native';
+import { Animated, Keyboard, LayoutAnimation, type ListRenderItem, Pressable, StyleSheet, type TextInput, View } from 'react-native';
+import { FlatList } from 'react-native-gesture-handler';
 import type { Db } from '../db/types';
 import {
   addItem,
@@ -325,7 +326,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       {/* 공책 한 쪽: 여백선은 목록 뒤에 깔리고, 빈 줄은 목록 꼬리에서 함께 스크롤된다 */}
       <View ref={pageRef} style={styles.page}>
         <MarginRule scrollY={scrollY} startY={headerH} />
-        <Animated.FlatList
+        <AnimatedList
           ref={listRef}
           style={styles.list}
           data={items}
@@ -425,6 +426,8 @@ const PANEL_MIN = WIDE.pageX * 2 + 480 + WIDE.gutter + PANEL_W;
 const LOAD_FAILED = '오늘 기록을 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요';
 const EMPTY_TITLE = '아직 적은 줄이 없어요';
 const EMPTY_HINT = '위 칸에 한 줄 적어 볼까요?';
+// 목록은 gesture-handler의 FlatList: 줄 밀기(Pan)와 목록 스크롤이 서로 손가락을 빼앗지 않게 조율된다
+const AnimatedList = Animated.createAnimatedComponent(FlatList<Item>);
 const REORDER = LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity); // 끈의 44pt 누르는 영역이 하루 마무리 버튼에 겹치지 않게
 
 const styles = StyleSheet.create({
