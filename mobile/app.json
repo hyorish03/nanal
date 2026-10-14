@@ -24,6 +24,7 @@
       "buildNumber": "3"
     },
     "android": {
+      "package": "mengle.zen",
       "adaptiveIcon": {
         "backgroundColor": "#1E2F4D",
         "foregroundImage": "./assets/android-icon-foreground.png",
