@@ -16,9 +16,10 @@ type Props = {
   animate?: boolean; // 큰 병: 사용자가 고른 뒤에만 깃펜을 내려 꽂는다(처음 불러올 때는 그대로)
   color?: string;
   paper?: string; // 병 안쪽 바탕색
+  scale?: number; // 큰 병: 넓은 화면에서 키운다(그림 비율은 그대로)
 };
 
-export function Inkwell({ id, mood, size, selected = false, animate = false, color = colors.navy, paper = colors.paperEvening }: Props) {
+export function Inkwell({ id, mood, size, selected = false, animate = false, color = colors.navy, paper = colors.paperEvening, scale = 1 }: Props) {
   const fillY = mood === null ? 80 : 70 - 23 * inkLevel(mood);
   if (size === 'small') {
     return (
@@ -34,13 +35,13 @@ export function Inkwell({ id, mood, size, selected = false, animate = false, col
       </Svg>
     );
   }
-  return <LargeInkwell id={id} fillY={fillY} selected={selected} animate={animate} color={color} paper={paper} />;
+  return <LargeInkwell id={id} fillY={fillY} selected={selected} animate={animate} color={color} paper={paper} scale={scale} />;
 }
 
-type LargeProps = { id: string; fillY: number; selected: boolean; animate: boolean; color: string; paper: string };
+type LargeProps = { id: string; fillY: number; selected: boolean; animate: boolean; color: string; paper: string; scale: number };
 
 // 깃펜은 네이티브 드라이버로 움직이도록 SVG 밖의 겹친 View에 따로 그린다. 병 뒤에 있어야 끝이 잉크에 잠겨 보인다.
-function LargeInkwell({ id, fillY, selected, animate, color, paper }: LargeProps) {
+function LargeInkwell({ id, fillY, selected, animate, color, paper, scale }: LargeProps) {
   const reduce = useReduceMotion();
   const quill = useRef(new Animated.Value(selected ? 1 : 0)).current;
 
@@ -55,11 +56,13 @@ function LargeInkwell({ id, fillY, selected, animate, color, paper }: LargeProps
     return () => anim.stop();
   }, [selected, animate, quill]);
 
-  const translateY = reduce ? 0 : quill.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] });
+  const translateY = reduce ? 0 : quill.interpolate({ inputRange: [0, 1], outputRange: [-6 * scale, 0] });
+  const width = LARGE_W * scale;
+  const height = LARGE_H * scale;
   return (
-    <View style={styles.large}>
+    <View style={{ width, height }}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: quill, transform: [{ translateY }] }]}>
-        <Svg width={48} height={72} viewBox="0 0 48 72" fill="none" accessible={false}>
+        <Svg width={width} height={height} viewBox="0 0 48 72" fill="none" accessible={false}>
           <Path d="M23 56L40 9" stroke={color} strokeWidth={1.3} strokeLinecap="round" />
           <Path d="M29.5 37C25.5 27 30 13 43.5 2C45 15.5 40.5 29 29.5 37Z" fill={color} />
           <Path
@@ -70,7 +73,7 @@ function LargeInkwell({ id, fillY, selected, animate, color, paper }: LargeProps
           />
         </Svg>
       </Animated.View>
-      <Svg width={48} height={72} viewBox="0 0 48 72" fill="none" accessible={false}>
+      <Svg width={width} height={height} viewBox="0 0 48 72" fill="none" accessible={false}>
         <Defs>
           <ClipPath id={id}>
             <Path d={WELL} />
@@ -88,6 +91,5 @@ function LargeInkwell({ id, fillY, selected, animate, color, paper }: LargeProps
   );
 }
 
-const styles = StyleSheet.create({
-  large: { width: 48, height: 72 },
-});
+const LARGE_W = 48;
+const LARGE_H = 72;
