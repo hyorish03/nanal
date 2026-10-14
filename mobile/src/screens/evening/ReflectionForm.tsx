@@ -6,6 +6,7 @@ import { dimPressed } from '../../ui/press';
 import { RuledPaper } from '../../ui/RuledPaper';
 import { colors, fonts } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
+import { macText } from '../../ui/desktop';
 
 // 줄 노트 간격. 선은 줄 상자 맨 아래에서 SIT만큼 올라와 글자 기준선 바로 밑에 그어진다.
 export const RULE = 32;
@@ -47,7 +48,7 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
             </Txt>
           )}
           <TextInput
-            style={styles.answer}
+            style={macText(styles.answer)}
             multiline
             maxLength={MAX_ANSWER_LENGTH}
             accessibilityLabel={q.text || title}

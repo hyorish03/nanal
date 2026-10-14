@@ -1,4 +1,5 @@
 import { StyleSheet, Text, type TextProps } from 'react-native';
+import { macText } from './desktop';
 import { colors, fonts, type as scale } from './theme';
 
 // body·medium·title·hand는 예전 이름(글꼴만 정한다). 나머지는 theme의 type 눈금(크기·줄 높이까지).
@@ -22,7 +23,7 @@ export function Txt({ variant = 'body', compact = false, style, ...rest }: Props
       lineBreakStrategyIOS="hangul-word"
       maxFontSizeMultiplier={compact ? MAX_FONT_SCALE_COMPACT : MAX_FONT_SCALE}
       {...rest}
-      style={[styles.base, styles[variant], style]}
+      style={macText([styles.base, styles[variant], style])}
     />
   );
 }

@@ -16,6 +16,7 @@ import { Paper } from '../../ui/Paper';
 import { useReduceMotion } from '../../ui/useReduceMotion';
 import { FadeIn } from '../../ui/FadeIn';
 import { dimPressed } from '../../ui/press';
+import { macText } from '../../ui/desktop';
 
 type Props = {
   db: Db;
@@ -146,7 +147,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
               <Txt style={styles.hint}>정리되지 않아도 괜찮아요. 할 일만 골라 둘게요.</Txt>
               <RuledPaper lineHeight={26} style={styles.paper}>
               <TextInput
-                style={styles.input}
+                style={macText(styles.input)}
                 multiline
                 editable={!loading}
                 value={text}

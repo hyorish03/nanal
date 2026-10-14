@@ -9,6 +9,7 @@ import { colors, fonts } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
 import { dimPressed } from '../ui/press';
+import { macText } from '../ui/desktop';
 
 const UNKNOWN_ERROR = '로그인하지 못했어요. 잠시 뒤에 다시 해 주세요';
 
@@ -62,7 +63,7 @@ export function LoginScreen() {
             <View style={styles.field}>
               <Txt style={styles.label}>이메일</Txt>
               <TextInput
-                style={styles.input}
+                style={macText(styles.input)}
                 placeholder="me@example.com"
                 placeholderTextColor={colors.muted}
                 accessibilityLabel="이메일"
@@ -82,7 +83,7 @@ export function LoginScreen() {
               <Txt style={styles.label}>비밀번호</Txt>
               <TextInput
                 ref={passwordRef}
-                style={styles.input}
+                style={macText(styles.input)}
                 accessibilityLabel="비밀번호"
                 secureTextEntry
                 autoCorrect={false}

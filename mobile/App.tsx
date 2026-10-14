@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ON_MAC, MAC_CONTENT_WIDTH } from './src/ui/desktop';
 import { KeyboardResize } from './src/ui/KeyboardResize';
 import { userMessage } from './src/lib/userError';
 import { openDb } from './src/db/client';
@@ -91,7 +92,10 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <View style={styles.root}>
-        <KeyboardResize>{body}</KeyboardResize>
+        {/* Mac의 넓은 창에서는 종이 한 장 폭으로 가운데 모은다 */}
+        <View style={ON_MAC ? styles.macColumn : styles.fill}>
+          <KeyboardResize>{body}</KeyboardResize>
+        </View>
       </View>
     </SafeAreaProvider>
   );
@@ -99,6 +103,8 @@ export default function App() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
+  fill: { flex: 1 },
+  macColumn: { flex: 1, width: '100%', maxWidth: MAC_CONTENT_WIDTH, alignSelf: 'center' },
   center: {
     flex: 1,
     justifyContent: 'center',

@@ -10,6 +10,7 @@ import { colors, fonts, HIT } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { Paper } from '../../ui/Paper';
 import { dimPressed } from '../../ui/press';
+import { macText } from '../../ui/desktop';
 
 type Props = {
   db: Db;
@@ -99,7 +100,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
           <View style={styles.field}>
             <Txt style={styles.label}>이름</Txt>
             <TextInput
-              style={styles.name}
+              style={macText(styles.name)}
               value={name}
               onChangeText={(v) => {
                 setName(v);
@@ -120,7 +121,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
               <View key={i} style={styles.question}>
                 <Txt style={styles.no}>{i + 1}</Txt>
                 <TextInput
-                  style={styles.questionInput}
+                  style={macText(styles.questionInput)}
                   value={q}
                   onChangeText={(v) => {
                     setQuestions(questions.map((x, j) => (j === i ? v : x)));
