@@ -16,8 +16,8 @@
 - [x] 앱 계정 시트(아이패드·Mac은 사이드바)에 "계정 삭제": 확인 창 → 함수 호출 → 이 기기 기록 비우기 → 로그아웃.
 
 ### 언젠가 서버 반영 — 코드 완료, 적용 남음
-- [ ] `supabase/migrations/20261015000000_someday.sql` 적용(`supabase db push`), `supabase/tests/someday.test.sql` 통과 확인. 적용 전에는 언젠가 줄만 올라가지 못해 outbox에 남고(다른 표는 그대로 오간다) 동기화 오류 문구가 보인다. 적용하면 다음 동기화에 올라간다.
-- [ ] 적용 뒤 비로그인으로 `someday`를 읽으면 `42501`인지 확인.
+- [x] (2026-10-14 적용, dropped_status와 함께) `supabase/migrations/20261015000000_someday.sql` 적용(`supabase db push`), `supabase/tests/someday.test.sql` 통과 확인. 적용 전에는 언젠가 줄만 올라가지 못해 outbox에 남고(다른 표는 그대로 오간다) 동기화 오류 문구가 보인다. 적용하면 다음 동기화에 올라간다.
+- [x] 적용 뒤 비로그인으로 `someday`를 읽으면 `42501`인지 확인(확인함). monthly-review 함수 재배포함.
 
 ### 사용자가 직접 할 일
 - [ ] Supabase → Settings → API Keys의 Secret keys에 만든 `anthropic_api_key`(Supabase 관리자 키)를 지웠는지 확인한다. Anthropic 키는 Edge Functions → Secrets의 `ANTHROPIC_API_KEY`에만 둔다.
