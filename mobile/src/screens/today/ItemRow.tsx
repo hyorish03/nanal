@@ -23,10 +23,11 @@ type Props = {
   onAdvance: (id: string) => void;
   onTogglePriority: (id: string, on: boolean) => void;
   onEdit: (id: string, text: string) => void;
+  onPostpone: (id: string) => void;
   onDelete: (id: string) => void;
 };
 
-export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status, priority, priorityFull, onAdvance, onTogglePriority, onEdit, onDelete }: Props) {
+export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status, priority, priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDelete }: Props) {
   const menu = useAnchor();
   // 넓은 배치에서는 글자가 커진 만큼 줄 높이도 공책 줄 간격(useRuleGap)에 맞춰 넓힌다
   const k = useTextScale();
@@ -54,6 +55,7 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
   const actions = [
     ...(advance ? [{ name: 'activate' }, { name: 'advance', label: '상태 바꾸기' }] : []),
     ...(canMark && !markDisabled ? [{ name: 'priority', label: item.priority ? '중요 표시 지우기' : '중요 표시하기' }] : []),
+    ...(canMark ? [{ name: 'postpone', label: '내일로 미루기' }] : []),
     { name: 'edit', label: '고치기' },
     { name: 'delete', label: '지우기' },
   ];
@@ -61,6 +63,7 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
     const name = e.nativeEvent.actionName;
     if (name === 'activate' || name === 'advance') onAdvance(id);
     else if (name === 'priority') togglePriority();
+    else if (name === 'postpone') onPostpone(id);
     else if (name === 'edit') edit();
     else if (name === 'delete') onDelete(id);
   };
@@ -129,6 +132,15 @@ export const ItemRow = memo(function ItemRow({ id, kind: itemKind, text, status,
             <Txt style={[styles.menuText, markDisabled && styles.menuDisabled]}>
               {item.priority ? '중요 표시 지우기' : markDisabled ? '중요 표시는 하루 3개까지예요' : '중요 표시하기'}
             </Txt>
+          </Pressable>
+        )}
+        {/* 끝나지 않은 할 일만. 오늘 줄은 › 옮긴 일로 남고 내일 장에 새 줄이 생긴다 */}
+        {canMark && (
+          <Pressable accessibilityRole="button" style={dimPressed(styles.menuItem)} onPress={pick(() => onPostpone(id))}>
+            <View style={styles.swatchText}>
+              <StatusSymbol kind="migrated" size={14} />
+            </View>
+            <Txt style={styles.menuText}>내일로 미루기</Txt>
           </Pressable>
         )}
         <Pressable

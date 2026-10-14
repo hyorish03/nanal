@@ -193,6 +193,13 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     return ok;
   };
   const onDelete = useEvent((id: string) => removeWithUndo(id));
+  const onPostpone = useEvent(async (id: string) => {
+    const ok = await reordering(() => migrateToTomorrow(db, id));
+    if (ok) {
+      haptic.light();
+      setToast({ key: Date.now(), message: '내일로 미뤘어요' });
+    }
+  });
   const hideToast = useCallback((key: number) => setToast((t) => (t?.key === key ? null : t)), []);
   const onCapture = useEvent(() => openCapture());
 
@@ -220,10 +227,11 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         onAdvance={onAdvance}
         onTogglePriority={onTogglePriority}
         onEdit={onEdit}
+        onPostpone={onPostpone}
         onDelete={onDelete}
       />
     ),
-    [priorityFull, onAdvance, onTogglePriority, onEdit, onDelete],
+    [priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDelete],
   );
 
   // 포스트잇과 입력칸을 목록 머리로 둬서 후보가 많아도 함께 스크롤된다. 컴포넌트 타입이 아닌 엘리먼트라 입력칸이 다시 마운트되지 않는다.

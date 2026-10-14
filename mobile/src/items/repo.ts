@@ -133,12 +133,14 @@ async function migrateInTx(tx: Tx, id: string, target: (today: string) => string
   const item = await requireItem(tx, id);
   if (item.status !== 'open' && item.status !== 'doing') throw new Error('끝나지 않은 할 일만 옮길 수 있습니다');
   const today = logicalDate(now);
-  if (item.date >= today) throw new Error('이전 날짜의 할 일만 옮길 수 있습니다');
+  const dest = target(today);
+  // 지난 일은 오늘·내일로, 오늘 일은 내일로. 같은 날이나 더 앞 날짜로는 옮기지 않는다
+  if (item.date >= dest) throw new Error('이전 날짜의 할 일만 옮길 수 있습니다');
   await update(tx, id, { status: 'migrated' }, now);
   const created: Item = {
     ...item,
     id: newId(),
-    date: target(today),
+    date: dest,
     status: 'open',
     priority: false,
     migrated_from: item.id,

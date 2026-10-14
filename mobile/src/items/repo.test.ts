@@ -162,6 +162,15 @@ test('migrateToTomorrow: 원래는 migrated, 내일 날짜로 새 할 일', asyn
   expect((await listItemsForDate(db, '2026-10-05'))[0].status).toBe('migrated');
 });
 
+test('migrateToTomorrow: 오늘 할 일도 내일로 미룰 수 있다(오늘 줄은 옮긴 일로 남는다)', async () => {
+  const item = await addItem(db, { kind: 'task', text: '장보기' }, TUE);
+  await advanceStatus(db, item.id, TUE); // 진행 중이어도 된다
+  const created = await migrateToTomorrow(db, item.id, TUE);
+  expect(created).toMatchObject({ date: '2026-10-07', status: 'open', migrated_from: item.id });
+  expect((await listItemsForDate(db, '2026-10-06')).map((i) => i.status)).toEqual(['migrated']);
+  await expect(migrateToTomorrow(db, created.id, TUE)).rejects.toThrow('이전 날짜의 할 일만');
+});
+
 test('listMigrationCandidates: 진행 중이던 지난 할 일도 포함', async () => {
   const doing = await addItem(db, { kind: 'task', text: 'doing' }, MON);
   await advanceStatus(db, doing.id, MON);
