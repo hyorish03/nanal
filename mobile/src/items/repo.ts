@@ -25,10 +25,8 @@ export const MAX_PRIORITY_PER_DAY = 3;
 export const MAX_TEXT = 200; // 한 줄에 쓸 수 있는 글자 수
 const NEXT_STATUS: Partial<Record<TaskStatus, TaskStatus>> = { open: 'doing', doing: 'done', done: 'open' };
 const COLUMNS = 'id, date, kind, text, status, priority, migrated_from, created_at, updated_at, deleted_at';
-// 진행 중 → 중요 → 나머지(입력 순) → 끝냄·옮김
-// 진행 중 → 할 일·메모 → 끝냄. 진행 중과 할 일 안에서는 형광펜(중요)이 먼저.
-const ORDER = `CASE WHEN status = 'doing' THEN 1 - priority WHEN status IN ('done', 'migrated') THEN 4
-  ELSE 3 - priority END, created_at`;
+// 종이 다이어리처럼 적은 순서 그대로. 상태를 바꾸거나 형광펜을 칠해도 줄이 자리를 옮기지 않는다
+const ORDER = 'created_at, id';
 
 const toItem = (row: ItemRow): Item => ({ ...row, priority: row.priority === 1 });
 

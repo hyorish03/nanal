@@ -1,6 +1,6 @@
 import { migrate } from '../db/schema';
 import { setMood } from '../days/repo';
-import { addItem, advanceStatus, deleteItem, listItemsForDate, migrateToToday, setPriority } from '../items/repo';
+import { addItem, advanceStatus, deleteItem, migrateToToday, setPriority } from '../items/repo';
 import { countRecordedDays } from '../stats/recordedDays';
 import { openTestDb } from '../../test/sqlite';
 import { pickNext, readWidgetSnapshot, widgetAdvance } from './sql';
@@ -47,9 +47,6 @@ describe('readWidgetSnapshot', () => {
     ]);
     expect(pickNext(snap.items)?.id).toBe(e.id);
 
-    // 앱 목록(listItemsForDate)에서 위젯이 빼는 것만 뺀 순서와 같다
-    const app = (await listItemsForDate(db, TODAY)).filter((i) => i.kind === 'task' && i.status !== 'migrated');
-    expect(snap.items.map((i) => i.id)).toEqual(app.map((i) => i.id));
   });
 
   it('목록은 8개까지만 읽고 상태별 총 개수는 따로 센다', async () => {

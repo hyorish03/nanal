@@ -3,7 +3,7 @@ import type { Db } from '../db/types';
 // 앱과 위젯(targets/widget/SharedSQL.swift)이 같이 쓰는 SQL. 하나를 바꾸면 다른 하나도 똑같이 바꾼다
 // (swiftParity.test.ts가 두 파일을 비교한다). 아래 TS 함수는 Swift가 하는 일을 그대로 실행해 앱 규칙과 같은지 시험하는 용도다.
 export const WIDGET_SQL = {
-  // 오늘 할 일: 진행 중(중요 먼저) → 할 일(중요 먼저) → 끝낸 일, 같은 칸 안에서는 입력 순. 메모·옮긴 원래 항목·지운 일은 뺀다(items/repo.ts의 ORDER와 같다).
+  // 오늘 할 일: 진행 중(중요 먼저) → 할 일(중요 먼저) → 끝낸 일, 같은 칸 안에서는 입력 순. 메모·옮긴 원래 항목·지운 일은 뺀다(앱 목록은 적은 순서 그대로지만 위젯은 칸이 좁아 할 일을 앞에 모은다).
   items: `SELECT id, text, status, priority FROM items
 WHERE date = ? AND kind = 'task' AND deleted_at IS NULL AND status IN ('open', 'doing', 'done')
 ORDER BY CASE WHEN status = 'doing' THEN 1 - priority WHEN status IN ('done', 'migrated') THEN 4

@@ -141,7 +141,7 @@ test('setPriority: 메모는 거부, 끄기는 언제나 된다', async () => {
   expect((await listItemsForDate(db, '2026-10-05')).find((i) => i.id === t.id)?.priority).toBe(false);
 });
 
-test('listItemsForDate 정렬: 진행 중 → 중요 → 나머지 → 끝냄', async () => {
+test('listItemsForDate: 상태를 바꾸거나 형광펜을 칠해도 적은 순서 그대로', async () => {
   const a = await addItem(db, { kind: 'task', text: 'a' }, new Date(2026, 9, 5, 9, 0));
   await addItem(db, { kind: 'task', text: 'b' }, new Date(2026, 9, 5, 9, 1));
   await addItem(db, { kind: 'note', text: 'c' }, new Date(2026, 9, 5, 9, 2));
@@ -151,19 +151,7 @@ test('listItemsForDate 정렬: 진행 중 → 중요 → 나머지 → 끝냄', 
   await advanceStatus(db, a.id, MON); // a: done
   await advanceStatus(db, e.id, MON); // e: doing
   await setPriority(db, d.id, true, MON); // d: 중요
-  expect((await listItemsForDate(db, '2026-10-05')).map((i) => i.text)).toEqual(['e', 'd', 'b', 'c', 'a']);
-});
-
-test('listItemsForDate 정렬: 진행 중 안에서도, 할 일 안에서도 중요가 먼저', async () => {
-  const a = await addItem(db, { kind: 'task', text: 'a' }, new Date(2026, 9, 5, 9, 0));
-  const b = await addItem(db, { kind: 'task', text: 'b' }, new Date(2026, 9, 5, 9, 1));
-  await addItem(db, { kind: 'task', text: 'c' }, new Date(2026, 9, 5, 9, 2));
-  const d = await addItem(db, { kind: 'task', text: 'd' }, new Date(2026, 9, 5, 9, 3));
-  await advanceStatus(db, a.id, MON); // a: doing
-  await advanceStatus(db, b.id, MON); // b: doing
-  await setPriority(db, b.id, true, MON); // b: doing + 중요
-  await setPriority(db, d.id, true, MON); // d: open + 중요
-  expect((await listItemsForDate(db, '2026-10-05')).map((i) => i.text)).toEqual(['b', 'a', 'd', 'c']);
+  expect((await listItemsForDate(db, '2026-10-05')).map((i) => i.text)).toEqual(['a', 'b', 'c', 'd', 'e']);
 });
 
 test('migrateToTomorrow: 원래는 migrated, 내일 날짜로 새 할 일', async () => {
