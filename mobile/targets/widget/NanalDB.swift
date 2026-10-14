@@ -111,7 +111,7 @@ enum NanalDB {
       if sqlite3_column_type(s, 0) != SQLITE_NULL { mood = Int(sqlite3_column_int(s, 0)) }
     }
     var recorded = 0
-    rows(db, SharedSQL.recordedDays, []) { recorded = Int(sqlite3_column_int($0, 0)) }
+    rows(db, SharedSQL.recordedDays, [date, date, date]) { recorded = Int(sqlite3_column_int($0, 0)) }
     return WidgetSnapshot(
       available: true, items: items, openCount: openCount, doingCount: doingCount, doneCount: doneCount, carried: carried, mood: mood, recordedDays: recorded)
   }

@@ -1,7 +1,7 @@
 import { openTestDb } from '../../test/sqlite';
 import { setMood } from '../days/repo';
 import { migrate } from '../db/schema';
-import { addItem, deleteItem } from '../items/repo';
+import { addItem, deleteItem, migrateToTomorrow } from '../items/repo';
 import { addReflection } from '../reflections/repo';
 import { countRecordedDays } from './recordedDays';
 
@@ -16,5 +16,14 @@ test('항목, 기분, 회고 중 하나라도 있는 날을 한 번씩 센다', 
   const removed = await addItem(db, { kind: 'note', text: 'd' }, new Date(2026, 9, 5, 9));
   await deleteItem(db, removed.id);
 
-  expect(await countRecordedDays(db)).toBe(3);
+  expect(await countRecordedDays(db, '2026-10-05')).toBe(3);
+});
+
+test('오늘보다 뒤 날짜(내일로 미룬 일)는 세지 않는다', async () => {
+  const db = openTestDb();
+  await migrate(db);
+  const now = new Date(2026, 9, 5, 9);
+  const item = await addItem(db, { kind: 'task', text: 'a' }, now);
+  await migrateToTomorrow(db, item.id, now);
+  expect(await countRecordedDays(db, '2026-10-05')).toBe(1);
 });

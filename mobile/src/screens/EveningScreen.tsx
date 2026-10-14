@@ -107,7 +107,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getMood(db, today), listReflections(db, today), listTemplates(db), countRecordedDays(db), listItemsForDate(db, today)])
+    Promise.all([getMood(db, today), listReflections(db, today), listTemplates(db), countRecordedDays(db, today), listItemsForDate(db, today)])
       .then(([m, r, t, n, items]) => {
         if (cancelled) return;
         setMoodState(m);
@@ -165,7 +165,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
       const rest = withoutTemplate({ template, answers }, template);
       await writeDraft(AsyncStorage, today, rest);
       // 도장 숫자와 카드가 바뀐 뒤에 찍히도록 여기서 바로 다시 읽는다
-      const [list, n] = await Promise.all([listReflections(db, today), countRecordedDays(db)]);
+      const [list, n] = await Promise.all([listReflections(db, today), countRecordedDays(db, today)]);
       setSaved(list);
       setRecordedDays(n);
       setFreshId(added.id);
@@ -188,7 +188,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     confirmDelete(`‘${r.templateName}’ 회고를 지울까요?`, '지난 기록에서도 사라져요.', () =>
       run(async () => {
         await deleteReflection(db, r.id);
-        const [list, n] = await Promise.all([listReflections(db, today), countRecordedDays(db)]);
+        const [list, n] = await Promise.all([listReflections(db, today), countRecordedDays(db, today)]);
         setSaved(list);
         setRecordedDays(n);
         setEditing((e) => (e?.id === r.id ? null : e));

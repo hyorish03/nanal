@@ -18,10 +18,11 @@ GROUP BY status`,
 WHERE date < ? AND kind = 'task' AND status IN ('open', 'doing') AND deleted_at IS NULL`,
   mood: `SELECT mood FROM days WHERE date = ? AND deleted_at IS NULL`,
   // 기록한 날(스펙 4절): 할 일·메모, 기분, 회고 중 하나라도 있는 날
+  // 오늘까지 기록이 있는 날. 내일로 미룬 일처럼 앞날짜 줄은 세지 않는다
   recordedDays: `SELECT COUNT(*) AS n FROM (
-SELECT date FROM items WHERE deleted_at IS NULL
-UNION SELECT date FROM days WHERE deleted_at IS NULL AND mood IS NOT NULL
-UNION SELECT date FROM reflections WHERE deleted_at IS NULL
+SELECT date FROM items WHERE deleted_at IS NULL AND date <= ?
+UNION SELECT date FROM days WHERE deleted_at IS NULL AND mood IS NOT NULL AND date <= ?
+UNION SELECT date FROM reflections WHERE deleted_at IS NULL AND date <= ?
 )`,
   // advanceStatus와 같은 순서(open → doing → done → open). 위젯이 보여 준 상태(마지막 ?)와 같을 때만 바꾼다. 바뀐 행이 있을 때만 markDirty를 실행한다.
   advance: `UPDATE items
@@ -42,7 +43,7 @@ export async function readWidgetSnapshot(db: Db, today: string): Promise<WidgetS
   for (const r of countRows) counts[r.status] = r.n;
   const carried = await db.getFirstAsync<{ n: number }>(WIDGET_SQL.carried, [today]);
   const mood = await db.getFirstAsync<{ mood: number | null }>(WIDGET_SQL.mood, [today]);
-  const recorded = await db.getFirstAsync<{ n: number }>(WIDGET_SQL.recordedDays, []);
+  const recorded = await db.getFirstAsync<{ n: number }>(WIDGET_SQL.recordedDays, [today, today, today]);
   return {
     items: rows.map((r) => ({ ...r, priority: r.priority === 1 })),
     counts,

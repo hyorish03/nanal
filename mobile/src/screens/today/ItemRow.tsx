@@ -330,7 +330,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
             ) : (
               // 글을 누르면 그 자리에서 고치고, 길게 누르면 ⋯와 같은 메뉴가 뜬다
               <Pressable accessible={false} style={styles.body} onPress={unlessOpen(() => edit())} onLongPress={openMenu}>
-                <Highlight on={item.priority && !done} animate={marked}>
+                <Highlight on={item.priority && (status === 'open' || status === 'doing')} animate={marked}>
                   <Txt variant={variant} style={textStyle}>
                     {item.text}
                   </Txt>

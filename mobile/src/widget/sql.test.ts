@@ -84,7 +84,7 @@ describe('readWidgetSnapshot', () => {
     await setMood(db, TODAY, 4, NOW);
     const snap = await readWidgetSnapshot(db, TODAY);
     expect(snap.mood).toBe(4);
-    expect(snap.recordedDays).toBe(await countRecordedDays(db));
+    expect(snap.recordedDays).toBe(await countRecordedDays(db, TODAY));
     expect(snap.recordedDays).toBe(2);
   });
 

@@ -25,9 +25,9 @@ enum SharedSQL {
 
   static let recordedDays = """
     SELECT COUNT(*) AS n FROM (
-    SELECT date FROM items WHERE deleted_at IS NULL
-    UNION SELECT date FROM days WHERE deleted_at IS NULL AND mood IS NOT NULL
-    UNION SELECT date FROM reflections WHERE deleted_at IS NULL
+    SELECT date FROM items WHERE deleted_at IS NULL AND date <= ?
+    UNION SELECT date FROM days WHERE deleted_at IS NULL AND mood IS NOT NULL AND date <= ?
+    UNION SELECT date FROM reflections WHERE deleted_at IS NULL AND date <= ?
     )
     """
 

@@ -126,7 +126,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([listItemsForDate(db, today), listMigrationCandidates(db, today), countRecordedDays(db)])
+    Promise.all([listItemsForDate(db, today), listMigrationCandidates(db, today), countRecordedDays(db, today)])
       .then(([i, c, n]) => {
         if (cancelled) return;
         if (reorder.current) {
