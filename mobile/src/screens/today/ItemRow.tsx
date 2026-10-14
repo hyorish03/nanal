@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { type AccessibilityActionEvent, Animated, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { type AccessibilityActionEvent, Animated, Keyboard, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { type ItemKind, MAX_TEXT, type TaskStatus } from '../../items/repo';
 import { haptic } from '../../ui/haptics';
@@ -14,7 +14,7 @@ import { dimPressed, tintPressed } from '../../ui/press';
 import { useTextScale } from '../../ui/typeScale';
 import { useEvent } from '../../ui/useEvent';
 import { useReduceMotion } from '../../ui/useReduceMotion';
-import { ROW_PAD_WIDE, ruleGapFor } from './NotebookPage';
+import { ROW_PAD_WIDE, RULE_GAP, ruleGapFor } from './NotebookPage';
 import { ACTION_W, dragTo, markAt, openRow, settleLeft, swipeActionsFor, type Zone, zoneAt } from './swipe';
 
 // 값은 원시값만, 함수는 화면이 한 번 만든 것(id를 받는다)만 받는다. 그래야 memo가 다른 줄의 변화에 다시 그리지 않는다.
@@ -41,6 +41,12 @@ export const ItemRow = memo(function ItemRow(props: Props) {
   // 넓은 배치에서는 글자가 커진 만큼 줄 높이도 공책 줄 간격(useRuleGap)에 맞춰 넓힌다
   const k = useTextScale();
   const roomy = k.wide ? { line: Math.round(24 * k.ownScale), gap: ruleGapFor(k) } : null;
+  // 시스템 글자 크기를 키우면(최대 MAX_FONT_SCALE) 글의 첫 줄도 그만큼 높아진다. 기호와 ⋯를 그 첫 줄 가운데에 맞춘다
+  // (기본 크기에서는 배율 1이라 24·50 그대로)
+  const fs = Math.min(useWindowDimensions().fontScale, MAX_FONT_SCALE);
+  const baseLine = roomy ? roomy.line : 24;
+  const lineH = Math.round(baseLine * fs);
+  const moreH = (roomy ? roomy.gap : RULE_GAP) + lineH - baseLine;
   // 고쳐서 저장하는 동안(목록을 다시 불러오기 전) 새 글을 먼저 보여준다
   const [pending, setPending] = useState<string | null>(null);
   useEffect(() => setPending(null), [text]);
@@ -296,14 +302,14 @@ export const ItemRow = memo(function ItemRow(props: Props) {
             {/* 상태는 기호만 눌러 바꾼다 */}
             {advance ? (
               <Pressable
-                style={tintPressed([styles.symbol, roomy && { height: roomy.line }])}
+                style={tintPressed([styles.symbol, { height: lineH }])}
                 hitSlop={SYMBOL_SLOP}
                 onPress={unlessOpen(() => onAdvance(id))}
               >
                 <StatusSymbol kind={kind} />
               </Pressable>
             ) : (
-              <View style={[styles.symbol, roomy && { height: roomy.line }]}>
+              <View style={[styles.symbol, { height: lineH }]}>
                 <StatusSymbol kind={kind} />
               </View>
             )}
@@ -349,7 +355,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
             accessibilityElementsHidden={!!editing}
             importantForAccessibility={editing ? 'no-hide-descendants' : 'auto'}
             disabled={!!editing}
-            style={dimPressed([styles.more, roomy && { height: roomy.gap }, !!editing && styles.hidden])}
+            style={dimPressed([styles.more, { height: moreH }, !!editing && styles.hidden])}
             onPress={unlessOpen(menu.open)}
           >
             <Txt style={styles.moreText}>⋯</Txt>

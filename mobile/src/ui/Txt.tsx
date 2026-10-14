@@ -1,4 +1,4 @@
-import { type StyleProp, StyleSheet, Text, type TextProps, type TextStyle } from 'react-native';
+import { type StyleProp, StyleSheet, Text, type TextProps, type TextStyle, useWindowDimensions } from 'react-native';
 import { colors, fonts, type as scale, typeWide } from './theme';
 import { scaleText, type TextScale, useTextScale } from './typeScale';
 
@@ -18,10 +18,15 @@ type Props = TextProps & {
 // 글꼴이 적용된 Text. hand(손글씨)는 기본으로 네이비 잉크색이다.
 // 한국어는 어절 단위로 줄을 바꾼다(글자 중간에서 끊기지 않게).
 // 아이패드·Mac(넓은 배치)에서는 variant가 typeWide 눈금을 쓰고, 화면이 준 크기도 같은 비율로 키운다(typeScale.ts).
+// 앱이 켜진 채로 시스템 글자 크기를 바꾸면, 글자는 새 크기로 그려지지만 자리(높이·폭)는 예전 크기로 잰 그대로 남는다
+// (props가 그대로라 다시 재지 않는다). 그래서 칩·버튼이 잘리고 긴 줄이 한 줄로 잘렸다. 글자 크기 배율이 바뀌면
+// Text를 새로 만들어 다시 재게 한다(key). 화면 상태는 그대로이고 글자만 다시 잰다.
 export function Txt({ variant = 'body', compact = false, style, ...rest }: Props) {
   const k = useTextScale();
+  const { fontScale } = useWindowDimensions();
   return (
     <Text
+      key={fontScale}
       lineBreakStrategyIOS="hangul-word"
       maxFontSizeMultiplier={compact ? MAX_FONT_SCALE_COMPACT : MAX_FONT_SCALE}
       {...rest}
