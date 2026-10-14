@@ -1,6 +1,6 @@
-import { canAdvance, itemA11yHint, itemA11yLabel, symbolKind } from './symbols';
+import { advanceAction, canAdvance, itemA11yHint, itemA11yLabel, LEGEND, symbolKind } from './symbols';
 
-const task = (status: 'open' | 'doing' | 'done' | 'migrated', priority = false) =>
+const task = (status: 'open' | 'doing' | 'done' | 'migrated' | 'dropped', priority = false) =>
   ({ kind: 'task' as const, status, priority, text: '보고서' });
 
 test('항목의 기호 종류', () => {
@@ -30,4 +30,13 @@ test('다음 동작은 힌트로 따로 읽는다', () => {
   expect(itemA11yHint(task('done'))).toBe('누르면 다시 할 일로 바뀌어요');
   expect(itemA11yHint(task('migrated'))).toBeUndefined();
   expect(itemA11yHint({ kind: 'note', status: null })).toBeUndefined();
+});
+
+test('안 하기로 한 일: 줄을 그어 남기고, 누르면 다시 할 일로', () => {
+  expect(symbolKind(task('dropped'))).toBe('dropped');
+  expect(canAdvance(task('dropped'))).toBe(true);
+  expect(advanceAction(task('dropped'))).toEqual({ label: '다시 하기', to: 'open' });
+  expect(itemA11yLabel(task('dropped'))).toBe('보고서, 안 하기로 한 일');
+  expect(itemA11yHint(task('dropped'))).toBe('누르면 다시 할 일로 바뀌어요');
+  expect(LEGEND.find((e) => e.symbol === 'dropped')?.desc).toContain('지우지 않고 줄을 그어 남겨요');
 });

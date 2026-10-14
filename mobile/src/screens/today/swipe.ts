@@ -2,15 +2,15 @@ import type { Item } from '../../items/repo';
 
 // 오늘 목록 줄 밀기의 규칙. 손가락 위치만 받아 정하는 순수한 부분이라 화면 없이 시험한다.
 
-export type SwipeAction = 'postpone' | 'delete';
+export type SwipeAction = 'postpone' | 'drop' | 'delete';
 
 type RowLike = Pick<Item, 'kind' | 'status'>;
 
-// 왼쪽으로 밀면 오른쪽에 드러나는 버튼(안쪽 → 바깥쪽). 지우기가 늘 맨 바깥이다.
+// 왼쪽으로 밀면 오른쪽에 드러나는 버튼(안쪽 → 바깥쪽): 미루기 · 안 하기 · 지우기. 지우기가 늘 맨 바깥이다(끝까지 밀면 지우기).
 // 오른쪽으로 밀어 형광펜을 칠하는 건 끝나지 않은 할 일만(메뉴의 중요 표시와 같다).
 export function swipeActionsFor(item: RowLike): { left: SwipeAction[]; mark: boolean } {
   const unfinished = item.kind === 'task' && (item.status === 'open' || item.status === 'doing');
-  return { left: unfinished ? ['postpone', 'delete'] : ['delete'], mark: unfinished };
+  return { left: unfinished ? ['postpone', 'drop', 'delete'] : ['delete'], mark: unfinished };
 }
 
 export const ACTION_W = 80; // 버튼 하나의 폭(넓은 배치는 글자 배율만큼 키운다)

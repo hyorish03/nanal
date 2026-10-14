@@ -21,6 +21,16 @@ export function StatusSymbol({ kind, size = 18 }: { kind: SymbolKind; size?: num
       </View>
     );
   }
+  if (kind === 'dropped') {
+    // 안 하기로 한 일: 작고 옅은 × 한 획. 끝낸 일(채운 동그라미)·지우기 버튼(빨강)과 섞이지 않게 가늘고 흐리게
+    const arm = Math.round(size * 0.55);
+    return (
+      <View accessible={false} style={[styles.cross, { width: size, height: size }]}>
+        <View style={[styles.stroke, { width: arm, transform: [{ rotate: '45deg' }] }]} />
+        <View style={[styles.stroke, { width: arm, transform: [{ rotate: '-45deg' }] }]} />
+      </View>
+    );
+  }
   return (
     <Txt accessible={false} style={[styles.glyph, { width: size, fontSize: kind === 'open' ? 20 : 18 }]}>
       {TEXT[kind]}
@@ -35,4 +45,6 @@ const styles = StyleSheet.create({
   filled: { backgroundColor: colors.navy },
   check: { color: colors.card },
   glyph: { textAlign: 'center', color: colors.ink },
+  cross: { alignItems: 'center', justifyContent: 'center' },
+  stroke: { position: 'absolute', height: 1.5, borderRadius: 1, backgroundColor: colors.muted },
 });

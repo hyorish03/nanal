@@ -5,13 +5,16 @@ import {
   addItem,
   advanceStatus,
   deleteItem,
+  dropItem,
   listItemsForDate,
   listMigrationCandidates,
   migrateAllToToday,
+  migrateToDate,
   migrateToToday,
   migrateToTomorrow,
   restoreItem,
   setPriority,
+  undoDrop,
   undoMigration,
   updateItemText,
 } from './repo';
@@ -288,4 +291,92 @@ test('undoMigration: 원래 줄이 이미 옮긴 상태가 아니면 거부하�
   await db.runAsync("UPDATE items SET status = 'open' WHERE id = ?", [item.id]);
   await expect(undoMigration(db, created.id, 'open', TUE)).rejects.toThrow('옮긴 상태가 아니라');
   expect((await listItemsForDate(db, '2026-10-07')).map((i) => i.id)).toEqual([created.id]);
+});
+
+test('migrateToDate: 고른 날로 옮기고, 그날이 오면 그날 목록에 보인다', async () => {
+  const item = await addItem(db, { kind: 'task', text: '치과' }, TUE);
+  const created = await migrateToDate(db, item.id, '2026-10-20', TUE);
+  expect(created).toMatchObject({ date: '2026-10-20', status: 'open', migrated_from: item.id });
+  expect((await listItemsForDate(db, '2026-10-06')).map((i) => i.status)).toEqual(['migrated']);
+  expect((await listItemsForDate(db, '2026-10-20')).map((i) => i.text)).toEqual(['치과']);
+  // 앞날짜 줄은 밀린 일(포스트잇)로 넘어오지 않는다
+  expect(await listMigrationCandidates(db, '2026-10-06')).toEqual([]);
+});
+
+test('migrateToDate: 오늘·지난 날·없는 날짜·원래 날짜보다 앞은 거부하고 아무것도 바꾸지 않는다', async () => {
+  const item = await addItem(db, { kind: 'task', text: '치과' }, TUE);
+  await expect(migrateToDate(db, item.id, '2026-10-06', TUE)).rejects.toThrow('오늘 뒤의 날짜로만');
+  await expect(migrateToDate(db, item.id, '2026-10-01', TUE)).rejects.toThrow('오늘 뒤의 날짜로만');
+  await expect(migrateToDate(db, item.id, '2026-02-30', TUE)).rejects.toThrow('날짜 형식');
+  await expect(migrateToDate(db, item.id, 'tomorrow', TUE)).rejects.toThrow('날짜 형식');
+  // 앞날로 미뤄 둔 줄을 그보다 앞 날짜로는 옮기지 않는다
+  const moved = await migrateToDate(db, item.id, '2026-10-20', TUE);
+  await expect(migrateToDate(db, moved.id, '2026-10-10', TUE)).rejects.toThrow('이전 날짜의 할 일만');
+  expect((await listItemsForDate(db, '2026-10-20')).map((i) => i.status)).toEqual(['open']);
+});
+
+test('migrateToDate: 새벽 4시 전에는 어제가 오늘이라 오늘 날짜로도 미룰 수 있다', async () => {
+  const late = new Date(2026, 9, 7, 2, 0); // 수요일 새벽 2시 = 화요일
+  const item = await addItem(db, { kind: 'task', text: '빨래' }, late);
+  expect(item.date).toBe('2026-10-06');
+  const created = await migrateToDate(db, item.id, '2026-10-07', late);
+  expect(created.date).toBe('2026-10-07');
+});
+
+test('migrateToDate: 끝낸 일·안 하기로 한 일은 옮기지 않는다', async () => {
+  const item = await addItem(db, { kind: 'task', text: 'a' }, TUE);
+  await dropItem(db, item.id, TUE);
+  await expect(migrateToDate(db, item.id, '2026-10-20', TUE)).rejects.toThrow('끝나지 않은 할 일만');
+});
+
+test('dropItem: 할 일·진행 중을 안 하기로, 바꾸기 전 상태를 돌려주고 outbox에 오른다', async () => {
+  const a = await addItem(db, { kind: 'task', text: 'a' }, TUE);
+  const b = await addItem(db, { kind: 'task', text: 'b' }, TUE);
+  await advanceStatus(db, b.id, TUE);
+  await db.runAsync('DELETE FROM outbox', []);
+  expect(await dropItem(db, a.id, TUE)).toBe('open');
+  expect(await dropItem(db, b.id, TUE)).toBe('doing');
+  expect((await listItemsForDate(db, '2026-10-06')).map((i) => i.status)).toEqual(['dropped', 'dropped']);
+  expect((await outboxKeys()).sort()).toEqual([a.id, b.id].sort());
+});
+
+test('dropItem: 끝낸 일·옮긴 일·메모·이미 안 하기로 한 일은 거부한다', async () => {
+  const done = await addItem(db, { kind: 'task', text: 'a' }, TUE);
+  await advanceStatus(db, done.id, TUE);
+  await advanceStatus(db, done.id, TUE);
+  const note = await addItem(db, { kind: 'note', text: 'n' }, TUE);
+  const moved = await addItem(db, { kind: 'task', text: 'm' }, TUE);
+  await migrateToTomorrow(db, moved.id, TUE);
+  const dropped = await addItem(db, { kind: 'task', text: 'd' }, TUE);
+  await dropItem(db, dropped.id, TUE);
+  for (const id of [done.id, note.id, moved.id, dropped.id]) {
+    await expect(dropItem(db, id, TUE)).rejects.toThrow('끝나지 않은 할 일만');
+  }
+});
+
+test('안 하기로 한 일은 기호를 누르면(advanceStatus) 다시 할 일로 돌아온다', async () => {
+  const item = await addItem(db, { kind: 'task', text: 'a' }, TUE);
+  await dropItem(db, item.id, TUE);
+  await advanceStatus(db, item.id, TUE);
+  expect((await listItemsForDate(db, '2026-10-06'))[0].status).toBe('open');
+});
+
+test('undoDrop: 줄 긋기 전 상태로 돌리고, 안 하기로 한 일이 아니면 거부한다', async () => {
+  const item = await addItem(db, { kind: 'task', text: 'a' }, TUE);
+  await advanceStatus(db, item.id, TUE);
+  const prev = await dropItem(db, item.id, TUE);
+  await undoDrop(db, item.id, prev, TUE);
+  expect((await listItemsForDate(db, '2026-10-06'))[0].status).toBe('doing');
+  await expect(undoDrop(db, item.id, 'open', TUE)).rejects.toThrow('되돌릴 수 없습니다');
+});
+
+test('안 하기로 한 일은 밀린 일(포스트잇) 후보가 아니고 중요 개수에도 세지 않는다', async () => {
+  const item = await addItem(db, { kind: 'task', text: 'a' }, MON);
+  await setPriority(db, item.id, true, MON);
+  await dropItem(db, item.id, MON);
+  expect(await listMigrationCandidates(db, '2026-10-06')).toEqual([]);
+  for (const t of ['b', 'c', 'd']) {
+    const other = await addItem(db, { kind: 'task', text: t }, MON);
+    await expect(setPriority(db, other.id, true, MON)).resolves.toBeUndefined();
+  }
 });

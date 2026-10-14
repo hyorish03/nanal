@@ -15,8 +15,8 @@ select throws_ok(
   '23514', null, '일정 종류는 거부된다');
 select throws_ok(
   $$ insert into public.items (id, date, kind, text, status, created_at, updated_at)
-     values ('aaaaaaaa-0000-0000-0000-000000000002', '2026-10-07', 'task', 'x', 'dropped', now(), now()) $$,
-  '23514', null, '놓아준 일 상태는 거부된다');
+     values ('aaaaaaaa-0000-0000-0000-000000000002', '2026-10-07', 'task', 'x', 'let_go', now(), now()) $$,
+  '23514', null, '모르는 상태는 거부된다(dropped는 20261014 마이그레이션부터 안 하기로 다시 받는다)');
 select lives_ok(
   $$ insert into public.items (id, date, kind, text, status, priority, created_at, updated_at)
      values ('aaaaaaaa-0000-0000-0000-000000000003', '2026-10-07', 'task', 'x', 'doing', true, now(), now()) $$,

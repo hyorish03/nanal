@@ -19,6 +19,7 @@ const items: ItemRow[] = [
   { date: '2026-09-01', kind: 'task', status: 'done', deleted_at: null },
   { date: '2026-09-01', kind: 'task', status: 'migrated', deleted_at: null },
   { date: '2026-09-01', kind: 'task', status: 'open', deleted_at: null },
+  { date: '2026-09-01', kind: 'task', status: 'dropped', deleted_at: null }, // 안 하기로 한 일: 할 일 수에서 빠진다
   { date: '2026-09-02', kind: 'note', status: null, deleted_at: null },
   { date: '2026-09-05', kind: 'task', status: 'done', deleted_at: '2026-09-05T00:00:00Z' }, // 지운 할 일
 ];
