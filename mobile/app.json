@@ -9,7 +9,7 @@
     "scheme": "nanal",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "mengle.zen",
+      "bundleIdentifier": "nanal.mengle.zen",
       "infoPlist": {
         "CADisableMinimumFrameDurationOnPhone": true,
         "ITSAppUsesNonExemptEncryption": false,
@@ -17,14 +17,14 @@
       },
       "entitlements": {
         "com.apple.security.application-groups": [
-          "group.mengle.zen"
+          "group.nanal.mengle.zen"
         ]
       },
       "appleTeamId": "8V5VNMF9JM",
       "buildNumber": "1"
     },
     "android": {
-      "package": "mengle.zen",
+      "package": "nanal.mengle.zen",
       "adaptiveIcon": {
         "backgroundColor": "#1E2F4D",
         "foregroundImage": "./assets/android-icon-foreground.png",
