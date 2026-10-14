@@ -339,6 +339,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
           />
         )}
         <SafeAreaView style={styles.container} edges={sidebar ? ['top', 'bottom', 'right'] : undefined}>
+          <SyncBar pending={pending} error={error} reduce={reduce} />
           <ScreenEnter key={screen ?? 'none'} reduce={reduce}>
             {screen === 'onboarding' && (
               // 넓은 창에서는 휴대폰 한 장 폭으로 가운데에 모은다(늘어난 온보딩이 되지 않게)
@@ -433,7 +434,6 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
         </SafeAreaView>
         {canReopenSidebar && <SidebarOpenButton onPress={toggleSidebar} />}
       </View>
-      <SyncBar pending={pending} error={error} />
       <Cover
         open={coverOpen}
         line="오늘도 한 줄씩"
@@ -454,11 +454,11 @@ function ScreenEnter({ reduce, children }: { reduce: boolean; children: ReactNod
   );
 }
 
-// 동기화 상태는 화면 위에 얹는다(나타나고 사라질 때 아래 글이 밀리지 않게).
+// 동기화 상태는 안전 영역 바로 아래 한 줄로 끼워 넣는다. 위에 얹으면 화면 맨 위 '‹ 오늘'·계정 버튼을 덮어서,
+// 보일 때만 화면을 한 줄 아래로 민다(나타나고 사라질 때 부드럽게).
 // 대기는 2초 넘게 이어질 때만 보이고(적자마자 깜빡이지 않게), 실패는 바로 보인다.
 const SYNC_LATE_MS = 2_000;
-function SyncBar({ pending, error }: { pending: number; error: string | null }) {
-  const insets = useSafeAreaInsets();
+function SyncBar({ pending, error, reduce }: { pending: number; error: string | null; reduce: boolean }) {
   const waiting = pending > 0;
   const [late, setLate] = useState(false);
   useEffect(() => {
@@ -467,9 +467,15 @@ function SyncBar({ pending, error }: { pending: number; error: string | null }) 
     const t = setTimeout(() => setLate(true), SYNC_LATE_MS);
     return () => clearTimeout(t);
   }, [waiting]);
-  if (!error && !(waiting && late)) return null;
+  const shown = !!error || (waiting && late);
+  const prevShown = useRef(shown);
+  if (prevShown.current !== shown) {
+    prevShown.current = shown;
+    if (!reduce) LayoutAnimation.configureNext(LayoutAnimation.create(200, 'easeInEaseOut', 'opacity'));
+  }
+  if (!shown) return null;
   return (
-    <View pointerEvents="none" style={[styles.syncBar, { top: insets.top }]}>
+    <View pointerEvents="none" style={styles.syncBar}>
       <Txt style={styles.syncText} accessibilityLiveRegion="polite">
         {error ? '아직 올리지 못했어요. 기록은 이 기기에 있고, 곧 다시 올릴게요' : `${pending}개를 올리는 중이에요`}
       </Txt>
@@ -525,6 +531,6 @@ const styles = StyleSheet.create({
   blockedPrimary: { minHeight: 52, borderRadius: 26, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   blockedPrimaryText: { color: colors.onDark },
   blockedSecondary: { minHeight: 48, borderRadius: 24, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
-  syncBar: { position: 'absolute', left: 0, right: 0, backgroundColor: colors.postit, paddingVertical: 6, paddingHorizontal: 16 },
+  syncBar: { backgroundColor: colors.postit, paddingVertical: 6, paddingHorizontal: 16 },
   syncText: { color: colors.postitText, fontSize: 13 },
 });
