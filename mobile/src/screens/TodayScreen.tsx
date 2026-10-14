@@ -266,14 +266,15 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     [priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDelete, onPriorityFull, onRevealEdit],
   );
 
-  // 포스트잇과 입력칸을 목록 머리로 둬서 후보가 많아도 함께 스크롤된다. 컴포넌트 타입이 아닌 엘리먼트라 입력칸이 다시 마운트되지 않는다.
-  const listHeader = (
-    <View style={styles.listHeader} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}>
-      {candidates.length > 0 && !panel && <PostIt candidates={candidates} onSettle={settle} onSettleAll={settleAll} />}
-
-      <Composer inputRef={inputRef} voice={VoiceSheet !== null} onCapture={onCapture} onSubmit={submit} />
-    </View>
-  );
+  // 포스트잇만 목록 머리에 둬서 후보가 많아도 함께 스크롤된다. 입력칸은 목록 위에 고정한다
+  const listHeader =
+    candidates.length > 0 && !panel ? (
+      <View style={styles.listHeader} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}>
+        <PostIt candidates={candidates} onSettle={settle} onSettleAll={settleAll} />
+      </View>
+    ) : null;
+  // 목록이 고정된 입력칸 밑으로 지나가기 시작하면 경계에 옅은 그늘을 깐다
+  const edgeShade = scrollY.interpolate({ inputRange: [0, 12], outputRange: [0, 1], extrapolate: 'clamp' });
 
   // 날짜 머리 + 공책 한 쪽. 휴대폰에서는 화면에 바로, 넓은 배치에서는 가운데 칸에 놓는다
   const notebook = (
@@ -323,9 +324,15 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       {/* 지난 기록 책갈피 끈: 하루 마무리 버튼 왼쪽, 화면 맨 위에 매달린다 */}
       {showNav && onOpenArchive && eveningW > 0 && <Ribbon onPress={onOpenArchive} style={{ right: SCREEN_X + eveningW + RIBBON_GAP }} />}
   
+      {/* 입력칸과 할 일·메모 칩은 고정. 그 아래 목록만 스크롤된다 */}
+      <View style={styles.composer}>
+        <Composer inputRef={inputRef} voice={VoiceSheet !== null} onCapture={onCapture} onSubmit={submit} />
+      </View>
+
       {/* 공책 한 쪽: 여백선은 목록 뒤에 깔리고, 빈 줄은 목록 꼬리에서 함께 스크롤된다 */}
       <View ref={pageRef} style={styles.page}>
-        <MarginRule scrollY={scrollY} startY={headerH} />
+        <MarginRule scrollY={scrollY} startY={listHeader ? headerH : 0} />
+        <Animated.View pointerEvents="none" style={[styles.edge, { opacity: edgeShade }]} />
         <AnimatedList
           ref={listRef}
           style={styles.list}
@@ -453,6 +460,21 @@ const styles = StyleSheet.create({
   eveningText: { fontSize: 14, color: colors.onDark },
   notice: { color: colors.inkSoft },
   error: { color: colors.danger },
+  composer: { paddingBottom: 14 },
+  // 고정 영역 아래 경계: 목록이 밑으로 지나갈 때만 보이는 옅은 선과 그늘
+  edge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    zIndex: 1,
+    backgroundColor: colors.lineSoft,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+  },
   page: { flex: 1, overflow: 'hidden' }, // 여백선이 머리 높이만큼 내려가도 화면 아래로 삐져나오지 않게
   list: { flex: 1 },
   listContent: { flexGrow: 1 },

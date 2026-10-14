@@ -1,4 +1,7 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useState } from 'react';
+import { LayoutAnimation, ScrollView, StyleSheet, View } from 'react-native';
+import { useReduceMotion } from '../../ui/useReduceMotion';
 import type { Item } from '../../items/repo';
 import { colors } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
@@ -7,6 +10,7 @@ import { PostIt, type SettleHow } from './PostIt';
 import { SymbolLegend } from './SymbolLegend';
 
 export const PANEL_W = 300;
+const LEGEND_KEY = 'nanal.legendCollapsed'; // 기호 설명을 접어 둔 채로 기억한다
 
 type Props = {
   candidates: Item[];
@@ -20,6 +24,20 @@ type Props = {
 // 그래서 가운데 공책에는 입력칸과 목록만 남는다.
 export function TodayPanel({ candidates, onSettle, onSettleAll, done, total }: Props) {
   const s = useSpace();
+  const reduce = useReduceMotion();
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(LEGEND_KEY)
+      .then((v) => setCollapsed(v === '1'))
+      .catch(() => {});
+  }, []);
+  const toggle = () => {
+    if (!reduce) LayoutAnimation.configureNext(LayoutAnimation.create(200, 'easeInEaseOut', 'opacity'));
+    setCollapsed((c) => {
+      AsyncStorage.setItem(LEGEND_KEY, c ? '0' : '1').catch(() => {});
+      return !c;
+    });
+  };
   return (
     <ScrollView style={styles.panel} contentContainerStyle={[styles.content, { gap: s.xl, paddingBottom: s.xl }]}>
       <View accessible accessibilityLabel={total > 0 ? `오늘 할 일 ${total}개 중 ${done}개를 끝냈어요` : '오늘 할 일이 아직 없어요'}>
@@ -33,7 +51,7 @@ export function TodayPanel({ candidates, onSettle, onSettleAll, done, total }: P
       </View>
       {candidates.length > 0 && <PostIt candidates={candidates} onSettle={onSettle} onSettleAll={onSettleAll} />}
       <View style={styles.legend}>
-        <SymbolLegend />
+        <SymbolLegend collapsed={collapsed} onToggle={toggle} />
       </View>
     </ScrollView>
   );
