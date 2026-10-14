@@ -7,10 +7,10 @@ import { colors, HIT } from './theme';
 import { Txt } from './Txt';
 import { useReduceMotion } from './useReduceMotion';
 
-type Props = { visible: boolean; email: string | null; onClose: () => void; onSignOut: () => void };
+type Props = { visible: boolean; email: string | null; onClose: () => void; onSignOut: () => void; onDeleteAccount: () => void };
 
 // 오늘 화면 계정 버튼을 누르면 아래에서 올라오는 작은 종이 시트: 이 노트의 주인(이메일)과 로그아웃
-export function AccountSheet({ visible, email, onClose, onSignOut }: Props) {
+export function AccountSheet({ visible, email, onClose, onSignOut, onDeleteAccount }: Props) {
   const insets = useSafeAreaInsets();
   const reduce = useReduceMotion();
   const show = useRef(new Animated.Value(0)).current;
@@ -45,6 +45,10 @@ export function AccountSheet({ visible, email, onClose, onSignOut }: Props) {
         <Pressable accessibilityRole="button" style={dimPressed(styles.signOut)} onPress={onSignOut}>
           <Txt style={styles.signOutText}>로그아웃</Txt>
         </Pressable>
+        {/* 되돌릴 수 없는 일이라 작고 조용하게, 누르면 한 번 더 묻는다 */}
+        <Pressable accessibilityRole="button" style={dimPressed(styles.delete)} onPress={onDeleteAccount}>
+          <Txt style={styles.deleteText}>계정 삭제</Txt>
+        </Pressable>
       </Animated.View>
     </Modal>
   );
@@ -76,4 +80,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   signOutText: { fontSize: 15, color: colors.inkSoft },
+  delete: { alignSelf: 'center', minHeight: HIT, paddingHorizontal: 12, justifyContent: 'center' },
+  deleteText: { fontSize: 13, color: colors.danger, textDecorationLine: 'underline' },
 });

@@ -11,14 +11,14 @@ import { useSpace } from './typeScale';
 
 export type SidebarKey = 'today' | 'evening' | 'archive';
 
-type Props = { current: SidebarKey; onSelect: (key: SidebarKey) => void; onCollapse?: () => void; onSignOut?: () => void };
+type Props = { current: SidebarKey; onSelect: (key: SidebarKey) => void; onCollapse?: () => void; onSignOut?: () => void; onDeleteAccount?: () => void };
 
 const ICON = 20;
 const SPINE_W = 10; // 왼쪽 끝 남색 천 책등
 
 // 아이패드·Mac의 왼쪽 칸. 공책 왼쪽에 붙은 남색 책등과 면지 한 장에 오늘·하루 마무리·지난 기록을 적어 둔다.
 // 휴대폰의 하루 마무리 버튼과 지난 기록 책갈피 끈을 대신한다.
-export function Sidebar({ current, onSelect, onCollapse, onSignOut }: Props) {
+export function Sidebar({ current, onSelect, onCollapse, onSignOut, onDeleteAccount }: Props) {
   const insets = useSafeAreaInsets();
   const email = useAccountEmail();
   const s = useSpace();
@@ -63,6 +63,11 @@ export function Sidebar({ current, onSelect, onCollapse, onSignOut }: Props) {
             >
               <Txt style={styles.signOutText}>로그아웃</Txt>
             </Pressable>
+            {onDeleteAccount && (
+              <Pressable accessibilityRole="button" onPress={onDeleteAccount} style={({ pressed }) => [styles.delete, pressed && styles.rowHover]}>
+                <Txt style={styles.deleteText}>계정 삭제</Txt>
+              </Pressable>
+            )}
           </View>
         )}
       </View>
@@ -182,6 +187,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   signOutText: { fontSize: 13, color: colors.inkSoft },
+  delete: { alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center', paddingHorizontal: 2 },
+  deleteText: { fontSize: 12, color: colors.danger, textDecorationLine: 'underline' },
   row: {
     minHeight: HIT,
     paddingHorizontal: 12,

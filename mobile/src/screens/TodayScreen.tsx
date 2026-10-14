@@ -44,7 +44,7 @@ import { usePane } from '../ui/pane';
 import { useLayoutClass, WIDE } from '../ui/responsive';
 import { useSpace } from '../ui/typeScale';
 import { PANEL_W, TodayPanel } from './today/TodayPanel';
-import { accountInitial, confirmSignOut, useAccountEmail } from '../lib/account';
+import { accountInitial, confirmDeleteAccount, confirmSignOut, useAccountEmail } from '../lib/account';
 import { AccountSheet } from '../ui/AccountSheet';
 
 // 개발용·출시 빌드에서만 말로 적기 시트를 불러온다(Expo Go에서는 네이티브 모듈이 없어 import 시 오류).
@@ -444,6 +444,10 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         onSignOut={() => {
           setAccountOpen(false);
           void confirmSignOut(db);
+        }}
+        onDeleteAccount={() => {
+          setAccountOpen(false);
+          confirmDeleteAccount(db);
         }}
       />
     </View>

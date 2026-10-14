@@ -15,7 +15,7 @@ import { claimOwner } from '../sync/owner';
 import { createSupabaseRemote } from '../sync/supabaseRemote';
 import { useSync } from '../sync/useSync';
 import { Cover } from '../ui/Cover';
-import { confirmSignOut } from '../lib/account';
+import { confirmDeleteAccount, confirmSignOut } from '../lib/account';
 import { FadeIn } from '../ui/FadeIn';
 import { LAMP_PAPER, LAMP_SHADE } from '../ui/lamp';
 import { EASE_OUT } from '../ui/motion';
@@ -279,6 +279,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
             onSelect={selectSection}
             onCollapse={toggleSidebar}
             onSignOut={() => void confirmSignOut(db)}
+            onDeleteAccount={() => confirmDeleteAccount(db)}
           />
         )}
         <SafeAreaView style={styles.container} edges={sidebar ? ['top', 'bottom', 'right'] : undefined}>

@@ -17,3 +17,12 @@ export async function claimOwner(db: Db, userId: string): Promise<'ok' | 'mismat
     return row.cursor === userId ? 'ok' : 'mismatch';
   });
 }
+
+// 계정을 지운 뒤 이 기기의 기록을 모두 비운다(할 일·메모·기분·회고·템플릿·월간 돌아보기, 보낼 목록, 동기화 위치, 소유자).
+// 표 구조는 그대로 두므로 다른 계정으로 로그인하면 빈 노트로 시작한다.
+const LOCAL_TABLES = ['items', 'days', 'reflections', 'templates', 'monthly_reviews', 'outbox', 'sync_state'] as const;
+export async function wipeLocalData(db: Db): Promise<void> {
+  await db.transaction(async (tx) => {
+    for (const t of LOCAL_TABLES) await tx.runAsync(`DELETE FROM ${t}`, []);
+  });
+}
