@@ -1,4 +1,5 @@
 import { isAuthRetryableFetchError, type AuthError } from '@supabase/supabase-js';
+import { useLayoutClass } from '../ui/responsive';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +28,7 @@ function authErrorMessage(e: AuthError): string {
 }
 
 export function LoginScreen() {
+  const wide = useLayoutClass() !== 'compact';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -52,14 +54,14 @@ export function LoginScreen() {
     <SafeAreaView style={styles.safe}>
       <Paper />
       <View style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.container, wide && styles.containerWide]} keyboardShouldPersistTaps="handled">
           <View style={styles.cover}>
             <BookCover width={262} height={354} titleSize={46} subtitle="오늘도 한 줄씩" footer="2026" />
           </View>
           <Txt variant="title" accessibilityRole="header" style={styles.srOnly}>
             나날 로그인
           </Txt>
-          <View style={styles.form}>
+          <View style={[styles.form, wide && styles.formWide]}>
             <View style={styles.field}>
               <Txt style={styles.label}>이메일</Txt>
               <TextInput
@@ -125,6 +127,9 @@ const styles = StyleSheet.create({
   cover: { alignSelf: 'center' },
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   form: { gap: 14 },
+  // 아이패드·Mac: 표지와 양식을 화면 가운데 한 묶음으로, 양식은 표지 폭과 비슷하게
+  containerWide: { justifyContent: 'center', alignItems: 'center' },
+  formWide: { width: '100%', maxWidth: 420 },
   field: { gap: 6 },
   label: { fontSize: 14, color: colors.muted },
   input: {
