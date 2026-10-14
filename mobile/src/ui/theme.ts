@@ -38,6 +38,9 @@ export const colors = {
   tape: 'rgba(214, 194, 146, 0.7)', // 종이 테이프
   postit: '#F3E4A8',
   postitText: '#6B5D3F',
+  // 온보딩 노트의 붉은 메모 글씨와 그림(테라코타). 종이 대비 4.85:1(AA).
+  // 형광펜 위(4.08:1)에는 '형광펜' 한 단어만 오고, 19pt 굵은 글씨라 큰 글씨 기준 3:1을 넘는다.
+  noteRed: '#A4513A',
   shadow: '#503C1E', // 종이 그림자(갈색 기운)
   pressTint: 'rgba(42, 37, 32, 0.05)', // 누르는 동안 종이에 지는 그늘
   inkDash: 'rgba(42, 37, 32, 0.25)', // 점선 구분선
@@ -53,12 +56,14 @@ export const fonts = Platform.select({
     body: 'IBMPlexSansKR-Regular',
     medium: 'IBMPlexSansKR-Medium',
     hand: 'NanumPen-Regular', // 나눔펜 TTF의 이름표는 'Nanum Pen'이다(NanumPenScript 아님)
+    note: 'Gaegu-Bold', // 개구 굵게. 온보딩 노트의 또박또박한 메모 글씨
   },
   default: {
     title: 'GowunBatang_400Regular',
     body: 'IBMPlexSansKR_400Regular',
     medium: 'IBMPlexSansKR_500Medium',
     hand: 'NanumPenScript_400Regular',
+    note: 'Gaegu_700Bold',
   },
 });
 

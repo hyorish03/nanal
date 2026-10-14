@@ -45,7 +45,8 @@
             "./node_modules/@expo-google-fonts/gowun-batang/400Regular/GowunBatang_400Regular.ttf",
             "./node_modules/@expo-google-fonts/ibm-plex-sans-kr/400Regular/IBMPlexSansKR_400Regular.ttf",
             "./node_modules/@expo-google-fonts/ibm-plex-sans-kr/500Medium/IBMPlexSansKR_500Medium.ttf",
-            "./node_modules/@expo-google-fonts/nanum-pen-script/400Regular/NanumPenScript_400Regular.ttf"
+            "./node_modules/@expo-google-fonts/nanum-pen-script/400Regular/NanumPenScript_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/gaegu/700Bold/Gaegu_700Bold.ttf"
           ]
         }
       ],
