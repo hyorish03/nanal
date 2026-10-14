@@ -11,6 +11,8 @@ import { Txt } from '../../ui/Txt';
 import { Paper } from '../../ui/Paper';
 import { dimPressed } from '../../ui/press';
 import { macText } from '../../ui/desktop';
+import { useLayoutClass } from '../../ui/responsive';
+import { useRule } from './rule';
 
 type Props = {
   db: Db;
@@ -21,6 +23,8 @@ type Props = {
   onDelete: (template: TemplateDef) => void;
 };
 
+const SHEET_MAX = 560; // 가운데 뜬 시트 안 글 폭
+
 const PLACEHOLDERS = ['예: 오늘 어떤 운동을 했나요?', '예: 몸과 마음은 어땠나요?', ''];
 
 export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete }: Props) {
@@ -29,6 +33,9 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   useKeyboardResizePaused(visible);
+  // 아이패드·Mac에서는 pageSheet가 가운데 뜬 폼 시트가 된다. 글 폭을 묶고 칸을 키운다.
+  const roomy = useLayoutClass() !== 'compact';
+  const rule = useRule();
 
   useEffect(() => {
     if (!visible) return;
@@ -76,7 +83,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={requestClose}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Paper />
-        <ScrollView contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.sheet, roomy && styles.sheetRoomy]} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <Pressable accessibilityRole="button" style={dimPressed(styles.headerButton)} onPress={requestClose}>
               <Txt style={styles.headerText}>취소</Txt>
@@ -100,7 +107,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
           <View style={styles.field}>
             <Txt style={styles.label}>이름</Txt>
             <TextInput
-              style={macText(styles.name)}
+              style={macText([styles.name, roomy && styles.nameRoomy])}
               value={name}
               onChangeText={(v) => {
                 setName(v);
@@ -121,7 +128,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
               <View key={i} style={styles.question}>
                 <Txt style={styles.no}>{i + 1}</Txt>
                 <TextInput
-                  style={macText(styles.questionInput)}
+                  style={macText([styles.questionInput, roomy && styles.questionInputRoomy])}
                   value={q}
                   onChangeText={(v) => {
                     setQuestions(questions.map((x, j) => (j === i ? v : x)));
@@ -153,12 +160,12 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
 
           <View style={styles.field}>
             <Txt style={styles.label}>미리보기</Txt>
-            <RuledPaper style={styles.preview}>
-              <Txt variant="hand" style={styles.previewName}>
+            <RuledPaper lineHeight={rule.line} style={styles.preview}>
+              <Txt variant="hand" style={{ fontSize: rule.hand - 1, lineHeight: rule.lineHeight }}>
                 {name.trim() || '템플릿 이름'}
               </Txt>
               {(filled.length ? filled : ['질문을 적으면 여기에 보여요']).map((q, i) => (
-                <Txt key={i} style={styles.previewQ}>
+                <Txt key={i} style={[styles.previewQ, { fontSize: rule.body - 1, lineHeight: rule.lineHeight }]}>
                   {q}
                 </Txt>
               ))}
@@ -187,6 +194,7 @@ export function TemplateSheet({ db, visible, editing, onClose, onSaved, onDelete
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
   sheet: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 28, gap: 16 },
+  sheetRoomy: { width: '100%', maxWidth: SHEET_MAX, alignSelf: 'center', paddingHorizontal: 32, paddingTop: 16, gap: 22 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerButton: { minHeight: HIT, minWidth: HIT, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   headerText: { fontSize: 15 },
@@ -201,16 +209,17 @@ const styles = StyleSheet.create({
     color: colors.ink,
     paddingHorizontal: 2,
   },
+  nameRoomy: { height: 54, fontSize: 19 },
   question: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
   no: { width: 18, fontSize: 13, color: colors.muted },
   questionInput: { flex: 1, height: 46, fontSize: 16, fontFamily: fonts.body, color: colors.ink },
+  questionInputRoomy: { height: 52, fontSize: 17 },
   removeQ: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   removeText: { fontSize: 18, color: colors.faint },
   add: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 2 },
   addText: { fontSize: 14, color: colors.navy },
   preview: { paddingVertical: 0, paddingHorizontal: 14, borderWidth: 1, borderColor: colors.lineFaint },
-  previewName: { fontSize: 22, lineHeight: 32 },
-  previewQ: { fontSize: 14, lineHeight: 32, color: colors.inkSoft },
+  previewQ: { color: colors.inkSoft },
   error: { color: colors.danger, fontSize: 14 },
   delete: {
     marginTop: 12,
