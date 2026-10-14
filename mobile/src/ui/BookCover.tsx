@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { colors } from './theme';
 import { Debossed } from './Cover';
@@ -11,14 +12,17 @@ type Props = {
   subtitle?: string;
   footer?: string;
   open?: Animated.Value; // 0 덮임 → 1 펼침. 표지만 책등을 축으로 넘어가고 속지는 제자리에 있다
+  openAngle?: number; // 다 펼쳤을 때 표지가 넘어간 각도. 180보다 조금 덜 넘기면 책상 위에서 살짝 들린 듯 보인다
+  inside?: ReactNode; // 표지 바로 아래 첫 장(width×height). 속지 묶음 위, 표지 밑에 놓인다
+  endpaper?: ReactNode; // 표지 안쪽 면지에 적힌 것
 };
 
 const PAGE_LINES = 7;
 
 // 종이 묶음 위에 놓인 하드커버 다이어리. 장식이므로 스크린 리더에서 숨긴다.
-export function BookCover({ width, height, titleSize, subtitle, footer, open }: Props) {
+export function BookCover({ width, height, titleSize, subtitle, footer, open, openAngle = 180, inside, endpaper }: Props) {
   const scale = width / 262;
-  const angle = open?.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-180deg'] }) ?? '0deg';
+  const angle = open?.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `-${openAngle}deg`] }) ?? '0deg';
   // 표지 뒷면(면지)은 같은 판을 제 가운데 축으로 한 번 더 뒤집어 둔다. 90°를 넘으면 앞면 대신 보인다.
   const leaf = (back: boolean) => [
     { perspective: 1200 },
@@ -33,8 +37,11 @@ export function BookCover({ width, height, titleSize, subtitle, footer, open }: 
           <View key={i} style={[styles.pageLine, { marginBottom: height * 0.09 }]} />
         ))}
       </View>
+      {inside && <View style={[styles.inside, { width, height }]}>{inside}</View>}
       {open && (
-        <Animated.View style={[styles.cover, styles.endpaper, { width, height, transform: leaf(true) }]} />
+        <Animated.View style={[styles.cover, styles.endpaper, { width, height, transform: leaf(true) }]}>
+          {endpaper}
+        </Animated.View>
       )}
       <Animated.View style={[styles.cover, { width, height, paddingTop: height * 0.24, transform: leaf(false) }]}>
         <Paper texture="cloth" />
@@ -79,6 +86,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 10 },
   },
+  inside: { position: 'absolute', top: 0, left: 0, overflow: 'hidden' },
   pageLine: { height: StyleSheet.hairlineWidth, backgroundColor: colors.ruled },
   cover: {
     position: 'absolute',

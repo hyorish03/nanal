@@ -207,6 +207,12 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     let t: ReturnType<typeof setTimeout> | undefined;
     readCoverOpening(AsyncStorage, new Date()).then((how) => {
       if (!alive) return;
+      // 처음 여는 날(온보딩)에는 온보딩의 책 펼치기가 여는 장면이라, 남색 표지는 기다리지 않고 짧게 흐려지며 비켜선다
+      if (screenRef.current === 'onboarding') {
+        setCoverOpening('fade');
+        setCoverOpen(true);
+        return;
+      }
       setCoverOpening(how);
       t = setTimeout(() => setCoverOpen(true), how === 'turn' ? 450 : 200);
     });
