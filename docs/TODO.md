@@ -12,7 +12,7 @@
 
 ### 계정 지우기 서버 함수 (App Store 5.1.1(v)) — 코드 완료, 배포 남음
 - `supabase/functions/delete-account`: `POST`만 받는다. 사용자 JWT로 부른 사람을 확인하고(없거나 틀리면 `401`), service role로 `auth.admin.deleteUser`를 불러 영구히 지운다. 성공하면 `{ ok: true }`. 사용자 표는 모두 `on delete cascade`라 함께 지워진다(Storage는 쓰지 않음).
-- [ ] (확인 후) 배포: `supabase functions deploy delete-account --project-ref xckbdxtgfcvdacwrolvb --use-api`. 로그인 없이 부르면 `401`인지 확인.
+- [x] 배포함(2026-10-14): `supabase functions deploy delete-account --project-ref xckbdxtgfcvdacwrolvb --use-api`. 로그인 없이 부르면 `401`인지 확인.
 - [x] 앱 계정 시트(아이패드·Mac은 사이드바)에 "계정 삭제": 확인 창 → 함수 호출 → 이 기기 기록 비우기 → 로그아웃.
 
 ### 사용자가 직접 할 일
