@@ -7,7 +7,9 @@ export type ErrorCode =
   | 'paid_required'
   | 'not_enough_days'
   | 'ai_busy'
-  | 'ai_failed';
+  | 'ai_failed'
+  | 'method_not_allowed'
+  | 'delete_failed';
 
 const STATUS: Record<ErrorCode, number> = {
   unauthorized: 401,
@@ -17,6 +19,8 @@ const STATUS: Record<ErrorCode, number> = {
   not_enough_days: 422,
   ai_busy: 503,
   ai_failed: 502,
+  method_not_allowed: 405,
+  delete_failed: 500,
 };
 
 export function json(body: unknown, status = 200): Response {
