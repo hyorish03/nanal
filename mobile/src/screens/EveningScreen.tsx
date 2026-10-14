@@ -29,6 +29,7 @@ import { dimPressed } from '../ui/press';
 import { Chip } from '../ui/Chip';
 import { PageHeader } from '../ui/PageHeader';
 import { useReduceMotion } from '../ui/useReduceMotion';
+import { usePane } from '../ui/pane';
 import { type LayoutClass, useLayoutClass, WIDE } from '../ui/responsive';
 
 type Props = { db: Db; version: number; onChanged: () => void; onClose: () => void };
@@ -60,7 +61,10 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const frame = useRef<View>(null);
   const { onScroll, keep } = useKeepVisible(scroll, frame);
   const layout = useLayoutClass();
-  const split = layout !== 'compact';
+  const pane = usePane();
+  // 두 칸은 칸 폭이 충분할 때만(아이패드 가로·넓은 Mac 창). 세로 아이패드처럼 좁으면 한 칸을 가운데로 모은다
+  const split = layout !== 'compact' && pane.width >= SPLIT_MIN;
+  const centered = layout !== 'compact' && !split;
   const rule = useRule();
 
   // 쓰던 답은 날마다 따로 보관한다. 불러오기 전에는 덮어쓰지 않는다.
@@ -520,7 +524,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
       {/* 앱 화면이 이미 키보드만큼 줄어들므로(KeyboardResize) 인셋은 더하지 않고, 쓰는 칸 쪽으로 스크롤만 옮긴다 */}
       <ScrollView
         ref={scroll}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, centered && styles.centered]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         onScroll={onScroll}
@@ -548,6 +552,8 @@ const WELL_SCALE: Record<LayoutClass, number> = { compact: 1, regular: 1.1, wide
 const MOOD_WORD: Record<LayoutClass, number> = { compact: 13, regular: 14, wide: 15 };
 const LEFT_MIN = 300;
 const LEFT_MAX = 440;
+// 왼쪽 칸 최소 + 사이 + 오른쪽 글 칸 최소(440) + 좌우 여백
+const SPLIT_MIN = LEFT_MIN + WIDE.gutter + 440 + WIDE.pageX * 2;
 const WET_INK = colors.navy; // 막 쓴 잉크는 남색으로 젖어 있다가 먹색으로 마른다
 
 // 색은 네이티브 드라이버로 바꿀 수 없어서, 먹색 글씨 위에 남색 글씨를 겹쳐 두고 남색만 흐리게 한다.
@@ -668,5 +674,7 @@ const styles = StyleSheet.create({
   left: { flex: 2, minWidth: LEFT_MIN, maxWidth: LEFT_MAX },
   right: { flex: 3, maxWidth: WIDE.readingWidth },
   column: { paddingTop: 8, paddingBottom: 32, gap: 24 },
-  rightColumn: { paddingTop: 18 }, // 테이프가 칸 위로 잘리지 않게
+  rightColumn: { paddingTop: 18 },
+  // 넓은 화면의 한 칸 배치: 읽기 폭으로 가운데
+  centered: { width: '100%', maxWidth: WIDE.readingWidth + WIDE.pageX * 2, alignSelf: 'center', paddingHorizontal: WIDE.pageX }, // 테이프가 칸 위로 잘리지 않게
 });
