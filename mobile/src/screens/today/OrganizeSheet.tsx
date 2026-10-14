@@ -16,7 +16,7 @@ import { Paper } from '../../ui/Paper';
 import { useReduceMotion } from '../../ui/useReduceMotion';
 import { FadeIn } from '../../ui/FadeIn';
 import { dimPressed } from '../../ui/press';
-import { macText } from '../../ui/desktop';
+import { useScaledText } from '../../ui/typeScale';
 
 type Props = {
   db: Db;
@@ -32,6 +32,7 @@ type Step = 'write' | 'loading' | 'review';
 // 두서없이 쓴(말한) 글 → AI 정리 → "이렇게 정리했어요"에서 고른 것만 넣는다(스펙 11.5).
 export function OrganizeSheet({ db, visible, today, initialText = '', autoOrganize = false, onClose, onAdded }: Props) {
   const [step, setStep] = useState<Step>('write');
+  const inputStyle = useScaledText(styles.input);
   const [text, setText] = useState(initialText);
   const [drafts, setDrafts] = useState<DraftItem[]>([]);
   const [saving, setSaving] = useState(false);
@@ -147,7 +148,7 @@ export function OrganizeSheet({ db, visible, today, initialText = '', autoOrgani
               <Txt style={styles.hint}>정리되지 않아도 괜찮아요. 할 일만 골라 둘게요.</Txt>
               <RuledPaper lineHeight={26} style={styles.paper}>
               <TextInput
-                style={macText(styles.input)}
+                style={inputStyle}
                 multiline
                 editable={!loading}
                 value={text}

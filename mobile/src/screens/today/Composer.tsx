@@ -8,7 +8,7 @@ import { haptic } from '../../ui/haptics';
 import { dimPressed } from '../../ui/press';
 import { colors, fonts } from '../../ui/theme';
 import { SymbolLegend } from './SymbolLegend';
-import { macText } from '../../ui/desktop';
+import { useScaledText } from '../../ui/typeScale';
 
 const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
   { kind: 'task', symbol: '•', label: '할 일' },
@@ -28,6 +28,7 @@ export const Composer = memo(function Composer({ inputRef, voice, onCapture, onS
   const [kind, setKind] = useState<ItemKind>('task');
   const [text, setText] = useState('');
   const info = useAnchor();
+  const inputStyle = useScaledText(styles.input);
   const pickKind = (next: ItemKind) => {
     if (next === kind) return;
     haptic.select();
@@ -47,7 +48,7 @@ export const Composer = memo(function Composer({ inputRef, voice, onCapture, onS
     <View style={styles.inputBlock}>
       <View style={styles.inputRow}>
         <TextInput
-          style={macText(styles.input)}
+          style={inputStyle}
           ref={inputRef}
           placeholder={kind === 'task' ? '할 일 한 줄' : '메모 한 줄'}
           placeholderTextColor={colors.muted}

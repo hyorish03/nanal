@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DefaultTheme, NavigationContainer, StackActions, type Theme, useNavigationContainerRef } from '@react-navigation/native';
+import { CommonActions, DefaultTheme, NavigationContainer, StackActions, type Theme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, AppState, Keyboard, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, AppState, Keyboard, Linking, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import type { Db } from '../db/types';
@@ -22,6 +22,9 @@ import { dimPressed } from '../ui/press';
 import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
+import { type Pane, PaneContext } from '../ui/pane';
+import { useLayoutClass, WIDE } from '../ui/responsive';
+import { Sidebar, type SidebarKey } from '../ui/Sidebar';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { takePendingAction } from '../widget/pendingAction';
 import { reloadWidgets } from '../widget/reload';
@@ -116,6 +119,15 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   screenRef.current = screen;
   const [route, setRoute] = useState<keyof StackParams>('today'); // 저녁 바탕을 켤지 정하려고 맨 위 화면을 따라간다
   const reduce = useReduceMotion();
+  // 아이패드·Mac(넓은 배치)에서는 왼쪽 사이드바가 오늘·하루 마무리·지난 기록을 바꾼다. 온보딩에는 없다.
+  const wide = useLayoutClass() !== 'compact';
+  const sidebar = wide && screen === 'today';
+  const insets = useSafeAreaInsets();
+  const { width: windowW } = useWindowDimensions();
+  const pane = useMemo<Pane>(
+    () => ({ sidebar, width: windowW - insets.left - insets.right - (sidebar ? WIDE.sidebarWidth : 0) }),
+    [sidebar, windowW, insets.left, insets.right],
+  );
 
   // 위젯·컨트롤에서 열면 오늘 화면으로 가서(표지가 아직 덮여 있으면 펼친 뒤) 동작을 넘긴다. 온보딩 중이면 화면은 그대로 둔다.
   const runAction = useCallback((action: LinkAction | null) => {
@@ -205,6 +217,26 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     requestSync();
   }, [refresh, requestSync]);
 
+  // 사이드바에서 고르면 밀어 넣지 않고 칸만 바꾼다(넓은 배치의 스택은 애니메이션이 없다).
+  // 오늘은 늘 스택 맨 아래에 두어(입력하던 글·스크롤이 그대로) 그 위에 고른 화면 하나만 얹는다.
+  const selectSection = useCallback((key: SidebarKey) => {
+    if (!nav.isReady()) return;
+    Keyboard.dismiss();
+    const state = nav.getRootState();
+    if (!state) return;
+    if (key === 'today') {
+      if (nav.canGoBack()) nav.dispatch(StackActions.popToTop());
+      return;
+    }
+    // 이미 그 화면이 오늘 바로 위에 있으면(월간 돌아보기를 연 지난 기록 등) 그 화면까지만 꺼낸다
+    if (state.routes[1]?.name === key) {
+      if (state.index > 1) nav.dispatch(StackActions.pop(state.index - 1));
+      return;
+    }
+    const base = state.routes[0]; // 오늘(같은 key라 다시 마운트되지 않는다)
+    nav.dispatch(CommonActions.reset({ index: 1, routes: [{ key: base.key, name: base.name }, { name: key }] }));
+  }, [nav]);
+
   const finishOnboarding = useCallback(() => {
     markOnboardingSeen(AsyncStorage);
     setScreen('today');
@@ -212,87 +244,98 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
 
   return (
     <View style={styles.root}>
-      {/* 남색 표지가 보이는 동안은 밝은 상태 막대 */}
-      <StatusBar style={coverSettled ? 'dark' : 'light'} animated />
+      {/* 남색 표지가 화면을 덮는 동안은 밝은 상태 막대(넓은 창에서는 표지가 종이 책상 가운데 놓여 늘 어둡게) */}
+      <StatusBar style={coverSettled || wide ? 'dark' : 'light'} animated />
       <EveningBackdrop on={screen === 'today' && route === 'evening'} />
       <Paper />
-      <SafeAreaView style={styles.container}>
-        <ScreenEnter key={screen ?? 'none'} reduce={reduce}>
-          {screen === 'onboarding' && <OnboardingScreen onDone={finishOnboarding} />}
-          {screen === 'today' && (
-            <NavigationContainer
-              ref={nav}
-              theme={navTheme}
-              onStateChange={() => setRoute(nav.getCurrentRoute()?.name ?? 'today')}
-            >
-              <Stack.Navigator
-                screenOptions={{
-                  headerShown: false,
-                  animation: reduce ? 'fade' : 'default',
-                  contentStyle: styles.page,
-                }}
-              >
-                <Stack.Screen name="today">
-                  {({ navigation }) => (
-                    <TodayScreen
-                      db={db}
-                      version={version}
-                      onChanged={onChanged}
-                      onOpenEvening={() => {
-                        Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
-                        navigation.navigate('evening');
-                      }}
-                      onOpenArchive={() => {
-                        Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
-                        navigation.navigate('archive');
-                      }}
-                      focusReady={coverSettled && focusPending}
-                      onFocused={() => setFocusPending(false)}
-                      pendingAction={coverSettled ? linkAction : null}
-                      onActionHandled={() => setLinkAction(null)}
-                    />
-                  )}
-                </Stack.Screen>
-                {/* 하루 마무리는 등잔 불빛 종이를 깔고 밀려 들어온다. 닫으면(가장자리 밀기 포함) 오늘로 돌아가고 키보드는 올리지 않는다 */}
-                <Stack.Screen
-                  name="evening"
-                  options={{ contentStyle: styles.evening }}
-                  listeners={{ beforeRemove: () => Keyboard.dismiss() }}
+      <View style={styles.shell}>
+        {sidebar && <Sidebar current={route === 'today' ? 'today' : route === 'evening' ? 'evening' : 'archive'} onSelect={selectSection} />}
+        <SafeAreaView style={styles.container} edges={sidebar ? ['top', 'bottom', 'right'] : undefined}>
+          <ScreenEnter key={screen ?? 'none'} reduce={reduce}>
+            {screen === 'onboarding' && (
+              // 넓은 창에서는 휴대폰 한 장 폭으로 가운데에 모은다(늘어난 온보딩이 되지 않게)
+              <View style={wide ? styles.onboardingWide : styles.container}>
+                <OnboardingScreen onDone={finishOnboarding} />
+              </View>
+            )}
+            {screen === 'today' && (
+              <PaneContext.Provider value={pane}>
+                <NavigationContainer
+                  ref={nav}
+                  theme={navTheme}
+                  onStateChange={() => setRoute(nav.getCurrentRoute()?.name ?? 'today')}
                 >
-                  {({ navigation }) => (
-                    <>
-                      <LampShade />
-                      <EveningScreen db={db} version={version} onChanged={onChanged} onClose={() => navigation.goBack()} />
-                    </>
-                  )}
-                </Stack.Screen>
-                <Stack.Screen name="archive">
-                  {({ navigation }) => (
-                    <ArchiveScreen
-                      db={db}
-                      version={version}
-                      onClose={() => navigation.goBack()}
-                      onOpenReview={(month) => navigation.navigate('review', { month })}
-                      onChanged={onChanged}
-                    />
-                  )}
-                </Stack.Screen>
-                <Stack.Screen name="review">
-                  {({ navigation, route }) => (
-                    <MonthlyReviewScreen
-                      db={db}
-                      month={route.params.month}
-                      version={version}
-                      onChanged={onChanged}
-                      onClose={() => navigation.goBack()}
-                    />
-                  )}
-                </Stack.Screen>
-              </Stack.Navigator>
-            </NavigationContainer>
-          )}
-        </ScreenEnter>
-      </SafeAreaView>
+                  <Stack.Navigator
+                    screenOptions={{
+                      headerShown: false,
+                      // 넓은 배치는 사이드바로 칸을 바꾸므로 밀어 넣지 않고 바로 바뀐다
+                      animation: wide ? 'none' : reduce ? 'fade' : 'default',
+                      contentStyle: styles.page,
+                    }}
+                  >
+                    <Stack.Screen name="today">
+                      {({ navigation }) => (
+                        <TodayScreen
+                          db={db}
+                          version={version}
+                          onChanged={onChanged}
+                          onOpenEvening={() => {
+                            Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
+                            navigation.navigate('evening');
+                          }}
+                          onOpenArchive={() => {
+                            Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
+                            navigation.navigate('archive');
+                          }}
+                          focusReady={coverSettled && focusPending}
+                          onFocused={() => setFocusPending(false)}
+                          pendingAction={coverSettled ? linkAction : null}
+                          onActionHandled={() => setLinkAction(null)}
+                        />
+                      )}
+                    </Stack.Screen>
+                    {/* 하루 마무리는 등잔 불빛 종이를 깔고 밀려 들어온다. 닫으면(가장자리 밀기 포함) 오늘로 돌아가고 키보드는 올리지 않는다 */}
+                    <Stack.Screen
+                      name="evening"
+                      options={{ contentStyle: styles.evening }}
+                      listeners={{ beforeRemove: () => Keyboard.dismiss() }}
+                    >
+                      {({ navigation }) => (
+                        <>
+                          <LampShade />
+                          <EveningScreen db={db} version={version} onChanged={onChanged} onClose={() => navigation.goBack()} />
+                        </>
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="archive">
+                      {({ navigation }) => (
+                        <ArchiveScreen
+                          db={db}
+                          version={version}
+                          onClose={() => navigation.goBack()}
+                          onOpenReview={(month) => navigation.navigate('review', { month })}
+                          onChanged={onChanged}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="review">
+                      {({ navigation, route }) => (
+                        <MonthlyReviewScreen
+                          db={db}
+                          month={route.params.month}
+                          version={version}
+                          onChanged={onChanged}
+                          onClose={() => navigation.goBack()}
+                        />
+                      )}
+                    </Stack.Screen>
+                  </Stack.Navigator>
+                </NavigationContainer>
+              </PaneContext.Provider>
+            )}
+          </ScreenEnter>
+        </SafeAreaView>
+      </View>
       <SyncBar pending={pending} error={error} />
       <Cover
         open={coverOpen}
@@ -369,9 +412,13 @@ function LampShade() {
   );
 }
 
+const ONBOARDING_MAX_W = 560;
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   evening: { backgroundColor: LAMP_PAPER },
+  shell: { flex: 1, flexDirection: 'row' },
+  onboardingWide: { flex: 1, width: '100%', maxWidth: ONBOARDING_MAX_W, alignSelf: 'center' },
   container: { flex: 1 }, // 배경은 root와 각 화면이 칠한다(저녁은 EveningBackdrop과 하루 마무리 화면이 칠한다)
   page: { backgroundColor: colors.paper },
   center: { justifyContent: 'center', alignItems: 'center' },

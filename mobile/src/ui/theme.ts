@@ -79,3 +79,19 @@ export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 }
 
 export const HIT = 44; // 최소 터치 크기
 export const SCREEN_X = 24; // 화면 좌우 여백
+
+// 넓은 배치(regular·wide: 아이패드, Mac)의 글자 눈금. 휴대폰 눈금(type)보다 한 단계 크고 줄 사이가 넉넉하다.
+// 어느 눈금을 쓸지와 Mac 배율은 typeScale.ts가 정한다.
+export const typeWide = {
+  display: { fontFamily: fonts.title, fontSize: 36, lineHeight: 44 },
+  h2: { fontFamily: fonts.title, fontSize: 26, lineHeight: 34 },
+  handLg: { fontFamily: fonts.hand, fontSize: 30, lineHeight: 36 },
+  hand: { fontFamily: fonts.hand, fontSize: 24, lineHeight: 30 },
+  body: { fontFamily: fonts.body, fontSize: 17, lineHeight: 26 },
+  small: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },
+  caption: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.muted },
+  label: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 22 },
+} as const satisfies Record<keyof typeof type, TextStyle>;
+
+// 넓은 배치의 간격 눈금(이름은 space와 같다)
+export const spaceWide = { xs: 6, sm: 10, md: 16, lg: 20, xl: 32, xxl: 40, xxxl: 64 } as const satisfies Record<keyof typeof space, number>;

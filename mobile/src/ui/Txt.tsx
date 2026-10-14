@@ -1,6 +1,6 @@
 import { StyleSheet, Text, type TextProps } from 'react-native';
-import { macText } from './desktop';
-import { colors, fonts, type as scale } from './theme';
+import { colors, fonts, type as scale, typeWide } from './theme';
+import { scaleText, useTextScale } from './typeScale';
 
 // body·medium·title·hand는 예전 이름(글꼴만 정한다). 나머지는 theme의 type 눈금(크기·줄 높이까지).
 export type TxtVariant = 'body' | 'medium' | 'title' | 'hand' | 'display' | 'h2' | 'handLg' | 'small' | 'caption' | 'label';
@@ -17,13 +17,19 @@ type Props = TextProps & {
 
 // 글꼴이 적용된 Text. hand(손글씨)는 기본으로 네이비 잉크색이다.
 // 한국어는 어절 단위로 줄을 바꾼다(글자 중간에서 끊기지 않게).
+// 아이패드·Mac(넓은 배치)에서는 variant가 typeWide 눈금을 쓰고, 화면이 준 크기도 같은 비율로 키운다(typeScale.ts).
 export function Txt({ variant = 'body', compact = false, style, ...rest }: Props) {
+  const k = useTextScale();
   return (
     <Text
       lineBreakStrategyIOS="hangul-word"
       maxFontSizeMultiplier={compact ? MAX_FONT_SCALE_COMPACT : MAX_FONT_SCALE}
       {...rest}
-      style={macText([styles.base, styles[variant], style])}
+      style={
+        k.wide
+          ? [scaleText([wide.base, wide[variant]], k.tokenScale), scaleText(style, k.ownScale)]
+          : [styles.base, styles[variant], style]
+      }
     />
   );
 }
@@ -40,4 +46,19 @@ const styles = StyleSheet.create({
   small: scale.small,
   caption: scale.caption,
   label: scale.label,
+});
+
+// 넓은 배치. 휴대폰 쪽과 같은 모양(예전 이름은 크기만, 눈금은 줄 높이까지)
+const wide = StyleSheet.create({
+  base: { color: colors.ink, fontSize: typeWide.body.fontSize },
+  body: { fontFamily: fonts.body },
+  medium: { fontFamily: fonts.medium },
+  title: { fontFamily: fonts.title },
+  hand: { fontFamily: fonts.hand, fontSize: typeWide.hand.fontSize, color: colors.navy },
+  display: typeWide.display,
+  h2: typeWide.h2,
+  handLg: { ...typeWide.handLg, color: colors.navy },
+  small: typeWide.small,
+  caption: typeWide.caption,
+  label: typeWide.label,
 });
