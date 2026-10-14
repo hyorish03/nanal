@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { Pressable, type StyleProp, StyleSheet, TextInput, View, type ViewStyle } from 'react-native';
+import Svg, { Line } from 'react-native-svg';
 import { MAX_ANSWER_LENGTH } from '../../reflections/repo';
 import type { TemplateQuestion } from '../../reflections/templates';
 import { dimPressed } from '../../ui/press';
@@ -7,7 +8,7 @@ import { RuledPaper } from '../../ui/RuledPaper';
 import { colors, fonts } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { macText } from '../../ui/desktop';
-import { useRule } from './rule';
+import { answerLines, useRule } from './rule';
 
 type Props = {
   title?: string; // 고칠 때 맨 윗줄에 템플릿 이름
@@ -32,10 +33,44 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
   // 선은 줄 상자 맨 아래에서 sit만큼 올라와 글자 기준선 바로 밑에 그어진다
   const rule = useRule();
   const formQ = { fontSize: rule.hand, lineHeight: rule.lineHeight };
-  const answer = { minHeight: rule.line * 2, fontSize: rule.body, lineHeight: rule.lineHeight };
+  // 적을 자리를 넉넉히 비워 둔다(질문 하나면 5줄). 글이 길어지면 칸이 따라 늘어난다.
+  const answer = { minHeight: rule.line * answerLines(questions.length), fontSize: rule.body, lineHeight: rule.lineHeight };
+
+  // 버튼은 쓰는 줄 위에 얹지 않고, 줄 아래 점선으로 나눈 칸에 따로 둔다
+  const footer = (
+    <View ref={button} style={styles.footer}>
+      <Svg width="100%" height={1} style={styles.dash} accessible={false} pointerEvents="none">
+        <Line x1="0" y1="0.5" x2="100%" y2="0.5" stroke={colors.ink} strokeOpacity={0.2} strokeWidth={1} strokeDasharray="4 3" />
+      </Svg>
+      <View style={styles.actions}>
+        {onCancel && (
+          <Pressable accessibilityRole="button" style={dimPressed(styles.cancel)} onPress={onCancel}>
+            <Txt style={styles.cancelText}>그만두기</Txt>
+          </Pressable>
+        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canSubmit }}
+          accessibilityHint={canSubmit ? undefined : '한 줄이라도 적으면 남길 수 있어요'}
+          disabled={!canSubmit}
+          style={dimPressed([styles.save, !canSubmit && styles.saveOff])}
+          onPress={onSubmit}
+        >
+          <Txt variant="medium" style={styles.saveText}>
+            {submitLabel}
+          </Txt>
+        </Pressable>
+      </View>
+    </View>
+  );
 
   return (
-    <RuledPaper lineHeight={rule.line} firstLineTop={top + rule.line - rule.sit} style={[styles.form, { paddingTop: top }, style]}>
+    <RuledPaper
+      lineHeight={rule.line}
+      firstLineTop={top + rule.line - rule.sit}
+      style={[styles.form, { paddingTop: top }, style]}
+      footer={footer}
+    >
       {title !== undefined && (
         <Txt variant="hand" style={formQ}>
           {title}
@@ -69,33 +104,17 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
           />
         </View>
       ))}
-      <View ref={button} style={styles.actions}>
-        {onCancel && (
-          <Pressable accessibilityRole="button" style={dimPressed(styles.cancel)} onPress={onCancel}>
-            <Txt style={styles.cancelText}>그만두기</Txt>
-          </Pressable>
-        )}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !canSubmit }}
-          accessibilityHint={canSubmit ? undefined : '한 줄이라도 적으면 남길 수 있어요'}
-          disabled={!canSubmit}
-          style={dimPressed([styles.save, !canSubmit && styles.saveOff])}
-          onPress={onSubmit}
-        >
-          <Txt variant="medium" style={styles.saveText}>
-            {submitLabel}
-          </Txt>
-        </Pressable>
-      </View>
     </RuledPaper>
   );
 }
 
 const styles = StyleSheet.create({
   // 질문과 답이 모두 같은 줄 간격(rule)으로 쌓여야 글자가 선 위에 앉는다(gap을 두지 않는다)
-  form: { paddingHorizontal: 16, paddingBottom: 14 },
+  form: { paddingHorizontal: 16, paddingBottom: 4 },
   answer: { fontFamily: fonts.body, color: colors.ink, padding: 0, textAlignVertical: 'top' },
+  // 고칠 때 카드(paddingVertical 0)에서도 버튼이 카드 밑변에 붙지 않게 아래 여백은 여기서 준다
+  footer: { marginTop: 8, paddingBottom: 10 },
+  dash: { marginBottom: 10 },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 },
   cancel: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center' },
   cancelText: { fontSize: 15, color: colors.inkSoft },

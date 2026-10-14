@@ -8,19 +8,31 @@ type Props = {
   firstLineTop?: number;
   style?: StyleProp<ViewStyle>;
   children: ReactNode;
+  // 줄 아래에 따로 두는 칸(버튼 줄 등). 있으면 선은 children이 차지한 곳까지만 긋는다.
+  footer?: ReactNode;
 };
 
 // 줄 노트 카드. 높이에 맞춰 lineHeight 간격으로 선을 긋는다.
-export function RuledPaper({ lineHeight = 32, firstLineTop, style, children }: Props) {
+export function RuledPaper({ lineHeight = 32, firstLineTop, style, children, footer }: Props) {
   const [height, setHeight] = useState(0);
+  const [bodyBottom, setBodyBottom] = useState(0);
   const first = firstLineTop ?? lineHeight - 1;
-  const count = height >= first + 1 ? Math.floor((height - 1 - first) / lineHeight) + 1 : 0;
+  const bottom = footer === undefined ? height : bodyBottom;
+  const count = bottom >= first + 1 ? Math.floor((bottom - 1 - first) / lineHeight) + 1 : 0;
   return (
     <View style={[styles.paper, style]} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
       {Array.from({ length: count }, (_, i) => (
         <View key={i} pointerEvents="none" style={[styles.line, { top: first + i * lineHeight }]} />
       ))}
-      {children}
+      {footer === undefined ? (
+        children
+      ) : (
+        <>
+          {/* 카드 위에서부터 글 칸 끝까지의 y. 선은 여기까지만 */}
+          <View onLayout={(e) => setBodyBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}>{children}</View>
+          {footer}
+        </>
+      )}
     </View>
   );
 }
