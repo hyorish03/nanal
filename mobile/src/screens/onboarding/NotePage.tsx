@@ -98,9 +98,9 @@ function Greeting({ date }: { date: string }) {
       <Ink i={2} left={x(236)} top={x(108)} grid={false}>
         <Star s={s} />
       </Ink>
-      <Body i={3} r={2} text="하루를 한 줄씩 적는 다이어리예요." />
-      <Body i={4} r={3} text="아침엔 할 일을 정하고," />
-      <Body i={5} r={4} text="저녁엔 오늘의 마음을 남겨요." />
+      <Body i={3} r={2} text="하루를 한 줄씩 적는 불렛 노트예요." />
+      <Body i={4} r={3} text="할 일과 메모는 기호 하나로 빠르게," />
+      <Body i={5} r={4} text="저녁엔 일기처럼 마음을 돌아봐요." />
       <Ink i={7} left={x(TEXT_X)} top={row(6)} maxWidth={room(TEXT_X)}>
         <NoteText face="note">한 장씩 넘기면서 알려 줄게요</NoteText>
       </Ink>
@@ -124,7 +124,7 @@ function Symbols() {
   const line = [styles.line, { gap: 10 * s }];
   return (
     <>
-      <Title i={0} text="기호 읽는 법" />
+      <Title i={0} text="기호 하나로 적어요" />
       {rows.map((r, n) => (
         <Fragment key={r.kind}>
           <Ink i={1 + n * 2} left={x(TEXT_X)} top={row(2 + n)} maxWidth={Math.min(x(NOTE_X - TEXT_X - 12), room(TEXT_X))} style={line}>
@@ -181,12 +181,12 @@ function Flow() {
       </Ink>
       <Head i={2} r={2} text="아침" />
       <Body i={3} r={3} text="어제 넘어온 일을 골라요" />
-      <Note i={4} r={4} text="오늘 할까 · 내일로 · 지울까" />
+      <Note i={4} r={4} text="오늘로 · 내일로 · 과감히 지우기" />
       <Ink i={5} pop left={x(13)} top={x(297)} grid={false}>
         <TimeIcon kind="pencil" s={s} />
       </Ink>
       <Head i={5} r={5} text="낮" />
-      <Body i={6} r={6} text="떠오를 때마다 한 줄씩 적어요" />
+      <Body i={6} r={6} text="떠오를 때마다 짧게, 한 줄씩" />
       <Ink i={7} pop left={x(13)} top={x(405)} grid={false}>
         <TimeIcon kind="moon" s={s} />
       </Ink>
@@ -195,7 +195,7 @@ function Flow() {
       <Ink i={9} pop left={fitX(300, 34)} top={x(428)} grid={false}>
         <InkBottle s={s} />
       </Ink>
-      <Note i={10} r={10} text="짧은 회고는 원할 때만 남겨요" />
+      <Note i={10} r={10} text="회고로 하루를 일기처럼 마무리해요" />
     </>
   );
 }
@@ -212,7 +212,12 @@ function Finale() {
       </Ink>
       <Title i={1} text="마지막으로" />
       <Body i={2} r={2} text="책갈피 끈을 누르면" />
-      <Body i={3} r={3} text="지난 날들을 볼 수 있어요" />
+      <Body i={3} r={3} text="지난 날과 회고를 다시 봐요" />
+      <Ink i={4} left={x(TEXT_X)} top={row(4)} maxWidth={room(TEXT_X)}>
+        <NoteText face="body" shrink>
+          한 달이 차면 월간 돌아보기로 흐름을 읽어요
+        </NoteText>
+      </Ink>
       <Ink i={4} left={fitX(252, 90)} top={x(128)} grid={false}>
         <UpArrow s={s} />
       </Ink>
