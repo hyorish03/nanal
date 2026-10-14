@@ -13,13 +13,14 @@ import { monthLabel } from '../monthly/labels';
 import { getMonthlyReview, saveMonthlyReview } from '../monthly/repo';
 import { supabase } from '../supabase';
 import { FadeIn } from '../ui/FadeIn';
-import { Inkwell } from '../ui/Inkwell';
 import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { dimPressed } from '../ui/press';
 import { PageHeader } from '../ui/PageHeader';
+import { useLayoutClass, WIDE } from '../ui/responsive';
+import { InkDot } from './archive/InkDot';
 
 type Props = { db: Db; month: string; version: number; onChanged: () => void; onClose: () => void };
 type Step = 'loading' | 'consent' | 'making' | 'result';
@@ -45,6 +46,7 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
   const alive = useRef(true);
   const busy = useRef(false);
   const label = monthLabel(month);
+  const large = useLayoutClass() !== 'compact'; // 아이패드·Mac: 읽기 폭으로 가운데에 모으고 달력을 키운다
 
   useEffect(() => {
     alive.current = true;
@@ -111,7 +113,7 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
   return (
     <View style={styles.flex}>
       <Paper />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.container, large && styles.containerLarge]}>
         <PageHeader title={`${label} 돌아보기`} onBack={onClose} backLabel="지난 기록" />
 
         {error && (
@@ -153,7 +155,7 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
         )}
 
         {step === 'result' && content && (
-          <ReviewResult content={content} month={month} writtenAt={writtenAt} reveal={justMade} />
+          <ReviewResult content={content} month={month} writtenAt={writtenAt} reveal={justMade} large={large} />
         )}
       </ScrollView>
     </View>
@@ -165,11 +167,13 @@ function ReviewResult({
   month,
   writtenAt,
   reveal,
+  large,
 }: {
   content: MonthlyReviewContent;
   month: string;
   writtenAt: string | null;
   reveal: boolean; // 처음 그릴 때 한 번 차례로 나타난다
+  large: boolean;
 }) {
   const reduce = useReduceMotion();
   // 동작 줄이기면 전체를 한 번에 흐리게 띄운다
@@ -187,10 +191,10 @@ function ReviewResult({
     <FadeIn on={reveal && reduce} duration={200} style={styles.block}>
       <FadeIn {...section()}>
         <Section title="한 달의 잉크">
-          <View style={styles.grid} accessibilityLabel={`${monthLabel(month)} 기분 달력`}>
+          <View style={[styles.grid, large && styles.gridLarge]} accessibilityLabel={`${monthLabel(month)} 기분 달력`}>
             <View style={styles.week}>
               {WEEKDAYS.map((w) => (
-                <Txt key={w} style={[styles.cell, styles.weekday]} accessible={false}>
+                <Txt key={w} style={[styles.cell, styles.weekday, large && styles.weekdayLarge]} accessible={false}>
                   {w}
                 </Txt>
               ))}
@@ -206,14 +210,14 @@ function ReviewResult({
                       on={stagger && !!date}
                       delay={Math.min(wave, CELL_TOTAL_MS - SECTION_MS)}
                       duration={SECTION_MS}
-                      style={styles.cell}
+                      style={[styles.cell, large && styles.cellLarge]}
                       accessible={false}
                     >
                       {date && (
                         <>
-                          <Inkwell id={`rv${date}`} mood={d?.mood ?? null} size="small" paper={colors.paper} />
-                          <Txt style={styles.dayNum}>{Number(date.slice(8))}</Txt>
-                          <View style={[styles.dot, d?.lethargy && styles.dotOn]} />
+                          <InkDot mood={d?.mood ?? null} min={large ? 10 : 7} max={large ? 18 : 12} />
+                          <Txt style={[styles.dayNum, large && styles.dayNumLarge]}>{Number(date.slice(8))}</Txt>
+                          <View style={[styles.dot, large && styles.dotLarge, d?.lethargy && styles.dotOn]} />
                         </>
                       )}
                     </FadeIn>
@@ -222,7 +226,7 @@ function ReviewResult({
               </View>
             ))}
           </View>
-          <Txt style={styles.legend}>진할수록 기분이 좋았던 날, ●는 무기력했던 날</Txt>
+          <Txt style={[styles.legend, large && styles.legendLarge]}>잉크가 크고 진할수록 기분이 좋았던 날, ●는 무기력했던 날</Txt>
         </Section>
       </FadeIn>
 
@@ -235,8 +239,8 @@ function ReviewResult({
       <FadeIn {...section()}>
         <Section title="무기력했던 날">
           <View style={styles.stats}>
-            <Stat value={`${stats.lethargyDates.length}번`} label={lethargyDays ? `${lethargyDays}일` : '없었어요'} />
-            {stats.lethargyAvgGapDays !== null && <Stat value={`약 ${Math.round(stats.lethargyAvgGapDays)}일`} label="평균 간격" />}
+            <Stat value={`${stats.lethargyDates.length}번`} label={lethargyDays ? `${lethargyDays}일` : '없었어요'} large={large} />
+            {stats.lethargyAvgGapDays !== null && <Stat value={`약 ${Math.round(stats.lethargyAvgGapDays)}일`} label="평균 간격" large={large} />}
           </View>
           {insights.lethargy.causes.length > 0 && (
             <View style={styles.causes}>
@@ -309,10 +313,10 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({ value, label, large }: { value: string; label: string; large: boolean }) {
   return (
-    <View style={styles.stat} accessible accessibilityLabel={`${value}, ${label}`}>
-      <Txt variant="title" style={styles.statValue}>
+    <View style={[styles.stat, large && styles.statLarge]} accessible accessibilityLabel={`${value}, ${label}`}>
+      <Txt variant="title" style={[styles.statValue, large && styles.statValueLarge]}>
         {value}
       </Txt>
       <Txt style={styles.muted}>{label}</Txt>
@@ -324,6 +328,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
   scroll: { flex: 1 },
   container: { paddingHorizontal: SCREEN_X, paddingTop: 4, paddingBottom: 32, gap: 16 },
+  containerLarge: { width: '100%', maxWidth: WIDE.readingWidth + WIDE.pageX * 2, alignSelf: 'center', paddingHorizontal: WIDE.pageX, paddingBottom: 48, gap: 20 },
   error: { color: colors.danger, fontSize: 14 },
   block: { gap: 18 },
   lead: { fontSize: 22 },
@@ -337,16 +342,24 @@ const styles = StyleSheet.create({
   section: { gap: 10, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.lineFaint },
   sectionTitle: { fontSize: 17 },
   grid: { gap: 4 },
+  gridLarge: { gap: 8 },
   week: { flexDirection: 'row' }, // 칸은 똑같이 나눠 가져서 줄이 넘치지 않는다
   cell: { flex: 1, minWidth: 0, alignItems: 'center', gap: 1 },
+  cellLarge: { gap: 3 },
   weekday: { fontSize: 12, color: colors.muted, textAlign: 'center' },
+  weekdayLarge: { fontSize: 13, paddingBottom: 4 },
   dayNum: { fontSize: 11, color: colors.muted },
+  dayNumLarge: { fontSize: 14 },
   dot: { width: 4, height: 4, borderRadius: 2 },
+  dotLarge: { width: 5, height: 5, borderRadius: 2.5 },
   dotOn: { backgroundColor: colors.navy },
   legend: { fontSize: 12, color: colors.muted },
+  legendLarge: { fontSize: 13 },
   stats: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 28, rowGap: 12 },
   stat: { gap: 2 },
+  statLarge: { minWidth: 140 }, // 넓은 화면에서 숫자 칸 폭을 맞춰 줄을 바꿔도 가지런하게
   statValue: { fontSize: 24 },
+  statValueLarge: { fontSize: 28 },
   causes: { gap: 4 },
   oneThing: { fontSize: 24, lineHeight: 30 },
   disclaimer: { fontSize: 12, lineHeight: 18, color: colors.muted },
