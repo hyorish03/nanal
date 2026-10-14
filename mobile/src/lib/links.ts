@@ -1,3 +1,4 @@
+// 앱 밖으로 여는 주소들.
 // 개인정보 처리방침(Notion 공개 페이지)
 export const PRIVACY_URL = 'https://hyorinleee.notion.site/3c3b7bc9ffaa8003a919ce49d8ecb34a';
 
