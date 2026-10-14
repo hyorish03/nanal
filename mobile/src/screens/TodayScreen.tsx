@@ -44,6 +44,8 @@ import { usePane } from '../ui/pane';
 import { useLayoutClass, WIDE } from '../ui/responsive';
 import { useSpace } from '../ui/typeScale';
 import { PANEL_W, TodayPanel } from './today/TodayPanel';
+import { accountInitial, confirmSignOut, useAccountEmail } from '../lib/account';
+import { AccountSheet } from '../ui/AccountSheet';
 
 // 개발용·출시 빌드에서만 말로 적기 시트를 불러온다(Expo Go에서는 네이티브 모듈이 없어 import 시 오류).
 const VoiceSheet: typeof import('./today/VoiceSheet').VoiceSheet | null = voiceAvailable
@@ -65,6 +67,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const afterVoice = useRef<{ text: string; auto: boolean } | null>(null); // 말로 적기 시트가 내려간 뒤 열 정리 시트
   const [notice, setNotice] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastSpec | null>(null);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const email = useAccountEmail();
   const busy = useRef(false);
   const reorder = useRef(false); // 상태·중요를 바꿨거나 포스트잇을 정리했다: 다음에 불러온 목록을 넣을 때만 자리 이동을 애니메이션한다
   const reduce = useReduceMotion();
@@ -297,6 +301,19 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         </View>
         {showNav && (
           <View style={styles.headerActions}>
+            {/* 왼쪽: 계정(이 노트의 주인·로그아웃). 오른쪽: 하루 마무리 */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="계정"
+              accessibilityHint="이메일을 보고 로그아웃할 수 있어요"
+              hitSlop={CHIP_SLOP}
+              style={dimPressed(styles.account)}
+              onPress={() => setAccountOpen(true)}
+            >
+              <Txt variant="medium" style={styles.accountText}>
+                {accountInitial(email)}
+              </Txt>
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               hitSlop={CHIP_SLOP}
@@ -420,6 +437,15 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         />
       )}
       <Toast toast={toast} onHide={hideToast} />
+      <AccountSheet
+        visible={accountOpen}
+        email={email}
+        onClose={() => setAccountOpen(false)}
+        onSignOut={() => {
+          setAccountOpen(false);
+          void confirmSignOut(db);
+        }}
+      />
     </View>
   );
 }
@@ -448,7 +474,18 @@ const styles = StyleSheet.create({
   message: { position: 'absolute', top: '100%', left: 0, right: 0, fontSize: 13, lineHeight: 18 },
   headerText: { gap: 4 },
   date: { fontSize: 30, letterSpacing: -0.5 },
-  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center', alignSelf: 'flex-end' },
+  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'space-between' },
+  account: {
+    width: CHIP_H,
+    height: CHIP_H,
+    borderRadius: CHIP_H / 2,
+    borderWidth: 1,
+    borderColor: colors.chipBorder,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountText: { fontSize: 14, color: colors.inkSoft },
   // 화면의 주 버튼 하나: 남색으로 채운다
   evening: {
     minHeight: CHIP_H,

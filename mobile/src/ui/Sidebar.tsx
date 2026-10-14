@@ -2,6 +2,7 @@ import { type ReactNode, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line, Path, Rect } from 'react-native-svg';
+import { useAccountEmail } from '../lib/account';
 import { Paper } from './Paper';
 import { WIDE } from './responsive';
 import { colors, HIT } from './theme';
@@ -10,15 +11,16 @@ import { useSpace } from './typeScale';
 
 export type SidebarKey = 'today' | 'evening' | 'archive';
 
-type Props = { current: SidebarKey; onSelect: (key: SidebarKey) => void; onCollapse?: () => void };
+type Props = { current: SidebarKey; onSelect: (key: SidebarKey) => void; onCollapse?: () => void; onSignOut?: () => void };
 
 const ICON = 20;
 const SPINE_W = 10; // 왼쪽 끝 남색 천 책등
 
 // 아이패드·Mac의 왼쪽 칸. 공책 왼쪽에 붙은 남색 책등과 면지 한 장에 오늘·하루 마무리·지난 기록을 적어 둔다.
 // 휴대폰의 하루 마무리 버튼과 지난 기록 책갈피 끈을 대신한다.
-export function Sidebar({ current, onSelect, onCollapse }: Props) {
+export function Sidebar({ current, onSelect, onCollapse, onSignOut }: Props) {
   const insets = useSafeAreaInsets();
+  const email = useAccountEmail();
   const s = useSpace();
   return (
     <View style={[styles.wrap, { width: WIDE.sidebarWidth + insets.left, paddingTop: insets.top + s.lg, paddingBottom: insets.bottom + s.lg }]}>
@@ -47,6 +49,22 @@ export function Sidebar({ current, onSelect, onCollapse }: Props) {
           <Row label="하루 마무리" icon={<LampIcon />} selected={current === 'evening'} onPress={() => onSelect('evening')} />
           <Row label="지난 기록" icon={<RibbonIcon />} selected={current === 'archive'} onPress={() => onSelect('archive')} />
         </View>
+        {/* 맨 아래: 이 노트의 주인(이메일)과 로그아웃 */}
+        {onSignOut && (
+          <View style={styles.account}>
+            <Txt variant="hand">이 노트의 주인</Txt>
+            <Txt style={styles.email} numberOfLines={1}>
+              {email ?? ''}
+            </Txt>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onSignOut}
+              style={({ pressed }) => [styles.signOut, pressed && styles.rowHover]}
+            >
+              <Txt style={styles.signOutText}>로그아웃</Txt>
+            </Pressable>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -150,6 +168,20 @@ const styles = StyleSheet.create({
   openButton: { position: 'absolute', zIndex: 5, width: HIT, height: HIT, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
   brand: { fontSize: 24, letterSpacing: 4, paddingHorizontal: 12, color: colors.navy },
   list: { gap: 2 },
+  // 남은 자리를 밀어내고 맨 아래에 붙는다
+  account: { marginTop: 'auto', paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.lineSoft, gap: 4 },
+  email: { fontSize: 13, color: colors.inkSoft },
+  signOut: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    minHeight: 36,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.chipBorder,
+    justifyContent: 'center',
+  },
+  signOutText: { fontSize: 13, color: colors.inkSoft },
   row: {
     minHeight: HIT,
     paddingHorizontal: 12,
