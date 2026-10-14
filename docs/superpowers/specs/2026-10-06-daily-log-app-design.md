@@ -223,7 +223,7 @@
 - 데이터: SQLite를 App Group 공유 폴더로 옮겨 앱과 위젯이 같은 DB 사용. 위젯 변경도 outbox에 기록하고 동기화는 앱이 한다.
 - 위젯 안 텍스트 입력과 녹음은 iOS에서 불가 → 앱을 해당 화면으로 연다.
 - 구현(계획 D): `@bacons/apple-targets`로 `mobile/targets/widget`(Swift)을 위젯 타깃으로 붙인다. `ios/`는 만들어 쓰고 버린다(CNG).
-- 번들 ID `com.hyorish03.nanal`(위젯 `.widget`), App Group `group.com.hyorish03.nanal`. 앱 DB는 `<App Group>/nanal/daily-log.db`로 한 번 옮긴다(임시 이름으로 복사 → 표마다 행 수·스키마 버전 확인 → 이름 바꾸기, 원본은 남김). 공유 폴더가 없으면 원래 자리를 쓰고 위젯은 "앱을 한 번 열어 주세요".
+- 번들 ID `mengle.zen`(위젯 `mengle.zen.widget`, Android 패키지도 `mengle.zen`), App Group `group.mengle.zen`. 앱 DB는 `<App Group>/nanal/daily-log.db`로 한 번 옮긴다(임시 이름으로 복사 → 표마다 행 수·스키마 버전 확인 → 이름 바꾸기, 원본은 남김). 공유 폴더가 없으면 원래 자리를 쓰고 위젯은 "앱을 한 번 열어 주세요".
 - 위젯 SQL은 `src/widget/sql.ts`와 `targets/widget/SharedSQL.swift`에 같은 글자로 두고 jest가 비교한다. 상태 바꾸기는 앱 기호 탭과 같이 한 단계씩(잠금화면 버튼도 두 번 누르면 완료). 위젯에서 바꾼 것은 outbox에 남고 앱이 열릴 때 동기화한다.
 - 앱이 화면을 다시 그릴 때마다 위젯을 새로 고친다. 위젯은 30분마다, 새벽 4시 경계에 새로 고친다.
 - 컨트롤(iOS 18): 말로 적기 `nanal://voice`, 한 줄 적기 `nanal://today?focus=1`.

@@ -9,7 +9,7 @@
     "scheme": "nanal",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hyorish03.nanal.app",
+      "bundleIdentifier": "mengle.zen",
       "infoPlist": {
         "CADisableMinimumFrameDurationOnPhone": true,
         "ITSAppUsesNonExemptEncryption": false,
@@ -17,11 +17,11 @@
       },
       "entitlements": {
         "com.apple.security.application-groups": [
-          "group.com.hyorish03.nanal.app"
+          "group.mengle.zen"
         ]
       },
       "appleTeamId": "8V5VNMF9JM",
-      "buildNumber": "3"
+      "buildNumber": "1"
     },
     "android": {
       "package": "mengle.zen",

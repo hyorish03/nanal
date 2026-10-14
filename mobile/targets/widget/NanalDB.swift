@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 // 앱과 같은 파일(src/db/location.ts의 APP_GROUP, DB_DIR, DB_NAME)
-let appGroupID = "group.com.hyorish03.nanal.app"
+let appGroupID = "group.mengle.zen"
 private let dbRelativePath = "nanal/daily-log.db"
 // src/days/moods.ts의 MOOD_WORDS
 let moodWords = ["힘듦", "가라앉음", "보통", "괜찮음", "좋음"]
