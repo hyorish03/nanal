@@ -15,12 +15,18 @@ export function Star({ s }: { s: number }) {
   );
 }
 
+// 아래 버튼을 가리키는 화살표는 화면이 짧으면 세로로만 줄여 버튼 위에서 멈춘다(촉은 모양 그대로).
+// maxH는 화살표가 차지해도 되는 높이(px). 줄기의 y 좌표만 비율 k로 줄인다.
+const squeeze = (s: number, baseH: number, maxH: number) => Math.min(1, Math.max(0.4, maxH / (baseH * s)));
+
 // 첫 장: 아래 버튼 쪽으로 구불구불 내려가는 화살표
-export function LongArrow({ s }: { s: number }) {
+export function LongArrow({ s, maxH }: { s: number; maxH: number }) {
+  const k = squeeze(s, 380, maxH);
+  const y = (v: number) => Math.round(v * k * 10) / 10;
   return (
-    <Svg width={140 * s} height={380 * s} viewBox="0 0 140 380" accessible={false}>
-      <Path d="M20 6 C 70 60, 10 140, 60 210 S 120 300, 112 360" fill="none" stroke={RED} strokeWidth={2} strokeLinecap="round" />
-      <Path d="M100 348 L112 362 L122 346" fill="none" stroke={RED} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    <Svg width={140 * s} height={380 * s * k} viewBox={`0 0 140 ${y(380)}`} accessible={false}>
+      <Path d={`M20 6 C 70 ${y(60)}, 10 ${y(140)}, 60 ${y(210)} S 120 ${y(300)}, 112 ${y(360)}`} fill="none" stroke={RED} strokeWidth={2} strokeLinecap="round" />
+      <Path d={`M100 ${y(362) - 14} L112 ${y(362)} L122 ${y(362) - 16}`} fill="none" stroke={RED} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -36,11 +42,13 @@ export function UpArrow({ s }: { s: number }) {
 }
 
 // 마지막 장: 아래 버튼으로 내려가는 화살표
-export function DownArrow({ s }: { s: number }) {
+export function DownArrow({ s, maxH }: { s: number; maxH: number }) {
+  const k = squeeze(s, 150, maxH);
+  const y = (v: number) => Math.round(v * k * 10) / 10;
   return (
-    <Svg width={80 * s} height={150 * s} viewBox="0 0 80 150" accessible={false}>
-      <Path d="M10 6 C 52 30, 70 80, 58 136" fill="none" stroke={RED} strokeWidth={2} strokeLinecap="round" />
-      <Path d="M47 124 L58 138 L68 123" fill="none" stroke={RED} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    <Svg width={80 * s} height={150 * s * k} viewBox={`0 0 80 ${y(150)}`} accessible={false}>
+      <Path d={`M10 6 C 52 ${y(30)}, 70 ${y(80)}, 58 ${y(136)}`} fill="none" stroke={RED} strokeWidth={2} strokeLinecap="round" />
+      <Path d={`M47 ${y(138) - 14} L58 ${y(138)} L68 ${y(138) - 15}`} fill="none" stroke={RED} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }

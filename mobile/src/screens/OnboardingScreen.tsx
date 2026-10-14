@@ -8,7 +8,7 @@ import { Txt } from '../ui/Txt';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { BookScene, OPEN_EASE, OPEN_MS, ZOOM_DELAY_MS, ZOOM_EASE, ZOOM_MS } from './onboarding/BookScene';
 import { NotePage } from './onboarding/NotePage';
-import { NOTE_STEPS, type NoteMode, type NoteStep } from './onboarding/notebook';
+import { NOTE_BAR_H, NOTE_STEPS, type NoteMode, type NoteStep } from './onboarding/notebook';
 import { TURN_EASE, TURN_MS, TURN_REDUCED_MS, TurningSheet } from './onboarding/PageTurn';
 
 const LEAVE_MS = 480; // 마지막 글씨가 흐려지며 사라지는 시간. 끝나면 오늘 화면이 올라온다
@@ -223,7 +223,6 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
-const BAR_H = 104;
 
 const styles = StyleSheet.create({
   // 확대되는 책이 칸 밖(넓은 창의 양옆)으로 비치지 않게 자른다. 바탕은 Main의 종이(책상)가 비친다.
@@ -235,7 +234,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: BAR_H,
+    height: NOTE_BAR_H,
     paddingHorizontal: 20,
     paddingBottom: 16,
     flexDirection: 'row',

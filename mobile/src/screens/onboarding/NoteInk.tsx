@@ -10,9 +10,10 @@ export type NoteCtx = {
   reduce: boolean;
   s: number;
   width: number;
+  height: number;
   nudge: number; // 글자 크기 설정으로 줄 높이가 늘어난 만큼 위로 당겨 글줄을 칸 가운데에 둔다
 };
-export const NoteContext = createContext<NoteCtx>({ mode: 'still', reduce: false, s: 1, width: 390, nudge: 0 });
+export const NoteContext = createContext<NoteCtx>({ mode: 'still', reduce: false, s: 1, width: 390, height: 844, nudge: 0 });
 export const useNote = () => useContext(NoteContext);
 
 // 글줄은 칸이 정해진 격자라 시스템 글자 크기는 이만큼까지만 따른다

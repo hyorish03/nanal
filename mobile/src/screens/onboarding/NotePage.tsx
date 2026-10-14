@@ -7,7 +7,7 @@ import { colors } from '../../ui/theme';
 import { useReduceMotion } from '../../ui/useReduceMotion';
 import { DownArrow, InfoMark, InkBottle, LongArrow, RibbonTab, Star, TimeIcon, Timeline, UpArrow } from './NoteDoodles';
 import { Ink, Marked, NOTE_FONT_SCALE, NoteContext, NoteText, useNote } from './NoteInk';
-import { MARGIN_X, type NoteMode, noteScale, type NoteStep, ROW_TOP, RULE_FIRST, RULE_GAP, TEXT_X } from './notebook';
+import { MARGIN_X, NOTE_BAR_H, type NoteMode, noteScale, type NoteStep, ROW_TOP, RULE_FIRST, RULE_GAP, TEXT_X } from './notebook';
 import { noteDateText, noteLabel } from './notePages';
 
 const EDGE = 16; // 글이 종이 오른쪽 끝에 닿지 않게 남기는 폭
@@ -23,7 +23,7 @@ export function NotePage({ step, mode, width, height }: { step: NoteStep; mode: 
   const [date] = useState(() => logicalDate(new Date()));
   // 글자 크기 설정만큼 줄 높이도 커지니, 늘어난 절반만큼 올려 글줄을 칸 가운데에 둔다
   const nudge = -((Math.min(fontScale, NOTE_FONT_SCALE) - 1) * RULE_GAP * s) / 2;
-  const ctx = useMemo(() => ({ mode, reduce, s, width, nudge }), [mode, reduce, s, width, nudge]);
+  const ctx = useMemo(() => ({ mode, reduce, s, width, height, nudge }), [mode, reduce, s, width, height, nudge]);
   const blank = mode === 'blank';
   const Page = PAGES[step];
   return (
@@ -70,9 +70,11 @@ function Paper({ s, height }: { s: number; height: number }) {
 
 // 목업 치수 → 화면 자리. row r의 위쪽, x에서 오른쪽 끝까지 남은 폭, 오른쪽으로 삐져나가지 않게 당긴 그림 x
 function useGrid() {
-  const { s, width } = useNote();
+  const { s, width, height } = useNote();
   return {
     s,
+    // 아래 조작 줄 바로 위까지 남은 높이(그림이 버튼을 덮지 않게)
+    above: (top: number) => height - NOTE_BAR_H - 8 * s - top,
     x: (n: number) => n * s,
     row: (r: number) => (ROW_TOP + RULE_GAP * r) * s,
     room: (x: number) => width - x * s - EDGE,
@@ -82,7 +84,7 @@ function useGrid() {
 
 // 1장: 인사
 function Greeting({ date }: { date: string }) {
-  const { s, x, row, room, fitX } = useGrid();
+  const { s, x, row, room, fitX, above } = useGrid();
   return (
     <>
       <Ink i={0} right={x(28)} top={row(-1)}>
@@ -103,7 +105,7 @@ function Greeting({ date }: { date: string }) {
         <NoteText face="note">한 장씩 넘기면서 알려 줄게요</NoteText>
       </Ink>
       <Ink i={8} left={fitX(210, 140)} top={x(372)} grid={false}>
-        <LongArrow s={s} />
+        <LongArrow s={s} maxH={above(x(372))} />
       </Ink>
     </>
   );
@@ -199,7 +201,7 @@ function Flow() {
 
 // 4장: 책갈피와 다시 보기
 function Finale() {
-  const { s, x, row, room, fitX } = useGrid();
+  const { s, x, row, room, fitX, above } = useGrid();
   const { width } = useNote();
   const postW = Math.min(x(258), width - x(66) - EDGE);
   return (
@@ -228,7 +230,7 @@ function Finale() {
       </Ink>
       <Note i={9} r={12} text="이제 오늘의 첫 줄을 써 볼까요" />
       <Ink i={10} left={fitX(270, 80)} top={x(590)} grid={false}>
-        <DownArrow s={s} />
+        <DownArrow s={s} maxH={above(x(590))} />
       </Ink>
     </>
   );
