@@ -22,14 +22,13 @@ function Glyph({ symbol }: { symbol: LegendEntry['symbol'] }) {
 
 type Props = {
   kind?: ItemKind;
-  onClose?: () => void;
   collapsed?: boolean;
   onToggle?: () => void; // 있으면 제목 줄을 눌러 설명을 접고 편다(넓은 배치의 오른쪽 칸)
 };
 
 // (i) 팝오버 안의 기호 설명. 지금 고른 입력 종류는 고른 칩과 같은 바탕으로 표시한다.
-// 넓은 배치의 오른쪽 칸에 둘 때는 kind·onClose 없이 쓰고, onToggle로 접고 편다.
-export function SymbolLegend({ kind, onClose, collapsed = false, onToggle }: Props) {
+// 넓은 배치의 오른쪽 칸에 둘 때는 kind 없이 쓰고, onToggle로 접고 편다.
+export function SymbolLegend({ kind, collapsed = false, onToggle }: Props) {
   const title = <Txt variant="hand">기호는 이렇게 읽어요</Txt>;
   return (
     <View style={styles.box}>
@@ -66,14 +65,18 @@ export function SymbolLegend({ kind, onClose, collapsed = false, onToggle }: Pro
           </View>
         </View>
       ))}
-      {onClose && (
-        <Pressable accessibilityRole="button" style={dimPressed(styles.ok)} onPress={onClose}>
-          <Txt variant="medium" style={styles.okText}>
-            닫기
-          </Txt>
-        </Pressable>
-      )}
     </View>
+  );
+}
+
+// (i) 팝오버 아래에 늘 보이는 닫기. 설명이 길어 스크롤해도 내려가지 않는다
+export function LegendClose({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" style={dimPressed(styles.ok)} onPress={onPress}>
+      <Txt variant="medium" style={styles.okText}>
+        닫기
+      </Txt>
+    </Pressable>
   );
 }
 

@@ -7,7 +7,7 @@ import { Popover, useAnchor } from '../../ui/Popover';
 import { haptic } from '../../ui/haptics';
 import { dimPressed } from '../../ui/press';
 import { colors, fonts } from '../../ui/theme';
-import { SymbolLegend } from './SymbolLegend';
+import { LegendClose, SymbolLegend } from './SymbolLegend';
 import { useScaledText } from '../../ui/typeScale';
 
 const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
@@ -99,8 +99,8 @@ export const Composer = memo(function Composer({ inputRef, voice, onCapture, onS
           </Svg>
         </Pressable>
       </View>
-      <Popover anchor={info.anchor} align="left" width={300} label="기호 설명" onClose={info.close}>
-        <SymbolLegend kind={kind} onClose={info.close} />
+      <Popover anchor={info.anchor} align="left" width={300} label="기호 설명" onClose={info.close} footer={<LegendClose onPress={info.close} />}>
+        <SymbolLegend kind={kind} />
       </Popover>
     </View>
   );

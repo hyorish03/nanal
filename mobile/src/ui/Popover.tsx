@@ -52,6 +52,7 @@ type Props = {
   label: string;
   onClose: () => void;
   children: ReactNode;
+  footer?: ReactNode; // 스크롤 밖 아래에 늘 보이는 줄(닫기 버튼 등)
 };
 
 // 열렸을 때만 안쪽을 그린다. 닫힌 팝오버(목록 줄마다 하나씩)가 창 크기·동작 줄이기 구독을 들고 있지 않게.
@@ -64,12 +65,13 @@ const GAP = 4; // 버튼과 팝오버 사이
 const EDGE = 8; // 화면 위아래 안전 여백에서 더 띄우는 거리
 const CHROME = 10; // 상자의 안쪽 여백(4×2)과 테두리(1×2)
 
-function OpenPopover({ anchor, align, width, label, onClose, children }: Props & { anchor: Anchor }) {
+function OpenPopover({ anchor, align, width, label, onClose, children, footer }: Props & { anchor: Anchor }) {
   const screen = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const reduce = useReduceMotion();
   const appear = useRef(new Animated.Value(0)).current;
   const [height, setHeight] = useState<number | null>(null); // 처음 잰 높이. 재기 전에는 투명하다
+  const [footerH, setFooterH] = useState(0);
 
   // 버튼 쪽 모서리에서 살짝 커지며 나타난다. 닫을 때는 바로 사라진다(뒤이은 Alert은 따로 창을 띄우니 기다릴 필요가 없다).
   const measured = height !== null;
@@ -113,9 +115,10 @@ function OpenPopover({ anchor, align, width, label, onClose, children }: Props &
           },
         ]}
       >
-        <ScrollView style={{ maxHeight: maxHeight - CHROME }} alwaysBounceVertical={false}>
+        <ScrollView style={{ maxHeight: maxHeight - CHROME - footerH }} alwaysBounceVertical={false}>
           {children}
         </ScrollView>
+        {footer && <View onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}>{footer}</View>}
       </Animated.View>
     </Modal>
   );
