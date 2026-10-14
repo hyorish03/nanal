@@ -4,6 +4,7 @@ import type { CoverOpening } from '../lib/coverOpening';
 import { EASE_OUT } from './motion';
 import { colors, fonts } from './theme';
 import { Paper } from './Paper';
+import { useLayoutClass } from './responsive';
 import { Txt } from './Txt';
 import { useReduceMotion } from './useReduceMotion';
 
@@ -19,10 +20,25 @@ type Props = {
 const DURATION = 820;
 const FADE_MS = 300; // 같은 날 다시 열 때
 const REDUCED_MS = 200; // 동작 줄이기: 돌리지 않고 흐리게만
+const BOOK_RATIO = 0.7; // 넓은 창의 다이어리 한 권(가로 ÷ 세로)
+const BOOK_MAX_H = 720;
+const BOOK_MARGIN = 48; // 창 가장자리와 책 사이
+
+// 넓은 창(아이패드·Mac)에서는 표지가 창을 다 덮지 않고, 종이 책상 가운데 다이어리 한 권으로 놓인다.
+function bookSize(width: number, height: number) {
+  let h = Math.min(height - BOOK_MARGIN * 2, BOOK_MAX_H);
+  let w = Math.round(h * BOOK_RATIO);
+  if (w > width - BOOK_MARGIN * 2) {
+    w = width - BOOK_MARGIN * 2;
+    h = Math.round(w / BOOK_RATIO);
+  }
+  return { width: w, height: h };
+}
 
 export function Cover({ open, line, onClosed, onOpened, opening = 'turn', children }: Props) {
   const reduce = useReduceMotion();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const book = useLayoutClass() === 'compact' ? null : bookSize(width, height);
   const progress = useRef(new Animated.Value(open ? 1 : 0)).current; // 0 덮임 → 1 넘어감
   const veil = useRef(new Animated.Value(1)).current; // 표지 전체의 불투명도(흐리게 열고 닫을 때)
   const openingRef = useRef(opening); // 바뀌어도 진행 중인 애니메이션은 그대로 두고 다음 펼침부터 쓴다
@@ -93,23 +109,46 @@ export function Cover({ open, line, onClosed, onOpened, opening = 'turn', childr
   const rotateY = progress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-100deg'] });
   // 넘어갈수록 빛을 덜 받아 어두워진다
   const shade = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] });
+  // 책으로 놓일 때: 표지가 넘어가는 동안 책상 종이와 속지가 함께 옅어져 뒤의 오늘 화면이 드러난다
+  const desk = progress.interpolate({ inputRange: [0, 0.7], outputRange: [1, 0], extrapolate: 'clamp' });
+  const leaf = (
+    <Animated.View
+      style={[
+        book ? [styles.book, book] : styles.leaf,
+        styles.cover,
+        { transform: [{ perspective: (book?.width ?? width) * 2.5 }, { rotateY }] },
+      ]}
+    >
+      <Paper texture="cloth" />
+      <View style={styles.spine} />
+      <View style={styles.frame} />
+      <View style={styles.band} />
+      <View style={styles.titleBox}>
+        <Debossed style={styles.title}>나날</Debossed>
+        <View style={styles.rule} />
+        <Txt variant="title" style={styles.line}>
+          {line}
+        </Txt>
+        {children}
+      </View>
+      <Animated.View pointerEvents="none" style={[styles.shade, { opacity: shade }]} />
+    </Animated.View>
+  );
   return (
     <Animated.View pointerEvents={open ? 'none' : 'auto'} accessibilityViewIsModal={!open} style={[styles.layer, { opacity: veil }]}>
-      <Animated.View style={[styles.leaf, styles.cover, { transform: [{ perspective: width * 2.5 }, { rotateY }] }]}>
-        <Paper texture="cloth" />
-        <View style={styles.spine} />
-        <View style={styles.frame} />
-        <View style={styles.band} />
-        <View style={styles.titleBox}>
-          <Debossed style={styles.title}>나날</Debossed>
-          <View style={styles.rule} />
-          <Txt variant="title" style={styles.line}>
-            {line}
-          </Txt>
-          {children}
-        </View>
-        <Animated.View pointerEvents="none" style={[styles.shade, { opacity: shade }]} />
-      </Animated.View>
+      {book ? (
+        <>
+          <Animated.View style={[styles.desk, styles.deskPaper, { opacity: desk }]}>
+            <Paper />
+            <View style={[styles.pages, book]} />
+          </Animated.View>
+          <View pointerEvents="box-none" style={styles.desk}>
+            {leaf}
+          </View>
+        </>
+      ) : (
+        leaf
+      )}
     </Animated.View>
   );
 }
@@ -140,6 +179,28 @@ const styles = StyleSheet.create({
     right: 0,
     transformOrigin: 'left center',
     backfaceVisibility: 'hidden',
+  },
+  desk: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
+  deskPaper: { backgroundColor: colors.paper },
+  // 가운데 놓인 한 권. 왼쪽 끝(책등)을 축으로 넘어간다
+  book: {
+    transformOrigin: 'left center',
+    backfaceVisibility: 'hidden',
+    borderTopLeftRadius: 3,
+    borderBottomLeftRadius: 3,
+  },
+  // 표지 아래 속지 묶음(표지가 넘어가면 잠깐 보인다). 책 그림자도 여기 진다(표지는 overflow: hidden이라 그림자가 잘린다)
+  pages: {
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    backgroundColor: colors.pages,
+    borderWidth: 1,
+    borderColor: colors.pageEdge,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    transform: [{ translateX: 4 }, { translateY: 3 }],
   },
   cover: { backgroundColor: colors.navy, borderTopRightRadius: 14, borderBottomRightRadius: 14, overflow: 'hidden' },
   shade: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#000' },
