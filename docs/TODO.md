@@ -10,6 +10,11 @@
 - [x] `organize-voice`, `monthly-review` 배포(`--use-api`). 로그인 없이 부르면 `401`.
 - 참고: CLI가 macOS 키체인 허용 창을 기다리며 멈출 수 있다(`Initialising login role...`에서 멈춤). Mac 화면의 허용 창에서 "항상 허용"을 누른다.
 
+### 계정 지우기 서버 함수 (App Store 5.1.1(v)) — 코드 완료, 배포 남음
+- `supabase/functions/delete-account`: `POST`만 받는다. 사용자 JWT로 부른 사람을 확인하고(없거나 틀리면 `401`), service role로 `auth.admin.deleteUser`를 불러 영구히 지운다. 성공하면 `{ ok: true }`. 사용자 표는 모두 `on delete cascade`라 함께 지워진다(Storage는 쓰지 않음).
+- [ ] (확인 후) 배포: `supabase functions deploy delete-account --project-ref xckbdxtgfcvdacwrolvb --use-api`. 로그인 없이 부르면 `401`인지 확인.
+- [ ] 앱 계정 시트에 "계정 지우기"(확인 창 → 함수 호출 → 로그아웃·로컬 DB 비우기)를 붙인다.
+
 ### 사용자가 직접 할 일
 - [ ] Supabase → Settings → API Keys의 Secret keys에 만든 `anthropic_api_key`(Supabase 관리자 키)를 지웠는지 확인한다. Anthropic 키는 Edge Functions → Secrets의 `ANTHROPIC_API_KEY`에만 둔다.
 - [ ] Anthropic Console에서 월 사용 한도를 건다.
@@ -51,7 +56,7 @@
 
 ### 그 밖
 - 배포: TestFlight → App Store(앱 아이콘, 스플래시, 개인정보 처리방침, AI 데이터 전송 고지).
-- 계정: 지금은 가입을 막아 둔 1인용이다. 다른 사람이 쓰게 하려면 가입·탈퇴(데이터 삭제) 흐름이 필요하다.
+- 계정: 지금은 가입을 막아 둔 1인용이다. 다른 사람이 쓰게 하려면 가입 흐름이 필요하다. 탈퇴는 `delete-account` 함수로 서버 쪽을 만들었다(1절).
 
 ## 4. 알려진 한계와 정리할 것
 - 월간 회고 서버 함수는 한 달 조회에 PostgREST 기본 1,000행 제한을 받는다. 할 일이 아주 많은 달은 통계가 잘릴 수 있다.
