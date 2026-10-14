@@ -63,7 +63,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
     AccessibilityInfo.announceForAccessibility(pageLabel(0));
   };
 
-  // 표지를 누르면 책등을 축으로 표지가 넘어가고, 책이 반 권 오른쪽으로 옮겨 간 뒤 오른쪽 장으로 다가간다.
+  // 표지를 누르면 책등을 축으로 표지가 넘어가며 책등이 칸 폭의 1/3쯤으로 옮겨 가고, 오른쪽 장으로 다가간다.
   // 동작 줄이기면 표지 그림 위로 첫 장이 흐리게 떠오른다.
   const openBook = () => {
     if (phase !== 'cover' || busy.current) return;
