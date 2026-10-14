@@ -16,10 +16,24 @@ const BIND_W = 20; // 제본 쪽 그늘 폭
 
 // 노트 한 장(종이·줄·여백선·그 장의 손글씨 메모)을 width×height로 그린다.
 // 자리는 모두 폭 390 기준 목업 치수에 noteScale을 곱한다. 장 하나가 스크린 리더에는 한 덩어리 글로 읽힌다.
-export function NotePage({ step, mode, width, height }: { step: NoteStep; mode: NoteMode; width: number; height: number }) {
+// scaleWidth를 주면 배율은 그 폭으로 정한다. 책 속 오른쪽 장처럼 화면보다 넓게 그려도 왼쪽 화면 폭만큼은
+// 진짜 노트(폭 scaleWidth)와 줄·여백선·제본 그늘이 똑같이 겹친다.
+export function NotePage({
+  step,
+  mode,
+  width,
+  height,
+  scaleWidth = width,
+}: {
+  step: NoteStep;
+  mode: NoteMode;
+  width: number;
+  height: number;
+  scaleWidth?: number;
+}) {
   const reduce = useReduceMotion();
   const { fontScale } = useWindowDimensions();
-  const s = noteScale(width);
+  const s = noteScale(scaleWidth);
   const [date] = useState(() => logicalDate(new Date()));
   // 글자 크기 설정만큼 줄 높이도 커지니, 늘어난 절반만큼 올려 글줄을 칸 가운데에 둔다
   const nudge = -((Math.min(fontScale, NOTE_FONT_SCALE) - 1) * RULE_GAP * s) / 2;

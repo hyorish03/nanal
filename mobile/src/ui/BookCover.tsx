@@ -51,14 +51,14 @@ export function BookCover({ width, height, titleSize, subtitle, footer, open, op
         <Debossed style={[styles.title, { fontSize: titleSize, letterSpacing: titleSize / 8 }]}>나날</Debossed>
         {subtitle && (
           <>
-            <View style={styles.rule} />
-            <Txt variant="title" style={styles.subtitle}>
+            <View style={[styles.rule, { width: 28 * scale }]} />
+            <Txt variant="title" style={[styles.subtitle, { fontSize: Math.max(11, 13 * scale) }]}>
               {subtitle}
             </Txt>
           </>
         )}
         {footer && (
-          <Txt variant="title" style={styles.footer}>
+          <Txt variant="title" style={[styles.footer, { bottom: 30 * scale, fontSize: Math.max(10, 11 * scale) }]}>
             {footer}
           </Txt>
         )}
@@ -125,7 +125,8 @@ const styles = StyleSheet.create({
   frame: { position: 'absolute', borderWidth: 1, borderColor: colors.coverFrame, borderRadius: 2 },
   band: { position: 'absolute', top: 0, bottom: 0, backgroundColor: colors.navyDeep },
   title: { color: colors.coverText },
-  rule: { marginTop: 14, width: 28, height: 1, backgroundColor: colors.coverRule },
-  subtitle: { marginTop: 14, fontSize: 13, letterSpacing: 3, color: colors.coverSub },
-  footer: { position: 'absolute', bottom: 30, fontSize: 11, letterSpacing: 4, color: colors.coverFooter },
+  // 부제·줄·연도는 기준 폭(262)에서의 크기를 표지 폭에 맞춰 늘이고 줄인다
+  rule: { marginTop: 14, height: 1, backgroundColor: colors.coverRule },
+  subtitle: { marginTop: 14, letterSpacing: 3, color: colors.coverSub },
+  footer: { position: 'absolute', letterSpacing: 4, color: colors.coverFooter },
 });
