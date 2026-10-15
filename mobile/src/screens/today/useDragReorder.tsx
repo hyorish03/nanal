@@ -1,11 +1,13 @@
-import { createContext, type ReactNode, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Animated, type LayoutChangeEvent, type StyleProp, StyleSheet, View, type ViewProps, type ViewStyle } from 'react-native';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Animated } from 'react-native';
 import { clampDy, dropIndex, offsetTo, shiftFor } from '../../lib/position';
 import { haptic } from '../../ui/haptics';
 import { EASE_OUT } from '../../ui/motion';
 
 // 길게 눌러 끌어 줄 순서를 바꾸기. 목록 화면(오늘 장·언젠가)이 하나 만들어 줄마다 넘긴다.
 // 끄는 줄은 손가락을 따라가고(목록이 저절로 굴러도 손가락 밑에 남는다), 사이의 줄들은 끄는 줄 높이만큼 비켜 간다.
+// 끄는 칸을 zIndex로 올리지 않는다: iOS는 zIndex가 바뀌면 칸 뷰의 순서를 다시 꽂아 진행 중인 터치(끌기)를 취소한다.
+// 사이의 줄들이 바로 비켜 가서 끄는 줄이 다음 줄 밑으로 지나가는 순간은 짧다.
 // 놓으면 그 자리로 미끄러진 뒤 화면이 새 순서를 먼저 보여 주고(저장은 뒤에서), 비켜 간 거리를 그 순간 0으로 되돌린다.
 
 export type DragReorder = {
@@ -209,28 +211,3 @@ export function useDragReorder(options: Options) {
   }));
   return { reorder: api, ...handlers };
 }
-
-// 끄는 줄의 칸을 다른 칸들 위에 그린다(아래로 끌 때 다음 줄 밑으로 숨지 않게). FlatList의 CellRendererComponent로 쓴다
-export const DraggingContext = createContext<string | null>(null);
-
-// FlatList가 칸에 주는 속성(CellRendererProps). onLayout·onFocusCapture는 기본 칸처럼 그대로 넘긴다
-type CellProps = {
-  cellKey: string;
-  children?: ReactNode;
-  style?: StyleProp<ViewStyle>;
-  onLayout?: (e: LayoutChangeEvent) => void;
-  onFocusCapture?: unknown; // View 타입에는 없지만 RN이 받는다
-};
-
-export function DragCell({ cellKey, children, style, onLayout, onFocusCapture }: CellProps) {
-  const dragging = useContext(DraggingContext);
-  return (
-    <View {...({ onFocusCapture } as ViewProps)} style={[style, dragging === cellKey && styles.top]} onLayout={onLayout}>
-      {children}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  top: { zIndex: 10 },
-});

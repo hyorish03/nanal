@@ -495,7 +495,14 @@ export const ItemRow = memo(function ItemRow(props: Props) {
               </View>
             ) : (
               // 글을 누르면 그 자리에서 고치고, 길게 누르면 ⋯와 같은 메뉴가 뜬다
-              <Pressable accessible={false} style={styles.body} onPress={unlessOpen(() => edit())} onLongPress={openMenu}>
+              <Pressable
+                accessible={false}
+                style={styles.body}
+                onPress={unlessOpen(() => edit())}
+                // 끌 수 있는 줄은 길게 누르기를 끌기(liftPan)가 맡는다: 움직이지 않고 놓으면 거기서 메뉴를 연다.
+                // 여기서도 메뉴를 열면 끌기가 시작된 직후 메뉴(Modal)가 떠서 끌기가 취소된다
+                onLongPress={canDrag ? undefined : openMenu}
+              >
                 <Highlight on={item.priority && (status === 'open' || status === 'doing')} animate={marked}>
                   <Txt variant={variant} style={textStyle}>
                     {item.text}

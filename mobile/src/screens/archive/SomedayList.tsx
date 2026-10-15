@@ -30,7 +30,7 @@ import { Composer } from '../today/Composer';
 import { ItemRow } from '../today/ItemRow';
 import { RuledFill, useRuleGap } from '../today/NotebookPage';
 import { openRow } from '../today/swipe';
-import { DragCell, DraggingContext, useDragReorder } from '../today/useDragReorder';
+import { useDragReorder } from '../today/useDragReorder';
 
 type Props = {
   db: Db;
@@ -232,42 +232,39 @@ export function SomedayList({ db, version, head, contentStyle, onChanged }: Prop
   return (
     // 밀어 연 줄 바깥 어디를 만져도 그 줄을 닫는다
     <View ref={pageRef} style={styles.flex} onTouchStart={openRow.touchOutside}>
-      <DraggingContext.Provider value={dragging}>
-        <FlatList
-          ref={listRef}
-          style={styles.flex}
-          data={sorted}
-          keyExtractor={(r) => r.id}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          contentContainerStyle={[styles.content, contentStyle]}
-          onScrollBeginDrag={openRow.closeAll}
-          onScroll={(e) => drag.onScroll(e.nativeEvent.contentOffset.y)}
-          scrollEventThrottle={16}
-          onContentSizeChange={drag.onContentSize}
-          scrollEnabled={dragging === null}
-          CellRendererComponent={DragCell}
-          ListHeaderComponent={header}
-          ListEmptyComponent={
-            loaded ? (
-              // 빈 목록은 첫 줄에 손글씨로 흐리게 적어 둔다
-              <View accessible accessibilityLabel={EMPTY} style={[styles.emptyRow, { minHeight: ruleGap }]}>
-                <Txt variant="hand" style={styles.empty}>
-                  {EMPTY}
-                </Txt>
-              </View>
-            ) : null
-          }
-          ListFooterComponentStyle={styles.footerWrap}
-          ListFooterComponent={
-            // 목록 아래 빈 곳까지 빈 줄로 채워, 누르면 키보드가 내려간다
-            <Pressable accessible={false} style={styles.footer} onPress={Keyboard.dismiss}>
-              <RuledFill />
-            </Pressable>
-          }
-          renderItem={renderItem}
-        />
-      </DraggingContext.Provider>
+      <FlatList
+        ref={listRef}
+        style={styles.flex}
+        data={sorted}
+        keyExtractor={(r) => r.id}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={[styles.content, contentStyle]}
+        onScrollBeginDrag={openRow.closeAll}
+        onScroll={(e) => drag.onScroll(e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
+        onContentSizeChange={drag.onContentSize}
+        scrollEnabled={dragging === null}
+        ListHeaderComponent={header}
+        ListEmptyComponent={
+          loaded ? (
+            // 빈 목록은 첫 줄에 손글씨로 흐리게 적어 둔다
+            <View accessible accessibilityLabel={EMPTY} style={[styles.emptyRow, { minHeight: ruleGap }]}>
+              <Txt variant="hand" style={styles.empty}>
+                {EMPTY}
+              </Txt>
+            </View>
+          ) : null
+        }
+        ListFooterComponentStyle={styles.footerWrap}
+        ListFooterComponent={
+          // 목록 아래 빈 곳까지 빈 줄로 채워, 누르면 키보드가 내려간다
+          <Pressable accessible={false} style={styles.footer} onPress={Keyboard.dismiss}>
+            <RuledFill />
+          </Pressable>
+        }
+        renderItem={renderItem}
+      />
       <Toast toast={toast} onHide={hideToast} />
     </View>
   );
