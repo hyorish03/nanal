@@ -1,12 +1,12 @@
 import { StyleSheet, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import type { SymbolKind } from './symbols';
 import { colors } from './theme';
 import { Txt } from './Txt';
 
-const TEXT: Partial<Record<SymbolKind, string>> = { open: '•', note: '–', migrated: '›' };
-
 // 줄 앞의 상태 기호 하나(스펙 11.2). 의미는 줄의 접근성 문구가 전한다.
-export function StatusSymbol({ kind, size = 18 }: { kind: SymbolKind; size?: number }) {
+// •·–·›도 글자가 아니라 같은 칸(size) 가운데에 그린다: 글자로 쓰면 작고 가늘어 •와 ›가 헷갈렸다.
+export function StatusSymbol({ kind, size = 19 }: { kind: SymbolKind; size?: number }) {
   if (kind === 'doing') {
     return (
       <View accessible={false} style={[styles.circle, styles.ring, { width: size, height: size, borderRadius: size / 2 }]}>
@@ -31,10 +31,31 @@ export function StatusSymbol({ kind, size = 18 }: { kind: SymbolKind; size?: num
       </View>
     );
   }
+  const box = [styles.box, { width: size, height: size }];
+  if (kind === 'migrated') {
+    // 옮긴 일: 굵은 꺾쇠
+    return (
+      <View accessible={false} style={box}>
+        <Svg width={size} height={size} viewBox="0 0 18 18">
+          <Path d="M6.5 3.8 L11.8 9 L6.5 14.2" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      </View>
+    );
+  }
+  if (kind === 'note') {
+    // 메모: 짧은 막대
+    return (
+      <View accessible={false} style={box}>
+        <View style={[styles.bar, { width: Math.round(size * 0.63) }]} />
+      </View>
+    );
+  }
+  // 할 일: 찬 점
+  const dot = Math.max(5, Math.round(size * 0.47));
   return (
-    <Txt accessible={false} style={[styles.glyph, { width: size, fontSize: kind === 'open' ? 20 : 18 }]}>
-      {TEXT[kind]}
-    </Txt>
+    <View accessible={false} style={box}>
+      <View style={[styles.dot, { width: dot, height: dot, borderRadius: dot / 2 }]} />
+    </View>
   );
 }
 
@@ -44,7 +65,9 @@ const styles = StyleSheet.create({
   half: { height: '100%', backgroundColor: colors.navy },
   filled: { backgroundColor: colors.navy },
   check: { color: colors.card },
-  glyph: { textAlign: 'center', color: colors.ink },
+  box: { alignItems: 'center', justifyContent: 'center' },
+  dot: { backgroundColor: colors.ink },
+  bar: { height: 2, borderRadius: 1, backgroundColor: colors.ink },
   cross: { alignItems: 'center', justifyContent: 'center' },
   stroke: { position: 'absolute', height: 1.5, borderRadius: 1, backgroundColor: colors.muted },
 });

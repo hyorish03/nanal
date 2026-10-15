@@ -310,7 +310,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
     kind === 'note' ? styles.note : styles.text,
     done && styles.done,
     dropped && styles.dropped,
-    someday && kind === 'migrated' && styles.moved,
+    kind === 'migrated' && styles.moved, // 옮긴 줄은 끝난 줄처럼 조금 흐리게(오늘 장·언젠가 모두)
   ];
   // 밀린 거리 → 왼쪽에서 자라는 형광펜 띠의 폭, 오른쪽 버튼 칸의 폭
   const stripW = drag.interpolate({ inputRange: [0, FAR], outputRange: [0, FAR], extrapolate: 'clamp' });
