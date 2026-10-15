@@ -14,7 +14,7 @@ test('테이블을 만들고 두 번 실행해도 안전하다', async () => {
   expect(tables.map((t) => t.name)).toEqual([
     'days', 'items', 'monthly_reviews', 'outbox', 'reflections', 'someday', 'sync_state', 'templates',
   ]);
-  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 5 });
+  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 6 });
 });
 
 test('task는 status가 필요하고, 그 외 종류는 status가 없어야 한다', async () => {
@@ -65,7 +65,7 @@ test('v1 데이터를 v2로 옮긴다: 일정은 할 일, 놓아준 일은 삭�
 
   await migrate(db);
 
-  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 5 });
+  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 6 });
   expect(await db.getAllAsync('SELECT id, kind, status, priority, deleted_at FROM items ORDER BY id', [])).toEqual([
     { id: 'dr', kind: 'task', status: 'open', priority: 0, deleted_at: TS2 },
     { id: 'ev', kind: 'task', status: 'open', priority: 0, deleted_at: null },
@@ -143,7 +143,7 @@ test('v4 → v5: 언젠가 표를 더해도 기존 기록·outbox·동기화 위
   await db.runAsync("INSERT INTO outbox (table_name, row_key) VALUES ('items', 'a')", []);
   await db.runAsync("INSERT INTO sync_state (table_name, cursor) VALUES ('owner', 'u1')", []);
 
-  await migrate(db);
+  await migrate(db, 5);
 
   expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 5 });
   expect(await db.getAllAsync(`SELECT ${cols} FROM items`, [])).toEqual([item]);
@@ -162,4 +162,50 @@ test('v4 → v5: 언젠가 표를 더해도 기존 기록·outbox·동기화 위
   await expect(ins('s4', 'x', 'doing')).rejects.toThrow(); // 언젠가에는 진행 중이 없다
   await expect(ins('s5', 'x', null)).rejects.toThrow();
   await expect(ins('s6', 'x', 'open', 2)).rejects.toThrow();
+});
+
+test('v5 → v6: 줄 순서(position)를 더하고, 이미 있는 줄은 적은 순서대로 날짜마다(언젠가는 전체에서) 1, 2, 3…', async () => {
+  const db = openTestDb();
+  await migrate(db, 5);
+  const cols = 'id, date, kind, text, status, priority, migrated_from, created_at, updated_at, deleted_at';
+  const at = (m: number) => `2026-10-06T00:0${m}:00.000Z`;
+  // 넣은 순서와 적은 시각이 다르다: 순서는 created_at, 같으면 id
+  const items = [
+    { id: 'c', date: '2026-10-06', kind: 'task', text: '셋', status: 'open', priority: 0, migrated_from: null, created_at: at(2), updated_at: at(2), deleted_at: null },
+    { id: 'a', date: '2026-10-06', kind: 'note', text: '하나', status: null, priority: 0, migrated_from: null, created_at: at(1), updated_at: at(1), deleted_at: null },
+    { id: 'b', date: '2026-10-06', kind: 'task', text: '둘', status: 'done', priority: 1, migrated_from: null, created_at: at(1), updated_at: at(1), deleted_at: TS },
+    { id: 'z', date: '2026-10-07', kind: 'task', text: '다음 날', status: 'open', priority: 0, migrated_from: null, created_at: at(0), updated_at: at(0), deleted_at: null },
+  ];
+  for (const r of items) await db.runAsync(`INSERT INTO items (${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, Object.values(r));
+  const ins = (id: string, created: string) =>
+    db.runAsync('INSERT INTO someday (id, text, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [id, id, 'open', created, created]);
+  await ins('s2', at(5));
+  await ins('s1', at(3));
+  await db.runAsync("INSERT INTO outbox (table_name, row_key) VALUES ('items', 'a')", []);
+
+  await migrate(db);
+
+  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 6 });
+  // 원래 열은 그대로
+  expect(await db.getAllAsync(`SELECT ${cols} FROM items ORDER BY id`, [])).toEqual(
+    [...items].sort((x, y) => x.id.localeCompare(y.id)),
+  );
+  expect(await db.getAllAsync('SELECT id, position FROM items ORDER BY date, position', [])).toEqual([
+    { id: 'a', position: 1 },
+    { id: 'b', position: 2 },
+    { id: 'c', position: 3 },
+    { id: 'z', position: 1 },
+  ]);
+  expect(await db.getAllAsync('SELECT id, position FROM someday ORDER BY position', [])).toEqual([
+    { id: 's1', position: 1 },
+    { id: 's2', position: 2 },
+  ]);
+  // 순서를 매긴 건 이 기기의 새 열일 뿐이라 올릴 거리(outbox)를 늘리지 않는다
+  expect(await db.getAllAsync('SELECT row_key FROM outbox', [])).toEqual([{ row_key: 'a' }]);
+  // 자리값은 비워 둘 수 있다(예전 앱·서버에서 받은 줄)
+  await expect(
+    db.runAsync('INSERT INTO items (id, date, kind, text, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [
+      'n', '2026-10-06', 'note', 'x', null, TS, TS,
+    ]),
+  ).resolves.toBeDefined();
 });

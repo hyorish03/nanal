@@ -138,6 +138,20 @@ const MIGRATIONS = [
     deleted_at TEXT
   );
   `,
+  // v6: 끌어서 바꾼 줄 순서(position, 분수 순서). 이미 있는 줄은 적은 순서(created_at, id)대로 1, 2, 3…을 매긴다.
+  // 오늘 장은 날짜마다, 언젠가는 한 목록 전체에서. 지운 줄도 같이 센다(서버 마이그레이션과 같은 규칙이라 값이 맞는다)
+  `
+  ALTER TABLE items ADD COLUMN position REAL;
+  UPDATE items SET position = (
+    SELECT COUNT(*) FROM items AS o
+    WHERE o.date = items.date AND (o.created_at < items.created_at OR (o.created_at = items.created_at AND o.id <= items.id))
+  );
+  ALTER TABLE someday ADD COLUMN position REAL;
+  UPDATE someday SET position = (
+    SELECT COUNT(*) FROM someday AS o
+    WHERE o.created_at < someday.created_at OR (o.created_at = someday.created_at AND o.id <= someday.id)
+  );
+  `,
 ];
 
 // target은 테스트에서 이전 버전 데이터를 만들 때만 쓴다.

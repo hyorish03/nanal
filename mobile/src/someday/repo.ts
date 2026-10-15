@@ -1,7 +1,9 @@
+import { moveInScope, POSITION_ORDER } from '../db/position';
 import type { Db, Tx } from '../db/types';
 import { insertTaskInTx, type Item, MAX_TEXT } from '../items/repo';
 import { logicalDate } from '../lib/date';
 import { newId } from '../lib/id';
+import { appendPosition } from '../lib/position';
 import { markDirty } from '../sync/outbox';
 
 // 언젠가: 날짜 없이 언젠가 할 일 한 목록. 오늘 장(items)과 따로 둬서 넘어온 일·월초 정리·셈·위젯·기록한 날에 섞이지 않는다.
@@ -14,6 +16,7 @@ export type Someday = {
   status: SomedayStatus;
   priority: boolean;
   migrated_to: string | null; // 오늘 할 일로 옮겨 만든 items의 id
+  position: number | null; // 줄 순서(끌어서 바꾼다). 없으면 맨 뒤에 적은 순서대로
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -22,7 +25,7 @@ export type Someday = {
 type SomedayRow = Omit<Someday, 'priority'> & { priority: number };
 
 const NEXT_STATUS: Partial<Record<SomedayStatus, SomedayStatus>> = { open: 'done', done: 'open', dropped: 'open' };
-const COLUMNS = 'id, text, status, priority, migrated_to, created_at, updated_at, deleted_at';
+const COLUMNS = 'id, text, status, priority, migrated_to, position, created_at, updated_at, deleted_at';
 
 const toSomeday = (row: SomedayRow): Someday => ({ ...row, priority: row.priority === 1 });
 
@@ -69,39 +72,58 @@ async function update(
 
 export async function addSomeday(db: Db, text: string, now = new Date()): Promise<Someday> {
   const ts = now.toISOString();
-  const row: Someday = {
-    id: newId(),
-    text: cleanText(text),
-    status: 'open',
-    priority: false,
-    migrated_to: null,
-    created_at: ts,
-    updated_at: ts,
-    deleted_at: null,
-  };
-  await db.transaction(async (tx) => {
-    await tx.runAsync(`INSERT INTO someday (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+  const clean = cleanText(text);
+  // 새 줄은 목록 맨 뒤에 붙는다
+  return db.transaction(async (tx) => {
+    const last = await tx.getFirstAsync<{ max: number | null }>('SELECT MAX(position) AS max FROM someday', []);
+    const row: Someday = {
+      id: newId(),
+      text: clean,
+      status: 'open',
+      priority: false,
+      migrated_to: null,
+      position: appendPosition(last?.max ?? null),
+      created_at: ts,
+      updated_at: ts,
+      deleted_at: null,
+    };
+    await tx.runAsync(`INSERT INTO someday (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
       row.id,
       row.text,
       row.status,
       0,
       null,
+      row.position,
       ts,
       ts,
       null,
     ]);
     await markDirty(tx, 'someday', row.id);
+    return row;
   });
-  return row;
 }
 
-// 적은 순서 그대로(오늘 장과 같다). 끝낸 줄을 아래로 모으는 건 화면이 한다
+// 적은 순서 그대로, 끌어서 바꾼 순서는 저장한다(오늘 장과 같다). 끝낸 줄을 아래로 모으는 건 화면이 한다
 export async function listSomeday(db: Db): Promise<Someday[]> {
   const rows = await db.getAllAsync<SomedayRow>(
-    `SELECT ${COLUMNS} FROM someday WHERE deleted_at IS NULL ORDER BY created_at, id`,
+    `SELECT ${COLUMNS} FROM someday WHERE deleted_at IS NULL ORDER BY ${POSITION_ORDER}`,
     [],
   );
   return rows.map(toSomeday);
+}
+
+// 끌어서 옮기기. 끝낸 줄은 화면 아래에 따로 모이므로 끌 수 없고, 끝내지 않은 줄들 사이에서만 옮긴다.
+// toIndex는 그 줄들(화면 위쪽 묶음)에서 놓일 자리
+export async function moveSomeday(db: Db, id: string, toIndex: number, now = new Date()): Promise<void> {
+  await db.transaction(async (tx) => {
+    const row = await requireSomeday(tx, id);
+    if (row.status === 'done') throw new Error('끝낸 일은 옮길 수 없어요');
+    const scope = await tx.getAllAsync<{ id: string; position: number | null }>(
+      `SELECT id, position FROM someday WHERE deleted_at IS NULL AND status != 'done' ORDER BY ${POSITION_ORDER}`,
+      [],
+    );
+    await moveInScope(tx, 'someday', scope, id, toIndex, now);
+  });
 }
 
 // 화면에 놓는 순서: 끝낸 줄은 아래로 모은다(이 목록에서만). 나머지는 적은 순서 그대로, 옮긴 일·안 하기로 한 일도 제자리에 남는다

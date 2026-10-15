@@ -16,6 +16,7 @@ import { useEvent } from '../../ui/useEvent';
 import { useReduceMotion } from '../../ui/useReduceMotion';
 import { ROW_PAD_WIDE, RULE_GAP, ruleGapFor } from './NotebookPage';
 import { ACTION_W, actionSpan, actionsWidth, dragTo, markAt, openRow, settleLeft, swipeActionsFor, type Zone, zoneAt } from './swipe';
+import type { DragReorder } from './useDragReorder';
 
 // 값은 원시값만, 함수는 화면이 한 번 만든 것(id를 받는다)만 받는다. 그래야 memo가 다른 줄의 변화에 다시 그리지 않는다.
 type Props = {
@@ -36,6 +37,13 @@ type Props = {
   // 언젠가 목록에서 쓸 때: 진행 중 없이 할 일 ↔ 끝낸 일, 미루기 자리에 '오늘 할 일로'(onPostpone이 바로 옮긴다),
   // 밀면 오늘 할 일로·지우기만, 옮긴 줄은 흐리게. 기본(day)은 오늘 장 그대로다
   place?: RowPlace;
+  // 길게 눌러 끌어 순서 바꾸기. 없거나 draggable이 아니면(언젠가의 끝낸 줄) 길게 누르면 메뉴만 뜬다
+  reorder?: DragReorder;
+  draggable?: boolean;
+  // 스크린 리더의 '위로 옮기기'·'아래로 옮기기'(한 칸씩). 끝 줄에서는 그쪽이 빠진다
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMove?: (id: string, delta: -1 | 1) => void;
 };
 
 export const ItemRow = memo(function ItemRow(props: Props) {
@@ -208,6 +216,56 @@ export const ItemRow = memo(function ItemRow(props: Props) {
         .onEnd(onEnd),
     [swipeable, onStart, onUpdate, onEnd],
   );
+  // ── 길게 눌러 끌기: 줄이 살짝 들리고(진동), 위아래로 움직이면 순서를 바꾼다. 움직이지 않고 놓으면 ⋯ 메뉴 ──
+  // 옆으로 밀기와 경주(Race)한다: 먼저 옆으로 8pt 밀면 밀기가, 가만히 LIFT_MS를 누르고 있으면 끌기가 이긴다.
+  // 끌기가 시작되면 gesture-handler가 글·기호의 Pressable 누르기를 거둬 가서 고치기·상태 넘기기가 일어나지 않는다
+  const { reorder } = props;
+  const canDrag = !!reorder && (props.draggable ?? true) && !editing;
+  const liftScale = useRef(new Animated.Value(1)).current;
+  const [lifted, setLifted] = useState(false);
+  const lift = useRef({ active: false, moved: false });
+  const onLiftStart = useEvent(() => {
+    if (!reorder) return;
+    closeSwipe();
+    openRow.closeAll();
+    lift.current = { active: reorder.begin(id), moved: false };
+    setLifted(true);
+    haptic.light();
+    if (!reduce) Animated.timing(liftScale, { toValue: LIFT_SCALE, duration: 120, easing: EASE_OUT, useNativeDriver: false }).start();
+  });
+  const onLiftUpdate = useEvent((e: { translationY: number; absoluteY: number }) => {
+    if (!lift.current.active) return;
+    // 손가락이 조금 떨리는 건 움직인 것으로 치지 않는다(놓으면 메뉴가 떠야 한다)
+    if (!lift.current.moved && Math.abs(e.translationY) < MOVE_SLOP) return;
+    lift.current.moved = true;
+    reorder?.move(e.translationY, e.absoluteY);
+  });
+  const onLiftEnd = useEvent((_e: unknown, success: boolean) => {
+    const { active, moved } = lift.current;
+    lift.current = { active: false, moved: false };
+    setLifted(false);
+    if (reduce) liftScale.setValue(1);
+    else Animated.timing(liftScale, { toValue: 1, duration: 150, easing: EASE_OUT, useNativeDriver: false }).start();
+    if (active) {
+      if (moved && success) reorder?.end();
+      else reorder?.cancel();
+    }
+    if (!moved && success) openMenu();
+  });
+  const liftPan = useMemo(
+    () =>
+      Gesture.Pan()
+        .runOnJS(true)
+        .enabled(canDrag)
+        .activateAfterLongPress(LIFT_MS) // 그 전에 10pt 넘게 움직이면 끌기가 아니다(목록 스크롤·밀기에 넘긴다)
+        .onStart(onLiftStart)
+        .onUpdate(onLiftUpdate)
+        .onEnd(onLiftEnd),
+    [canDrag, onLiftStart, onLiftUpdate, onLiftEnd],
+  );
+  const gesture = useMemo(() => Gesture.Race(pan, liftPan), [pan, liftPan]);
+  const shiftY = reorder ? reorder.valueFor(id) : null;
+
   // 버튼이 열린 줄을 누르면 하려던 일 대신 닫기만 한다
   const unlessOpen = (fn: () => void) => () => (isOpen.current ? closeSwipe() : fn());
   // 메뉴를 닫고 고른 일을 한다
@@ -232,6 +290,8 @@ export const ItemRow = memo(function ItemRow(props: Props) {
     ...(canMark ? [{ name: 'postpone', label: postponeLabel }, { name: 'drop', label: '안 하기' }] : []),
     { name: 'edit', label: '고치기' },
     { name: 'delete', label: '지우기' },
+    ...(props.onMove && props.canMoveUp ? [{ name: 'moveUp', label: '위로 옮기기' }] : []),
+    ...(props.onMove && props.canMoveDown ? [{ name: 'moveDown', label: '아래로 옮기기' }] : []),
   ];
   const onAction = (e: AccessibilityActionEvent) => {
     const name = e.nativeEvent.actionName;
@@ -241,6 +301,8 @@ export const ItemRow = memo(function ItemRow(props: Props) {
     else if (name === 'drop') onDrop(id);
     else if (name === 'edit') edit();
     else if (name === 'delete') onDelete(id);
+    else if (name === 'moveUp') props.onMove?.(id, -1);
+    else if (name === 'moveDown') props.onMove?.(id, 1);
   };
 
   const variant = kind === 'note' ? 'hand' : 'body';
@@ -304,9 +366,14 @@ export const ItemRow = memo(function ItemRow(props: Props) {
   );
 
   return (
-    <View
+    <Animated.View
       ref={row}
-      style={[styles.row, menu.anchor !== null && styles.rowOpen]}
+      style={[
+        styles.row,
+        menu.anchor !== null && styles.rowOpen,
+        lifted && styles.lifted,
+        { transform: [{ translateY: shiftY ?? 0 }, { scale: liftScale }] },
+      ]}
       // 고치는 동안에는 입력칸을 스크린 리더가 따로 읽도록 줄을 한 요소로 묶지 않는다
       accessible={!editing}
       accessibilityRole={advance ? 'button' : undefined}
@@ -317,6 +384,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
       onTouchStart={() => openRow.touch(id)}
       onLayout={(e) => {
         width.current = e.nativeEvent.layout.width;
+        reorder?.measure(id, e.nativeEvent.layout.height);
       }}
     >
       {swipe.mark && (
@@ -386,7 +454,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
           </Txt>
         </Pressable>
       </Animated.View>
-      <GestureDetector gesture={pan}>
+      <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.front, { transform: [{ translateX: drag }] }]}>
           <View style={[styles.main, roomy && styles.mainWide]}>
             {/* 상태는 기호만 눌러 바꾼다 */}
@@ -482,7 +550,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
           <Txt style={[styles.menuText, styles.danger]}>지우기</Txt>
         </Pressable>
       </Popover>
-    </View>
+    </Animated.View>
   );
 });
 
@@ -491,6 +559,11 @@ const SYMBOL_SLOP = { top: 13, bottom: 13, left: 14, right: 8 };
 // 메뉴(Modal)가 다 닫힌 뒤에 입력칸에 포커스를 준다. 닫히는 중에 주면 iOS가 포커스를 거둬 갈 수 있다
 const MENU_FOCUS_DELAY = 350;
 const MENU_SHEET_DELAY = 250;
+// 길게 누르기: ⋯ 메뉴를 띄우던 기본 길게 누르기(500ms)보다 조금 빠르게 들어 올린다
+const LIFT_MS = 350;
+const LIFT_SCALE = 1.02;
+const MOVE_SLOP = 6; // 이보다 덜 움직이고 놓으면 끌기가 아니라 메뉴
+
 // 밀린 거리 → 띠·버튼 폭. 어떤 줄 폭보다도 넉넉한 끝값
 const FAR = 4000;
 const ERASER = '#EDE4D2'; // 메뉴가 열린 줄과 같은 옅은 종이색
@@ -500,6 +573,14 @@ const styles = StyleSheet.create({
   // 줄은 자르지 않는다(기호의 누르는 영역이 줄 밖까지 나간다). 밀려 나간 글은 공책 칸(page)이 자른다
   row: { flexDirection: 'row', alignItems: 'flex-start', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.ruled },
   rowOpen: { backgroundColor: ERASER }, // 메뉴가 열린 줄
+  // 들어 올린 줄: 종이 한 장이 떠오른 것처럼 바탕을 칠하고 그림자를 드리운다(아래 줄의 선·여백선을 가린다)
+  lifted: {
+    backgroundColor: colors.paper,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
   // 앞면(기호·글·⋯)은 투명해서 여백선이 비친다. 밀려 비운 자리에만 띠·버튼이 드러난다
   front: { flex: 1, flexDirection: 'row', alignItems: 'flex-start' },
   main: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 13 },

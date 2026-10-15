@@ -1,7 +1,9 @@
 export const TABLES = {
   items: {
     key: 'id',
-    columns: ['id', 'date', 'kind', 'text', 'status', 'priority', 'migrated_from', 'created_at', 'updated_at', 'deleted_at'],
+    // position: 끌어서 바꾼 줄 순서. 서버 마이그레이션 20261016000000_item_position 전에는 서버가 이 열을 몰라
+    // items·someday를 올리지 못하고 outbox에 남는다(다른 표는 그대로 오간다)
+    columns: ['id', 'date', 'kind', 'text', 'status', 'priority', 'migrated_from', 'position', 'created_at', 'updated_at', 'deleted_at'],
   },
   days: {
     key: 'date',
@@ -22,7 +24,7 @@ export const TABLES = {
   // 언젠가 목록(날짜 없는 할 일). 서버 마이그레이션 20261015000000_someday 전에는 이 표만 올리지 못하고 outbox에 남는다
   someday: {
     key: 'id',
-    columns: ['id', 'text', 'status', 'priority', 'migrated_to', 'created_at', 'updated_at', 'deleted_at'],
+    columns: ['id', 'text', 'status', 'priority', 'migrated_to', 'position', 'created_at', 'updated_at', 'deleted_at'],
   },
 } as const;
 

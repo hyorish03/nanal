@@ -12,6 +12,7 @@ import {
   migrateAllToToday,
   migrateToDate,
   migrateToToday,
+  moveItem,
   reopen,
   restoreItem,
   setPriority,
@@ -429,4 +430,95 @@ test('reopen: 끝낸 일이 아니면(두 번 되돌리기 등) 거부한다', a
   await expect(reopen(db, item.id, 'open', TUE)).rejects.toThrow('끝낸 일이 아니라');
   await deleteItem(db, item.id, TUE);
   await expect(reopen(db, item.id, 'open', TUE)).rejects.toThrow('찾을 수 없습니다');
+});
+
+describe('줄 순서(position)', () => {
+  const texts = async (date: string) => (await listItemsForDate(db, date)).map((i) => i.text);
+  const add = (text: string, now = TUE, date?: string) => addItem(db, { kind: 'task', text, date }, now);
+
+  test('새 줄은 그날 장의 맨 뒤에 붙는다(날짜마다 따로, 1부터)', async () => {
+    const a = await add('a');
+    const b = await addItem(db, { kind: 'note', text: 'b' }, TUE);
+    const other = await add('다음 날', TUE, '2026-10-07');
+    expect([a.position, b.position, other.position]).toEqual([1, 2, 1]);
+  });
+
+  test('moveItem: 같은 날 안에서 옮기고, 옮긴 줄만 이웃 가운데 값을 받아 outbox에 오른다', async () => {
+    await add('a');
+    const b = await add('b');
+    const c = await add('c');
+    await db.runAsync('DELETE FROM outbox', []);
+    const later = new Date(2026, 9, 6, 10, 0);
+    await moveItem(db, c.id, 0, later);
+    expect(await texts('2026-10-06')).toEqual(['c', 'a', 'b']);
+    await moveItem(db, b.id, 1, later);
+    expect(await texts('2026-10-06')).toEqual(['c', 'b', 'a']);
+    const rows = await listItemsForDate(db, '2026-10-06');
+    expect(rows.map((r) => r.position)).toEqual([0, 0.5, 1]);
+    expect(rows[1].updated_at).toBe(later.toISOString());
+    expect((await outboxKeys()).sort()).toEqual([b.id, c.id].sort());
+  });
+
+  test('moveItem: 맨 뒤로, 제자리는 아무것도 바꾸지 않는다, 목록 밖 자리는 끝에 맞춘다', async () => {
+    const a = await add('a');
+    await add('b');
+    await db.runAsync('DELETE FROM outbox', []);
+    await moveItem(db, a.id, 0, TUE);
+    expect(await outboxKeys()).toEqual([]);
+    await moveItem(db, a.id, 99, TUE);
+    expect(await texts('2026-10-06')).toEqual(['b', 'a']);
+    expect((await listItemsForDate(db, '2026-10-06'))[1].position).toBe(3);
+  });
+
+  test('moveItem: 다른 날 줄·지운 줄은 셈에 들지 않는다(같은 날 안에서만)', async () => {
+    await add('a');
+    const gone = await add('지움');
+    const c = await add('c');
+    await add('다음 날', TUE, '2026-10-07');
+    await deleteItem(db, gone.id, TUE);
+    await moveItem(db, c.id, 0, TUE);
+    expect(await texts('2026-10-06')).toEqual(['c', 'a']);
+    expect(await texts('2026-10-07')).toEqual(['다음 날']);
+    await expect(moveItem(db, gone.id, 0, TUE)).rejects.toThrow('항목을 찾을 수 없습니다');
+  });
+
+  test('moveItem: 이웃 사이가 너무 좁으면 그날 줄을 모두 1, 2, 3…으로 다시 매기고 모두 outbox에 오른다', async () => {
+    const a = await add('a');
+    const b = await add('b');
+    const c = await add('c');
+    await add('다음 날', TUE, '2026-10-07');
+    await db.runAsync('UPDATE items SET position = ? WHERE id = ?', [1 + 5e-7, b.id]);
+    await db.runAsync('DELETE FROM outbox', []);
+    await moveItem(db, c.id, 1, TUE);
+    expect(await texts('2026-10-06')).toEqual(['a', 'c', 'b']);
+    expect((await listItemsForDate(db, '2026-10-06')).map((r) => r.position)).toEqual([1, 2, 3]);
+    expect((await outboxKeys()).sort()).toEqual([a.id, b.id, c.id].sort());
+    expect((await listItemsForDate(db, '2026-10-07'))[0].position).toBe(1);
+  });
+
+  test('자리값이 없는 줄(예전 앱이 만든 줄)은 맨 뒤에 적은 순서대로, 그날을 옮기면 모두 다시 매긴다', async () => {
+    await add('a');
+    await db.runAsync(
+      "INSERT INTO items (id, date, kind, text, status, created_at, updated_at) VALUES ('old', '2026-10-06', 'note', '예전', NULL, '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')",
+      [],
+    );
+    expect(await texts('2026-10-06')).toEqual(['a', '예전']);
+    await moveItem(db, 'old', 0, TUE);
+    expect(await texts('2026-10-06')).toEqual(['예전', 'a']);
+    expect((await listItemsForDate(db, '2026-10-06')).map((r) => r.position)).toEqual([1, 2]);
+  });
+
+  test('미루기·오늘로 옮기기로 만든 줄은 옮겨 간 날 장의 맨 뒤에 붙고, 되돌리기는 순서를 건드리지 않는다', async () => {
+    const old = await addItem(db, { kind: 'task', text: '어제 일' }, MON);
+    await add('a');
+    await add('b');
+    const created = await migrateToToday(db, old.id, TUE);
+    expect(await texts('2026-10-06')).toEqual(['a', 'b', '어제 일']);
+    expect(created.position).toBe(3);
+    const a = (await listItemsForDate(db, '2026-10-06'))[0];
+    const moved = await migrateToDate(db, a.id, '2026-10-08', TUE);
+    expect(moved.position).toBe(1);
+    await undoMigration(db, moved.id, 'open', TUE);
+    expect(await texts('2026-10-06')).toEqual(['a', 'b', '어제 일']);
+  });
 });

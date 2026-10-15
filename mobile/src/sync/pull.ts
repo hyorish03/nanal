@@ -11,12 +11,15 @@ const PAGE = 500;
 // 다시 받은 행은 LWW 조건 때문에 변화가 없으므로 안전하다.
 const OVERLAP_MS = 60_000;
 
+const KEEP_LOCAL_WHEN_NULL = new Set(['position']);
+
 export async function applyRemoteRow(tx: Tx, table: TableName, row: Row): Promise<boolean> {
   const { key, columns } = TABLES[table];
   const cols = columns as readonly string[];
+  // 자리값이 비어 온 행(예전 앱이 만들었거나 서버 마이그레이션 전)은 이 기기에 매긴 줄 순서를 지우지 않는다
   const updates = cols
     .filter((c) => c !== key)
-    .map((c) => `${c} = excluded.${c}`)
+    .map((c) => (KEEP_LOCAL_WHEN_NULL.has(c) ? `${c} = COALESCE(excluded.${c}, ${table}.${c})` : `${c} = excluded.${c}`))
     .join(', ');
   const result = await tx.runAsync(
     `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})

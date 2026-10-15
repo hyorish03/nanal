@@ -253,3 +253,16 @@ test('한 표를 받지 못해도(서버에 아직 없는 표) 다른 표는 받
   await expect(pull(db, fake.remote)).rejects.toThrow('someday 다운로드 실패');
   await expect(pull(db, fake.remote)).rejects.not.toBeInstanceOf(PullPartlyFailed);
 });
+
+test('줄 순서: 서버의 자리값을 받고, 자리값 없이 온 더 새 행(서버 마이그레이션 전·예전 앱)은 이 기기 순서를 지우지 않는다', async () => {
+  const fake = createFakeRemote();
+  const local = await addItem(db, { kind: 'task', text: '로컬' }, new Date(Date.UTC(2026, 9, 6, 1)));
+  expect(local.position).toBe(1);
+  fake.serverWrite('items', serverItem({ id: local.id, date: local.date, text: '고침', updated_at: '2026-10-06T12:00:00Z' }));
+  fake.serverWrite('items', serverItem({ id: 'srv-2', date: local.date, text: '다른 기기', position: 0.5 }));
+  expect(await pull(db, fake.remote)).toBe(true);
+  expect((await listItemsForDate(db, local.date)).map((i) => [i.text, i.position])).toEqual([
+    ['다른 기기', 0.5],
+    ['고침', 1],
+  ]);
+});

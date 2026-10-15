@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Keyboard, LayoutAnimation, type ListRenderItem, Pressable, StyleSheet, type TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Keyboard, LayoutAnimation, type ListRenderItem, Pressable, StyleSheet, type TextInput, View } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
 import type { Db } from '../db/types';
 import {
@@ -16,6 +16,7 @@ import {
   migrateAllToToday,
   migrateToDate,
   migrateToToday,
+  moveItem,
   reopen,
   restoreItem,
   setPriority,
@@ -24,6 +25,7 @@ import {
   updateItemText,
 } from '../items/repo';
 import { formatDayWithWeekday, formatLongDate, logicalDate } from '../lib/date';
+import { moveIndex } from '../lib/position';
 import { countRecordedDays } from '../stats/recordedDays';
 import { userMessage } from '../lib/userError';
 import { colors, SCREEN_X } from '../ui/theme';
@@ -32,6 +34,7 @@ import { Paper } from '../ui/Paper';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { ItemRow } from './today/ItemRow';
 import { openRow } from './today/swipe';
+import { DragCell, DraggingContext, useDragReorder } from './today/useDragReorder';
 import { MarginRule, NOTE_MARGIN, RuledFill, useRuleGap } from './today/NotebookPage';
 import { Ribbon } from './today/Ribbon';
 import type { LinkAction } from '../lib/deepLink';
@@ -263,6 +266,32 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     });
   });
   const hideToast = useCallback((key: number) => setToast((t) => (t?.key === key ? null : t)), []);
+
+  // ── 길게 눌러 끌어 순서 바꾸기(오늘 장의 모든 줄). 새 순서를 먼저 보여 주고 저장한다. 못 하면 다시 읽어 되돌린다 ──
+  const [dragging, setDragging] = useState<string | null>(null);
+  const ids = useMemo(() => items.map((i) => i.id), [items]);
+  const commitMove = (id: string, from: number, to: number) => {
+    setItems((prev) => (prev[from]?.id === id ? moveIndex(prev, from, to) : prev));
+    void run(() => moveItem(db, id, to)).then((ok) => {
+      if (!ok) onChanged();
+    });
+  };
+  const drag = useDragReorder({
+    ids,
+    reduce,
+    scrollTo: (offset) => listRef.current?.scrollToOffset({ offset, animated: false }),
+    measureViewport: (done) => pageRef.current?.measureInWindow((_x, y, _w, h) => done(y, h)),
+    onActive: setDragging,
+    onDrop: commitMove,
+  });
+  // 스크린 리더: 한 칸씩 옮기고 몇 번째가 됐는지 읽어 준다
+  const onMove = useEvent((id: string, delta: -1 | 1) => {
+    const from = items.findIndex((i) => i.id === id);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= items.length) return;
+    commitMove(id, from, to);
+    AccessibilityInfo.announceForAccessibility(`${to + 1}번째 줄로 옮겼어요`);
+  });
   const onCapture = useEvent(() => openCapture());
 
   // 그날 했어요: 원래 날짜 장에 끝낸 일로 남긴다. 되돌리면 체크하기 전 상태(할 일·진행 중)로 포스트잇에 돌아온다
@@ -296,8 +325,9 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const tasks = items.filter((i) => i.kind === 'task' && i.status !== 'migrated' && i.status !== 'dropped');
   const doneCount = tasks.filter((i) => i.status === 'done').length;
 
+  const count = items.length;
   const renderItem = useCallback<ListRenderItem<Item>>(
-    ({ item }) => (
+    ({ item, index }) => (
       <ItemRow
         id={item.id}
         kind={item.kind}
@@ -313,9 +343,13 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         onDelete={onDelete}
         onPriorityFull={onPriorityFull}
         onRevealEdit={onRevealEdit}
+        reorder={drag.reorder}
+        canMoveUp={index > 0}
+        canMoveDown={index < count - 1}
+        onMove={onMove}
       />
     ),
-    [priorityFull, onAdvance, onTogglePriority, onEdit, onPostpone, onDrop, onDelete, onPriorityFull, onRevealEdit],
+    [priorityFull, count, onAdvance, onTogglePriority, onEdit, onPostpone, onDrop, onDelete, onPriorityFull, onRevealEdit, drag.reorder, onMove],
   );
 
   // 포스트잇만 목록 머리에 둬서 후보가 많아도 함께 스크롤된다. 입력칸은 목록 위에 고정한다
@@ -398,42 +432,51 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         <View ref={pageRef} style={styles.page}>
           <MarginRule scrollY={scrollY} startY={listHeader ? LIST_TOP + headerH : 0} />
           <Animated.View pointerEvents="none" style={[styles.edge, { opacity: edgeShade }]} />
-          <AnimatedList
-            ref={listRef}
-            style={styles.list}
-            data={items}
-            keyExtractor={(i) => i.id}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            contentContainerStyle={styles.listContent}
-            ListFooterComponentStyle={styles.footerWrap}
-            ListHeaderComponent={listHeader}
-            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
-            scrollEventThrottle={16}
-            onScrollBeginDrag={openRow.closeAll} // 목록을 굴리면 밀어 연 줄을 닫는다
-            ListEmptyComponent={
-              // 빈 날은 첫 두 줄에 흐리게 적어 두고, 그 아래로 빈 줄이 이어진다. 스크린 리더는 한 번에 읽는다
-              <View accessible accessibilityLabel={`${EMPTY_TITLE}. ${EMPTY_HINT}`}>
-                <View style={[styles.emptyRow, { minHeight: ruleGap }]}>
-                  <Txt style={styles.empty}>{EMPTY_TITLE}</Txt>
+          {/* 끄는 줄의 칸을 맨 위에 그린다 */}
+          <DraggingContext.Provider value={dragging}>
+            <AnimatedList
+              ref={listRef}
+              style={styles.list}
+              data={items}
+              keyExtractor={(i) => i.id}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={styles.listContent}
+              ListFooterComponentStyle={styles.footerWrap}
+              ListHeaderComponent={listHeader}
+              onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+                useNativeDriver: true,
+                listener: (e: { nativeEvent: { contentOffset: { y: number } } }) => drag.onScroll(e.nativeEvent.contentOffset.y),
+              })}
+              scrollEventThrottle={16}
+              onContentSizeChange={drag.onContentSize}
+              scrollEnabled={dragging === null} // 끄는 동안 목록은 손가락을 따라 굴러가지 않는다(끝 가까이에서만 저절로)
+              CellRendererComponent={DragCell}
+              onScrollBeginDrag={openRow.closeAll} // 목록을 굴리면 밀어 연 줄을 닫는다
+              ListEmptyComponent={
+                // 빈 날은 첫 두 줄에 흐리게 적어 두고, 그 아래로 빈 줄이 이어진다. 스크린 리더는 한 번에 읽는다
+                <View accessible accessibilityLabel={`${EMPTY_TITLE}. ${EMPTY_HINT}`}>
+                  <View style={[styles.emptyRow, { minHeight: ruleGap }]}>
+                    <Txt style={styles.empty}>{EMPTY_TITLE}</Txt>
+                  </View>
+                  <View style={[styles.emptyRow, { minHeight: ruleGap }]}>
+                    <Txt style={styles.emptyHint}>{EMPTY_HINT}</Txt>
+                  </View>
                 </View>
-                <View style={[styles.emptyRow, { minHeight: ruleGap }]}>
-                  <Txt style={styles.emptyHint}>{EMPTY_HINT}</Txt>
-                </View>
-              </View>
-            }
-            ListFooterComponent={
-              // 목록 아래 빈 곳까지 빈 줄로 채워, 누르면 키보드가 내려간다
-              <Pressable accessible={false} style={styles.footerWrap} onPress={Keyboard.dismiss}>
-                <RuledFill />
-                <Txt variant="hand" style={[styles.footer, keyboardUp && styles.footerHidden]}>
-                  오늘도 한 줄씩.
-                </Txt>
-              </Pressable>
-            }
-            extraData={priorityFull}
-            renderItem={renderItem}
-          />
+              }
+              ListFooterComponent={
+                // 목록 아래 빈 곳까지 빈 줄로 채워, 누르면 키보드가 내려간다
+                <Pressable accessible={false} style={styles.footerWrap} onPress={Keyboard.dismiss}>
+                  <RuledFill />
+                  <Txt variant="hand" style={[styles.footer, keyboardUp && styles.footerHidden]}>
+                    오늘도 한 줄씩.
+                  </Txt>
+                </Pressable>
+              }
+              extraData={priorityFull}
+              renderItem={renderItem}
+            />
+          </DraggingContext.Provider>
         </View>
       </View>
     </>

@@ -88,6 +88,7 @@ const item = (id: string, date: string): Item => ({
   status: 'open',
   priority: false,
   migrated_from: null,
+  position: null,
   created_at: '',
   updated_at: '',
   deleted_at: null,

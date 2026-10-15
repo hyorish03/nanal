@@ -1,4 +1,21 @@
 import { fromRemote, toRemote } from './codec';
+import { TABLES } from './tables';
+
+test('줄 순서(position)는 items·someday 둘 다 숫자 그대로 오가고, 없으면 null', () => {
+  expect(TABLES.items.columns).toContain('position');
+  expect(TABLES.someday.columns).toContain('position');
+  const row = { id: 'i', date: '2026-10-07', kind: 'task', text: 'a', status: 'open', priority: 0, migrated_from: null, position: 2.5,
+    created_at: '2026-10-07T00:00:00.000Z', updated_at: '2026-10-07T00:00:00.000Z', deleted_at: null };
+  expect(toRemote('items', row).position).toBe(2.5);
+  expect(fromRemote('items', toRemote('items', row)).position).toBe(2.5);
+  // 서버 마이그레이션 전(열이 없다)에 받은 행
+  const old = toRemote('items', row);
+  delete old.position;
+  expect(fromRemote('items', old).position).toBeNull();
+  const s = { id: 's', text: 'x', status: 'open', priority: 0, migrated_to: null, position: 0.25,
+    created_at: '2026-10-07T00:00:00.000Z', updated_at: '2026-10-07T00:00:00.000Z', deleted_at: null };
+  expect(fromRemote('someday', toRemote('someday', s))).toEqual(s);
+});
 
 test('toRemote: 정의된 컬럼만 보내고 answers는 JSON 객체로 바꾼다', () => {
   expect(

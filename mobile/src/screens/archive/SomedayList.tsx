@@ -1,7 +1,8 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, LayoutAnimation, type ListRenderItem, Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Keyboard, LayoutAnimation, type ListRenderItem, Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
 import type { Db } from '../../db/types';
+import { moveIndex } from '../../lib/position';
 import { userMessage } from '../../lib/userError';
 import {
   addSomeday,
@@ -9,6 +10,7 @@ import {
   deleteSomeday,
   dropSomeday,
   listSomeday,
+  moveSomeday,
   moveSomedayToToday,
   restoreSomeday,
   type Someday,
@@ -28,6 +30,7 @@ import { Composer } from '../today/Composer';
 import { ItemRow } from '../today/ItemRow';
 import { RuledFill, useRuleGap } from '../today/NotebookPage';
 import { openRow } from '../today/swipe';
+import { DragCell, DraggingContext, useDragReorder } from '../today/useDragReorder';
 
 type Props = {
   db: Db;
@@ -142,8 +145,39 @@ export function SomedayList({ db, version, head, contentStyle, onChanged }: Prop
   });
   const hideToast = useCallback((key: number) => setToast((t) => (t?.key === key ? null : t)), []);
 
+  // ── 길게 눌러 끌어 순서 바꾸기. 끝낸 줄은 아래에 따로 모이므로 끌 수 없고, 끝내지 않은 줄(위쪽 묶음) 사이에서만 ──
+  const [dragging, setDragging] = useState<string | null>(null);
+  const ids = useMemo(() => sorted.filter((r) => r.status !== 'done').map((r) => r.id), [sorted]);
+  const commitMove = (id: string, from: number, to: number) => {
+    setRows((prev) => {
+      const open = sortSomeday(prev).filter((r) => r.status !== 'done');
+      if (open[from]?.id !== id) return prev;
+      return [...moveIndex(open, from, to), ...prev.filter((r) => r.status === 'done')];
+    });
+    // 못 하면 다시 읽어 되돌린다
+    void run(() => moveSomeday(db, id, to)).then((ok) => {
+      if (!ok) setTick((t) => t + 1);
+    });
+  };
+  const drag = useDragReorder({
+    ids,
+    reduce,
+    scrollTo: (offset) => listRef.current?.scrollToOffset({ offset, animated: false }),
+    measureViewport: (done) => pageRef.current?.measureInWindow((_x, y, _w, h) => done(y, h)),
+    onActive: setDragging,
+    onDrop: commitMove,
+  });
+  const onMove = useEvent((id: string, delta: -1 | 1) => {
+    const from = ids.indexOf(id);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    commitMove(id, from, to);
+    AccessibilityInfo.announceForAccessibility(`${to + 1}번째 줄로 옮겼어요`);
+  });
+  const openCount = ids.length;
+
   const renderItem = useCallback<ListRenderItem<Someday>>(
-    ({ item }) => (
+    ({ item, index }) => (
       <ItemRow
         place="someday"
         id={item.id}
@@ -160,9 +194,14 @@ export function SomedayList({ db, version, head, contentStyle, onChanged }: Prop
         onDelete={onDelete}
         onPriorityFull={noop}
         onRevealEdit={onRevealEdit}
+        reorder={drag.reorder}
+        draggable={item.status !== 'done'}
+        canMoveUp={item.status !== 'done' && index > 0}
+        canMoveDown={item.status !== 'done' && index < openCount - 1}
+        onMove={onMove}
       />
     ),
-    [onAdvance, onTogglePriority, onEdit, onMoveToday, onDrop, onDelete, noop, onRevealEdit],
+    [onAdvance, onTogglePriority, onEdit, onMoveToday, onDrop, onDelete, noop, onRevealEdit, drag.reorder, openCount, onMove],
   );
 
   const header = (
@@ -193,35 +232,42 @@ export function SomedayList({ db, version, head, contentStyle, onChanged }: Prop
   return (
     // 밀어 연 줄 바깥 어디를 만져도 그 줄을 닫는다
     <View ref={pageRef} style={styles.flex} onTouchStart={openRow.touchOutside}>
-      <FlatList
-        ref={listRef}
-        style={styles.flex}
-        data={sorted}
-        keyExtractor={(r) => r.id}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        contentContainerStyle={[styles.content, contentStyle]}
-        onScrollBeginDrag={openRow.closeAll}
-        ListHeaderComponent={header}
-        ListEmptyComponent={
-          loaded ? (
-            // 빈 목록은 첫 줄에 손글씨로 흐리게 적어 둔다
-            <View accessible accessibilityLabel={EMPTY} style={[styles.emptyRow, { minHeight: ruleGap }]}>
-              <Txt variant="hand" style={styles.empty}>
-                {EMPTY}
-              </Txt>
-            </View>
-          ) : null
-        }
-        ListFooterComponentStyle={styles.footerWrap}
-        ListFooterComponent={
-          // 목록 아래 빈 곳까지 빈 줄로 채워, 누르면 키보드가 내려간다
-          <Pressable accessible={false} style={styles.footer} onPress={Keyboard.dismiss}>
-            <RuledFill />
-          </Pressable>
-        }
-        renderItem={renderItem}
-      />
+      <DraggingContext.Provider value={dragging}>
+        <FlatList
+          ref={listRef}
+          style={styles.flex}
+          data={sorted}
+          keyExtractor={(r) => r.id}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={[styles.content, contentStyle]}
+          onScrollBeginDrag={openRow.closeAll}
+          onScroll={(e) => drag.onScroll(e.nativeEvent.contentOffset.y)}
+          scrollEventThrottle={16}
+          onContentSizeChange={drag.onContentSize}
+          scrollEnabled={dragging === null}
+          CellRendererComponent={DragCell}
+          ListHeaderComponent={header}
+          ListEmptyComponent={
+            loaded ? (
+              // 빈 목록은 첫 줄에 손글씨로 흐리게 적어 둔다
+              <View accessible accessibilityLabel={EMPTY} style={[styles.emptyRow, { minHeight: ruleGap }]}>
+                <Txt variant="hand" style={styles.empty}>
+                  {EMPTY}
+                </Txt>
+              </View>
+            ) : null
+          }
+          ListFooterComponentStyle={styles.footerWrap}
+          ListFooterComponent={
+            // 목록 아래 빈 곳까지 빈 줄로 채워, 누르면 키보드가 내려간다
+            <Pressable accessible={false} style={styles.footer} onPress={Keyboard.dismiss}>
+              <RuledFill />
+            </Pressable>
+          }
+          renderItem={renderItem}
+        />
+      </DraggingContext.Provider>
       <Toast toast={toast} onHide={hideToast} />
     </View>
   );

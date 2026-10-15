@@ -2,7 +2,7 @@ import { createFakeRemote } from '../../test/fakeRemote';
 import { openTestDb } from '../../test/sqlite';
 import { migrate } from '../db/schema';
 import type { Db } from '../db/types';
-import { addItem, advanceStatus, dropItem } from '../items/repo';
+import { addItem, advanceStatus, dropItem, moveItem } from '../items/repo';
 import { setMood } from '../days/repo';
 import { addSomeday, moveSomedayToToday } from '../someday/repo';
 import { markDirty, pendingCount } from './outbox';
@@ -112,5 +112,36 @@ test('서버에 아직 someday 표가 없으면: someday만 outbox에 남고, �
   fake.remote.upsert = upsert;
   await push(db, fake.remote);
   expect(fake.store.someday.get(s.id)).toMatchObject({ status: 'migrated', migrated_to: created.id, priority: false });
+  expect(await pendingCount(db)).toBe(0);
+});
+
+test('서버에 아직 position 열이 없으면: items·someday는 outbox에 남고 다른 표는 올라간다. 적용 뒤 순서까지 올라간다', async () => {
+  const fake = createFakeRemote();
+  const a = await addItem(db, { kind: 'task', text: 'a' }, NOW);
+  const b = await addItem(db, { kind: 'task', text: 'b' }, NOW);
+  await moveItem(db, b.id, 0, NOW);
+  const s = await addSomeday(db, '언젠가', NOW);
+  await setMood(db, '2026-10-06', 4, NOW);
+  const upsert = fake.remote.upsert;
+  fake.remote.upsert = async (table, rows) => {
+    if (rows.some((r) => 'position' in r)) throw new Error(`${table} 업로드 실패: Could not find the 'position' column`);
+    await upsert(table, rows);
+  };
+  await expect(push(db, fake.remote)).rejects.toThrow('position');
+  expect(fake.store.days.size).toBe(1);
+  const left = await db.getAllAsync<{ table_name: string; row_key: string }>('SELECT table_name, row_key FROM outbox ORDER BY table_name, row_key', []);
+  expect(left).toEqual(
+    [
+      { table_name: 'items', row_key: a.id },
+      { table_name: 'items', row_key: b.id },
+      { table_name: 'someday', row_key: s.id },
+    ].sort((x, y) => (x.table_name + x.row_key).localeCompare(y.table_name + y.row_key)),
+  );
+
+  fake.remote.upsert = upsert;
+  await push(db, fake.remote);
+  expect(fake.store.items.get(a.id)?.position).toBe(1);
+  expect(fake.store.items.get(b.id)?.position).toBe(0);
+  expect(fake.store.someday.get(s.id)?.position).toBe(1);
   expect(await pendingCount(db)).toBe(0);
 });

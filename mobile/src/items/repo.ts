@@ -1,6 +1,8 @@
+import { moveInScope, POSITION_ORDER } from '../db/position';
 import type { Db, Tx } from '../db/types';
 import { addDays, logicalDate } from '../lib/date';
 import { newId } from '../lib/id';
+import { appendPosition } from '../lib/position';
 import { markDirty } from '../sync/outbox';
 
 export type ItemKind = 'task' | 'note';
@@ -15,6 +17,7 @@ export type Item = {
   status: TaskStatus | null;
   priority: boolean;
   migrated_from: string | null;
+  position: number | null; // 그날 장의 줄 순서(끌어서 바꾼다). 없으면 맨 뒤에 적은 순서대로
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -26,14 +29,18 @@ export const MAX_PRIORITY_PER_DAY = 3;
 export const MAX_TEXT = 200; // 한 줄에 쓸 수 있는 글자 수
 // 안 하기로 한 일은 기호를 누르면 다시 할 일로 돌아온다
 const NEXT_STATUS: Partial<Record<TaskStatus, TaskStatus>> = { open: 'doing', doing: 'done', done: 'open', dropped: 'open' };
-const COLUMNS = 'id, date, kind, text, status, priority, migrated_from, created_at, updated_at, deleted_at';
-// 종이 다이어리처럼 적은 순서 그대로. 상태를 바꾸거나 형광펜을 칠해도 줄이 자리를 옮기지 않는다
-const ORDER = 'created_at, id';
+const COLUMNS = 'id, date, kind, text, status, priority, migrated_from, position, created_at, updated_at, deleted_at';
+// 종이 다이어리처럼 적은 순서 그대로(새 줄은 그날 맨 뒤에 붙는다). 끌어서 바꾼 순서는 저장한다.
+// 상태를 바꾸거나 형광펜을 칠해도 줄이 자리를 옮기지 않는다
+const ORDER = POSITION_ORDER;
 
 const toItem = (row: ItemRow): Item => ({ ...row, priority: row.priority === 1 });
 
-async function insertItem(tx: Tx, item: Item): Promise<void> {
-  await tx.runAsync(`INSERT INTO items (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+// 새 줄은 그날 장의 맨 뒤에 붙는다(지운 줄까지 세어 자리값이 겹치지 않게). 자리값을 채운 줄을 돌려준다
+async function insertItem(tx: Tx, input: Omit<Item, 'position'>): Promise<Item> {
+  const last = await tx.getFirstAsync<{ max: number | null }>('SELECT MAX(position) AS max FROM items WHERE date = ?', [input.date]);
+  const item: Item = { ...input, position: appendPosition(last?.max ?? null) };
+  await tx.runAsync(`INSERT INTO items (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
     item.id,
     item.date,
     item.kind,
@@ -41,11 +48,13 @@ async function insertItem(tx: Tx, item: Item): Promise<void> {
     item.status,
     item.priority ? 1 : 0,
     item.migrated_from,
+    item.position,
     item.created_at,
     item.updated_at,
     item.deleted_at,
   ]);
   await markDirty(tx, 'items', item.id);
+  return item;
 }
 
 async function requireItem(tx: Tx, id: string): Promise<Item> {
@@ -90,20 +99,20 @@ export async function addItem(
   if (!isDate(date)) throw new Error('날짜 형식이 아닙니다');
   if (date < today) throw new Error('지난 날짜에는 넣을 수 없어요');
   const ts = now.toISOString();
-  const item: Item = {
-    id: newId(),
-    date,
-    kind: input.kind,
-    text,
-    status: input.kind === 'task' ? 'open' : null,
-    priority: false,
-    migrated_from: null,
-    created_at: ts,
-    updated_at: ts,
-    deleted_at: null,
-  };
-  await db.transaction((tx) => insertItem(tx, item));
-  return item;
+  return db.transaction((tx) =>
+    insertItem(tx, {
+      id: newId(),
+      date,
+      kind: input.kind,
+      text,
+      status: input.kind === 'task' ? 'open' : null,
+      priority: false,
+      migrated_from: null,
+      created_at: ts,
+      updated_at: ts,
+      deleted_at: null,
+    }),
+  );
 }
 
 // 다른 목록(언젠가)에서 오늘 장으로 옮겨 적을 때. 부르는 쪽 트랜잭션 안에서 열린 할 일 한 줄을 만든다
@@ -112,7 +121,7 @@ export async function insertTaskInTx(tx: Tx, text: string, date: string, now: Da
   if (!trimmed) throw new Error('내용을 입력하세요');
   if (!isDate(date)) throw new Error('날짜 형식이 아닙니다');
   const ts = now.toISOString();
-  const item: Item = {
+  return insertItem(tx, {
     id: newId(),
     date,
     kind: 'task',
@@ -123,9 +132,7 @@ export async function insertTaskInTx(tx: Tx, text: string, date: string, now: Da
     created_at: ts,
     updated_at: ts,
     deleted_at: null,
-  };
-  await insertItem(tx, item);
-  return item;
+  });
 }
 
 export async function advanceStatus(db: Db, id: string, now = new Date()): Promise<void> {
@@ -164,7 +171,8 @@ async function migrateInTx(tx: Tx, id: string, target: (today: string) => string
   if (item.date >= dest) throw new Error('이전 날짜의 할 일만 옮길 수 있습니다');
   if (dest < today) throw new Error('지난 날짜로는 옮길 수 없어요');
   await update(tx, id, { status: 'migrated' }, now);
-  const created: Item = {
+  // 옮겨 간 날 장의 맨 뒤에 붙는다(자리값은 insertItem이 새로 매긴다)
+  return insertItem(tx, {
     ...item,
     id: newId(),
     date: dest,
@@ -174,9 +182,7 @@ async function migrateInTx(tx: Tx, id: string, target: (today: string) => string
     created_at: ts,
     updated_at: ts,
     deleted_at: null,
-  };
-  await insertItem(tx, created);
-  return created;
+  });
 }
 
 function migrateTo(db: Db, id: string, target: (today: string) => string, now: Date): Promise<Item> {
@@ -303,6 +309,18 @@ export async function restoreItem(db: Db, id: string, now = new Date()): Promise
   });
 }
 
+// 끌어서 옮기기: 같은 날 장 안에서만. toIndex는 그날 목록(지운 줄 빼고)에서 놓일 자리
+export async function moveItem(db: Db, id: string, toIndex: number, now = new Date()): Promise<void> {
+  await db.transaction(async (tx) => {
+    const item = await requireItem(tx, id);
+    const scope = await tx.getAllAsync<{ id: string; position: number | null }>(
+      `SELECT id, position FROM items WHERE date = ? AND deleted_at IS NULL ORDER BY ${ORDER}`,
+      [item.date],
+    );
+    await moveInScope(tx, 'items', scope, id, toIndex, now);
+  });
+}
+
 export async function listItemsForDate(db: Db, date: string): Promise<Item[]> {
   const rows = await db.getAllAsync<ItemRow>(
     `SELECT ${COLUMNS} FROM items WHERE date = ? AND deleted_at IS NULL ORDER BY ${ORDER}`,
@@ -315,7 +333,7 @@ export async function listMigrationCandidates(db: Db, today: string): Promise<It
   const rows = await db.getAllAsync<ItemRow>(
     `SELECT ${COLUMNS} FROM items
      WHERE kind = 'task' AND status IN ('open', 'doing') AND date < ? AND deleted_at IS NULL
-     ORDER BY date, created_at`,
+     ORDER BY date, ${ORDER}`,
     [today],
   );
   return rows.map(toItem);
