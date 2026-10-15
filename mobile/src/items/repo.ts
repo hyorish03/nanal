@@ -209,9 +209,24 @@ export function migrateToDate(db: Db, id: string, date: string, now = new Date()
   );
 }
 
-// 포스트잇의 '내일로 넘기기'(한 번에)
-export function migrateToTomorrow(db: Db, id: string, now = new Date()): Promise<Item> {
-  return migrateToDate(db, id, addDays(logicalDate(now), 1), now);
+// 그날 했어요: 넘어온 일을 옮기지 않고 원래 날짜 장에 끝낸 일로 남긴다(포스트잇·월초 정리의 ○).
+// 되돌리기를 위해 바꾸기 전 상태를 돌려준다
+export async function completeOnItsDay(db: Db, id: string, now = new Date()): Promise<'open' | 'doing'> {
+  return db.transaction(async (tx) => {
+    const item = await requireItem(tx, id);
+    if (item.status !== 'open' && item.status !== 'doing') throw new Error('끝나지 않은 할 일만 그날 한 일로 체크할 수 있어요');
+    await update(tx, id, { status: 'done' }, now);
+    return item.status;
+  });
+}
+
+// 그날 했어요를 바로 '되돌리기'했을 때: 체크하기 전 상태(할 일·진행 중)로
+export async function reopen(db: Db, id: string, prevStatus: 'open' | 'doing', now = new Date()): Promise<void> {
+  await db.transaction(async (tx) => {
+    const item = await requireItem(tx, id);
+    if (item.status !== 'done') throw new Error('끝낸 일이 아니라 되돌릴 수 없습니다');
+    await update(tx, id, { status: prevStatus }, now);
+  });
 }
 
 // 안 하기: 끝나지 않은 할 일에 줄을 긋는다. 되돌리기·다시 하기를 위해 바꾸기 전 상태를 돌려준다

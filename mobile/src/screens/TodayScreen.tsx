@@ -5,6 +5,7 @@ import type { Db } from '../db/types';
 import {
   addItem,
   advanceStatus,
+  completeOnItsDay,
   deleteItem,
   dropItem,
   type Item,
@@ -15,7 +16,7 @@ import {
   migrateAllToToday,
   migrateToDate,
   migrateToToday,
-  migrateToTomorrow,
+  reopen,
   restoreItem,
   setPriority,
   undoDrop,
@@ -264,10 +265,28 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const hideToast = useCallback((key: number) => setToast((t) => (t?.key === key ? null : t)), []);
   const onCapture = useEvent(() => openCapture());
 
+  // 그날 했어요: 원래 날짜 장에 끝낸 일로 남긴다. 되돌리면 체크하기 전 상태(할 일·진행 중)로 포스트잇에 돌아온다
+  const completeWithUndo = async (item: Item) => {
+    let prev: 'open' | 'doing' = 'open';
+    const ok = await reordering(async () => {
+      prev = await completeOnItsDay(db, item.id);
+    });
+    if (ok) {
+      setToast({
+        key: Date.now(),
+        message: `${formatDayWithWeekday(item.date)}에 한 일로 체크했어요`,
+        action: { label: '되돌리기', onPress: () => void reordering(() => reopen(db, item.id, prev)) },
+      });
+    }
+    return ok;
+  };
+
   const settle = (item: Item, how: SettleHow) =>
     how === 'delete'
       ? removeWithUndo(item.id)
-      : reordering(() => (how === 'today' ? migrateToToday(db, item.id) : migrateToTomorrow(db, item.id)));
+      : how === 'done'
+        ? completeWithUndo(item)
+        : reordering(() => migrateToToday(db, item.id));
 
   const settleAll = () => reordering(() => migrateAllToToday(db, candidates.map((c) => c.id)));
 
@@ -303,7 +322,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const listHeader =
     candidates.length > 0 && !panel ? (
       <View style={styles.listHeader} onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}>
-        <PostIt candidates={candidates} onSettle={settle} onSettleAll={settleAll} />
+        <PostIt candidates={candidates} today={today} onSettle={settle} onSettleAll={settleAll} />
       </View>
     ) : null;
   // 목록이 고정된 입력칸 밑으로 지나가기 시작하면 경계에 옅은 그늘을 깐다
@@ -427,7 +446,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         <View style={[styles.roomy, { paddingTop: s.xl, gap: WIDE.gutter }]}>
           <View style={[styles.column, { gap: s.xl }]}>{notebook}</View>
           {panel && (
-            <TodayPanel candidates={candidates} onSettle={settle} onSettleAll={settleAll} done={doneCount} total={tasks.length} />
+            <TodayPanel candidates={candidates} today={today} onSettle={settle} onSettleAll={settleAll} done={doneCount} total={tasks.length} />
           )}
         </View>
       ) : (

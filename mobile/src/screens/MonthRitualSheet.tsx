@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, LayoutAnimation, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Db } from '../db/types';
-import { deleteItem, type Item, migrateAllToToday, migrateToToday, restoreItem, undoMigration } from '../items/repo';
-import { formatLongDate, logicalDate, monthOf } from '../lib/date';
+import { carryGroupLabel } from '../items/carryOver';
+import { completeOnItsDay, deleteItem, type Item, migrateAllToToday, migrateToToday, reopen, restoreItem, undoMigration } from '../items/repo';
+import { formatDayWithWeekday, logicalDate, monthOf } from '../lib/date';
 import { userMessage } from '../lib/userError';
 import { monthLabel, reviewTargetMonth } from '../monthly/labels';
 import { groupByDate, listMonthLeftovers } from '../monthly/ritual';
@@ -16,6 +17,7 @@ import { colors, HIT, SCREEN_X } from '../ui/theme';
 import { Toast, type ToastSpec } from '../ui/Toast';
 import { Txt } from '../ui/Txt';
 import { useReduceMotion } from '../ui/useReduceMotion';
+import { CHECKED_MS, DayCheck } from './today/DayCheck';
 
 type Props = {
   db: Db;
@@ -29,7 +31,7 @@ const DONE_CLOSE_MS = 2200; // '새 달을 시작해요'를 읽을 틈(그사이
 const SETTLE = LayoutAnimation.create(220, 'easeInEaseOut', 'opacity');
 
 // 월초 정리(스펙 11.10). 새 달 첫 장에 지난달까지 끝내지 못한 일을 원래 날짜별로 모아 한 줄씩 정한다.
-// 이번 달로(오늘 할 일로 옮긴다) · 지우기, 한꺼번에 이번 달로, 나중에(닫기만 한다. 오늘 포스트잇에 그대로 남는다).
+// 그날 했어요(○, 원래 날짜에 끝낸 일로) · 이번 달로(오늘 할 일로 옮긴다) · 지우기, 한꺼번에 이번 달로, 나중에(닫기만 한다. 오늘 포스트잇에 그대로 남는다).
 // 누르기 전에는 아무것도 바꾸지 않는다.
 export function MonthRitualSheet({ db, visible, onClose, onChanged, onOpenReview }: Props) {
   const reduce = useReduceMotion();
@@ -44,6 +46,9 @@ export function MonthRitualSheet({ db, visible, onClose, onChanged, onOpenReview
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastSpec | null>(null);
   const busy = useRef(false);
+  // 그날 했어요를 눌러 ✓로 잠깐 남아 있는 줄(그동안 '모두 이번 달로'는 기다린다)
+  const [checked, setChecked] = useState<ReadonlySet<string>>(new Set());
+  const checking = useRef(new Set<string>());
   const lastMonth = reviewTargetMonth(today);
 
   const load = useCallback(
@@ -65,6 +70,8 @@ export function MonthRitualSheet({ db, visible, onClose, onChanged, onOpenReview
     setSettledAny(false);
     setError(null);
     setToast(null);
+    setChecked(new Set());
+    checking.current.clear();
   }, [visible]);
 
   useEffect(() => {
@@ -137,6 +144,37 @@ export function MonthRitualSheet({ db, visible, onClose, onChanged, onOpenReview
     }
   };
 
+  const setRowChecked = (id: string, on: boolean) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
+  // 그날 했어요: ✓·줄긋기·'그날 했어요'를 잠깐 보여 준 뒤 저장하고 목록을 다시 읽는다(줄이 빠진다)
+  const completeOnDay = async (item: Item) => {
+    if (checking.current.has(item.id)) return;
+    checking.current.add(item.id);
+    haptic.select();
+    setRowChecked(item.id, true);
+    await new Promise<void>((resolve) => setTimeout(resolve, CHECKED_MS));
+    let prev: 'open' | 'doing' = 'open';
+    const ok = await run(async () => {
+      prev = await completeOnItsDay(db, item.id);
+    });
+    checking.current.delete(item.id);
+    // 성공하면 줄이 빠지고, 되돌리기로 돌아오면 다시 빈 ○로 보인다
+    setRowChecked(item.id, false);
+    if (ok) {
+      setToast({
+        key: Date.now(),
+        message: `${formatDayWithWeekday(item.date)}에 한 일로 체크했어요`,
+        action: { label: '되돌리기', onPress: () => void run(() => reopen(db, item.id, prev)) },
+      });
+    }
+  };
+
   const remove = async (item: Item) => {
     const ok = await run(() => deleteItem(db, item.id));
     if (ok) {
@@ -145,7 +183,7 @@ export function MonthRitualSheet({ db, visible, onClose, onChanged, onOpenReview
     }
   };
 
-  const moveAll = () => run(() => migrateAllToToday(db, items.map((i) => i.id)));
+  const moveAll = () => checking.current.size === 0 && run(() => migrateAllToToday(db, items.map((i) => i.id)));
 
   const hideToast = useCallback((key: number) => setToast((t) => (t?.key === key ? null : t)), []);
 
@@ -184,7 +222,7 @@ export function MonthRitualSheet({ db, visible, onClose, onChanged, onOpenReview
             <Txt variant="handLg">지난달에서 넘어온 일을 정리해요</Txt>
             {!done && items.length > 0 && (
               <Txt variant="small" style={styles.hint}>
-                넘어온 일 {items.length}개. ‘이번 달로’는 오늘 할 일로 옮겨요
+                넘어온 일 {items.length}개. 그날 했으면 ○를 눌러 체크하고, ‘이번 달로’는 오늘 할 일로 옮겨요
               </Txt>
             )}
           </View>
@@ -215,10 +253,17 @@ export function MonthRitualSheet({ db, visible, onClose, onChanged, onOpenReview
               {groups.map((g) => (
                 <View key={g.date} style={styles.group}>
                   <Txt variant="label" accessibilityRole="header" style={styles.date}>
-                    {formatLongDate(g.date)}
+                    {carryGroupLabel(g.date, today)}
                   </Txt>
                   {g.items.map((item) => (
-                    <LeftoverRow key={item.id} item={item} onToday={moveToToday} onDelete={remove} />
+                    <LeftoverRow
+                      key={item.id}
+                      item={item}
+                      checked={checked.has(item.id)}
+                      onDone={completeOnDay}
+                      onToday={moveToToday}
+                      onDelete={remove}
+                    />
                   ))}
                 </View>
               ))}
@@ -245,32 +290,45 @@ export function MonthRitualSheet({ db, visible, onClose, onChanged, onOpenReview
   );
 }
 
-function LeftoverRow({ item, onToday, onDelete }: { item: Item; onToday: (item: Item) => void; onDelete: (item: Item) => void }) {
+type RowProps = {
+  item: Item;
+  checked: boolean;
+  onDone: (item: Item) => void;
+  onToday: (item: Item) => void;
+  onDelete: (item: Item) => void;
+};
+
+function LeftoverRow({ item, checked, onDone, onToday, onDelete }: RowProps) {
   return (
     <View style={styles.row}>
-      <Txt style={styles.text}>
-        • {item.text}
-      </Txt>
-      {/* 글자를 키워 한 줄에 다 안 들어가면 버튼이 잘리지 않고 다음 줄로 내려간다 */}
-      <View style={styles.actions}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${item.text}, 이번 달로, 오늘 할 일로 옮기기`}
-          style={dimPressed(styles.action)}
-          onPress={() => onToday(item)}
-        >
-          <Txt variant="medium" style={styles.todayText}>
-            이번 달로
-          </Txt>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${item.text}, 지우기`}
-          style={dimPressed(styles.action)}
-          onPress={() => onDelete(item)}
-        >
-          <Txt style={styles.removeText}>지우기</Txt>
-        </Pressable>
+      <DayCheck text={item.text} date={item.date} checked={checked} onPress={() => onDone(item)} />
+      <View style={styles.body}>
+        <Txt style={[styles.text, checked && styles.textChecked]}>{item.text}</Txt>
+        {checked ? (
+          <Txt style={styles.didIt}>그날 했어요</Txt>
+        ) : (
+          // 글자를 키워 한 줄에 다 안 들어가면 버튼이 잘리지 않고 다음 줄로 내려간다
+          <View style={styles.actions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${item.text}, 이번 달로, 오늘 할 일로 옮기기`}
+              style={dimPressed(styles.action)}
+              onPress={() => onToday(item)}
+            >
+              <Txt variant="medium" style={styles.todayText}>
+                이번 달로
+              </Txt>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${item.text}, 지우기`}
+              style={dimPressed(styles.action)}
+              onPress={() => onDelete(item)}
+            >
+              <Txt style={styles.removeText}>지우기</Txt>
+            </Pressable>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -302,8 +360,11 @@ const styles = StyleSheet.create({
   allText: { color: colors.onDark, fontSize: 15 },
   group: { gap: 2 },
   date: { color: colors.inkSoft, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
-  row: { paddingVertical: 6, borderBottomWidth: 1, borderStyle: 'dashed', borderBottomColor: colors.inkDash },
+  row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 2, borderBottomWidth: 1, borderStyle: 'dashed', borderBottomColor: colors.inkDash },
+  body: { flex: 1, paddingTop: 10, paddingBottom: 2 },
   text: { fontSize: 16 },
+  textChecked: { textDecorationLine: 'line-through', color: colors.muted },
+  didIt: { paddingVertical: 12, fontSize: 13, color: colors.muted },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginLeft: -10 },
   action: { minHeight: HIT, paddingHorizontal: 10, justifyContent: 'center' },
   todayText: { fontSize: 15, color: colors.navy },

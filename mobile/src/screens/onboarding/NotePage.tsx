@@ -195,7 +195,7 @@ function Flow() {
       </Ink>
       <Head i={2} r={2} text="아침" />
       <Body i={3} r={3} text="어제 넘어온 일을 골라요" />
-      <Note i={4} r={4} text="오늘로 · 내일로 · 과감히 지우기" />
+      <Note i={4} r={4} text="했으면 체크 · 오늘로 · 지우기" />
       <Ink i={5} pop left={x(13)} top={x(297)} grid={false}>
         <TimeIcon kind="pencil" s={s} />
       </Ink>

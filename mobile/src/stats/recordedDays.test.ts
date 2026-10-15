@@ -1,7 +1,7 @@
 import { openTestDb } from '../../test/sqlite';
 import { setMood } from '../days/repo';
 import { migrate } from '../db/schema';
-import { addItem, deleteItem, migrateToTomorrow } from '../items/repo';
+import { addItem, deleteItem, migrateToDate } from '../items/repo';
 import { addReflection } from '../reflections/repo';
 import { countRecordedDays } from './recordedDays';
 
@@ -24,6 +24,6 @@ test('오늘보다 뒤 날짜(내일로 미룬 일)는 세지 않는다', async 
   await migrate(db);
   const now = new Date(2026, 9, 5, 9);
   const item = await addItem(db, { kind: 'task', text: 'a' }, now);
-  await migrateToTomorrow(db, item.id, now);
+  await migrateToDate(db, item.id, '2026-10-06', now);
   expect(await countRecordedDays(db, '2026-10-05')).toBe(1);
 });

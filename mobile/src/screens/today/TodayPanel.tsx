@@ -14,6 +14,7 @@ const LEGEND_KEY = 'nanal.legendCollapsed'; // 기호 설명을 접어 둔 채�
 
 type Props = {
   candidates: Item[];
+  today: string; // 논리 날짜
   onSettle: (item: Item, how: SettleHow) => Promise<boolean>;
   onSettleAll: () => Promise<boolean>;
   done: number; // 오늘 끝낸 할 일
@@ -22,7 +23,7 @@ type Props = {
 
 // 넓은 창(wide)에서 오늘 공책 오른쪽에 붙는 칸. 넘어온 일 포스트잇과 오늘 끝낸 일 수, 기호 설명을 펴 둔다.
 // 그래서 가운데 공책에는 입력칸과 목록만 남는다.
-export function TodayPanel({ candidates, onSettle, onSettleAll, done, total }: Props) {
+export function TodayPanel({ candidates, today, onSettle, onSettleAll, done, total }: Props) {
   const s = useSpace();
   const reduce = useReduceMotion();
   const [collapsed, setCollapsed] = useState(false);
@@ -49,7 +50,7 @@ export function TodayPanel({ candidates, onSettle, onSettleAll, done, total }: P
           </Txt>
         </Txt>
       </View>
-      {candidates.length > 0 && <PostIt candidates={candidates} onSettle={onSettle} onSettleAll={onSettleAll} />}
+      {candidates.length > 0 && <PostIt candidates={candidates} today={today} onSettle={onSettle} onSettleAll={onSettleAll} />}
       <View style={styles.legend}>
         <SymbolLegend collapsed={collapsed} onToggle={toggle} />
       </View>

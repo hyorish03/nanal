@@ -39,6 +39,19 @@ export function formatDayWithWeekday(date: string): string {
   return `${m}월 ${d}일(${WEEKDAYS[weekdayOf(date)]})`;
 }
 
+// '10월 13일': 접근성 문구처럼 요일 없이 짧게
+export function formatMonthDay(date: string): string {
+  const { m, d } = partsOf(date);
+  return `${m}월 ${d}일`;
+}
+
+// from에서 to까지 며칠(달력 날짜만 센다). to가 앞이면 음수
+export function daysBetween(from: string, to: string): number {
+  const a = partsOf(from);
+  const b = partsOf(to);
+  return Math.round((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86_400_000);
+}
+
 export function formatShortDate(date: string): string {
   const { m, d } = partsOf(date);
   return `${m}/${d}`;

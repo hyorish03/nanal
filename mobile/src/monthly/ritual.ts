@@ -27,23 +27,8 @@ export function listMonthLeftovers(db: Db, today: string): Promise<Item[]> {
   return listMigrationCandidates(db, monthStart(today));
 }
 
-export type DateGroup = { date: string; items: Item[] };
-
-// 원래 날짜별로 묶는다. 오래된 날부터, 같은 날 안에서는 받은 순서(적은 순서) 그대로.
-export function groupByDate(items: Item[]): DateGroup[] {
-  const groups: DateGroup[] = [];
-  const byDate = new Map<string, DateGroup>();
-  for (const item of items) {
-    let g = byDate.get(item.date);
-    if (!g) {
-      g = { date: item.date, items: [] };
-      byDate.set(item.date, g);
-      groups.push(g);
-    }
-    g.items.push(item);
-  }
-  return groups.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-}
+// 원래 날짜별 묶기는 오늘 포스트잇과 같이 쓴다(items/carryOver.ts)
+export { type DateGroup, groupByDate } from '../items/carryOver';
 
 // 저장소를 읽지 못하면 띄우지 않는다(실행할 때마다 시트가 뜨지 않게). 포스트잇이 그대로 남아 있다.
 export async function readMonthRitualDue(store: KeyValueStore, now: Date): Promise<boolean> {
