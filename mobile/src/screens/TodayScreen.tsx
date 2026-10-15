@@ -389,51 +389,52 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       {/* 지난 기록 책갈피 끈: 하루 마무리 버튼 왼쪽, 화면 맨 위에 매달린다 */}
       {showNav && onOpenArchive && eveningW > 0 && <Ribbon onPress={onOpenArchive} style={{ right: SCREEN_X + eveningW + RIBBON_GAP }} />}
   
-      {/* 입력칸과 할 일·메모 칩은 고정. 그 아래 목록만 스크롤된다 */}
-      <View style={styles.composer}>
+      {/* 입력칸과 할 일·메모 칩은 고정. 그 아래 목록만 스크롤된다.
+          칩과 목록 사이는 좁게 두고, 숨 쉴 자리는 목록 맨 위 여백(LIST_TOP)으로 넣어 스크롤하면 함께 올라가게 한다 */}
+      <View style={styles.writing}>
         <Composer inputRef={inputRef} voice={VoiceSheet !== null} onCapture={onCapture} onSubmit={submit} />
-      </View>
 
-      {/* 공책 한 쪽: 여백선은 목록 뒤에 깔리고, 빈 줄은 목록 꼬리에서 함께 스크롤된다 */}
-      <View ref={pageRef} style={styles.page}>
-        <MarginRule scrollY={scrollY} startY={listHeader ? headerH : 0} />
-        <Animated.View pointerEvents="none" style={[styles.edge, { opacity: edgeShade }]} />
-        <AnimatedList
-          ref={listRef}
-          style={styles.list}
-          data={items}
-          keyExtractor={(i) => i.id}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          contentContainerStyle={styles.listContent}
-          ListFooterComponentStyle={styles.footerWrap}
-          ListHeaderComponent={listHeader}
-          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
-          scrollEventThrottle={16}
-          onScrollBeginDrag={openRow.closeAll} // 목록을 굴리면 밀어 연 줄을 닫는다
-          ListEmptyComponent={
-            // 빈 날은 첫 두 줄에 흐리게 적어 두고, 그 아래로 빈 줄이 이어진다. 스크린 리더는 한 번에 읽는다
-            <View accessible accessibilityLabel={`${EMPTY_TITLE}. ${EMPTY_HINT}`}>
-              <View style={[styles.emptyRow, { minHeight: ruleGap }]}>
-                <Txt style={styles.empty}>{EMPTY_TITLE}</Txt>
+        {/* 공책 한 쪽: 여백선은 목록 뒤에 깔리고, 빈 줄은 목록 꼬리에서 함께 스크롤된다 */}
+        <View ref={pageRef} style={styles.page}>
+          <MarginRule scrollY={scrollY} startY={listHeader ? LIST_TOP + headerH : 0} />
+          <Animated.View pointerEvents="none" style={[styles.edge, { opacity: edgeShade }]} />
+          <AnimatedList
+            ref={listRef}
+            style={styles.list}
+            data={items}
+            keyExtractor={(i) => i.id}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            contentContainerStyle={styles.listContent}
+            ListFooterComponentStyle={styles.footerWrap}
+            ListHeaderComponent={listHeader}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+            scrollEventThrottle={16}
+            onScrollBeginDrag={openRow.closeAll} // 목록을 굴리면 밀어 연 줄을 닫는다
+            ListEmptyComponent={
+              // 빈 날은 첫 두 줄에 흐리게 적어 두고, 그 아래로 빈 줄이 이어진다. 스크린 리더는 한 번에 읽는다
+              <View accessible accessibilityLabel={`${EMPTY_TITLE}. ${EMPTY_HINT}`}>
+                <View style={[styles.emptyRow, { minHeight: ruleGap }]}>
+                  <Txt style={styles.empty}>{EMPTY_TITLE}</Txt>
+                </View>
+                <View style={[styles.emptyRow, { minHeight: ruleGap }]}>
+                  <Txt style={styles.emptyHint}>{EMPTY_HINT}</Txt>
+                </View>
               </View>
-              <View style={[styles.emptyRow, { minHeight: ruleGap }]}>
-                <Txt style={styles.emptyHint}>{EMPTY_HINT}</Txt>
-              </View>
-            </View>
-          }
-          ListFooterComponent={
-            // 목록 아래 빈 곳까지 빈 줄로 채워, 누르면 키보드가 내려간다
-            <Pressable accessible={false} style={styles.footerWrap} onPress={Keyboard.dismiss}>
-              <RuledFill />
-              <Txt variant="hand" style={[styles.footer, keyboardUp && styles.footerHidden]}>
-                오늘도 한 줄씩.
-              </Txt>
-            </Pressable>
-          }
-          extraData={priorityFull}
-          renderItem={renderItem}
-        />
+            }
+            ListFooterComponent={
+              // 목록 아래 빈 곳까지 빈 줄로 채워, 누르면 키보드가 내려간다
+              <Pressable accessible={false} style={styles.footerWrap} onPress={Keyboard.dismiss}>
+                <RuledFill />
+                <Txt variant="hand" style={[styles.footer, keyboardUp && styles.footerHidden]}>
+                  오늘도 한 줄씩.
+                </Txt>
+              </Pressable>
+            }
+            extraData={priorityFull}
+            renderItem={renderItem}
+          />
+        </View>
       </View>
     </>
   );
@@ -514,6 +515,7 @@ const EMPTY_TITLE = '아직 적은 줄이 없어요';
 const EMPTY_HINT = '위 칸에 한 줄 적어 볼까요?';
 // 목록은 gesture-handler의 FlatList: 줄 밀기(Pan)와 목록 스크롤이 서로 손가락을 빼앗지 않게 조율된다
 const AnimatedList = Animated.createAnimatedComponent(FlatList<Item>);
+const LIST_TOP = 14; // 목록 맨 위 여백(스크롤하면 함께 올라간다)
 const REORDER = LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity); // 끈의 44pt 누르는 영역이 하루 마무리 버튼에 겹치지 않게
 
 const styles = StyleSheet.create({
@@ -550,7 +552,7 @@ const styles = StyleSheet.create({
   eveningText: { fontSize: 14, color: colors.onDark },
   notice: { color: colors.inkSoft },
   error: { color: colors.danger },
-  composer: { paddingBottom: 14 },
+  writing: { flex: 1, gap: 6 },
   // 고정 영역 아래 경계: 목록이 밑으로 지나갈 때만 보이는 옅은 선과 그늘
   edge: {
     position: 'absolute',
@@ -567,7 +569,7 @@ const styles = StyleSheet.create({
   },
   page: { flex: 1, overflow: 'hidden' }, // 여백선이 머리 높이만큼 내려가도 화면 아래로 삐져나오지 않게
   list: { flex: 1 },
-  listContent: { flexGrow: 1 },
+  listContent: { flexGrow: 1, paddingTop: LIST_TOP },
   // 할 일이 적으면 화면 맨 아래에 머물고, 목록이 길면 마지막 줄 아래로 밀려난다
   footerWrap: { flexGrow: 1, justifyContent: 'flex-end' },
   listHeader: { gap: 26, paddingBottom: 20 },
