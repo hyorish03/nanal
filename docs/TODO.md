@@ -20,7 +20,7 @@
 - [x] 적용 뒤 비로그인으로 `someday`를 읽으면 `42501`인지 확인(확인함). monthly-review 함수 재배포함.
 
 ### 줄 순서(끌어서 바꾸기) 서버 반영 — 코드 완료, 적용 남음
-- [ ] `supabase/migrations/20261016000000_item_position.sql` 적용(`supabase db push`). items·someday에 `position double precision`(비워 둘 수 있음)을 더하고, 기존 줄을 사용자·날짜마다(언젠가는 사용자마다) created_at, id 순서로 1, 2, 3… 채운다. 채우는 동안 LWW 트리거를 꺼 synced_at이 바뀌지 않는다(모든 기기가 다시 받지 않는다). 로컬 `supabase test db`로 `supabase/tests/item_position.test.sql` 통과 확인함.
+- [x] (2026-10-15 적용) `supabase/migrations/20261016000000_item_position.sql` 적용(`supabase db push`). items·someday에 `position double precision`(비워 둘 수 있음)을 더하고, 기존 줄을 사용자·날짜마다(언젠가는 사용자마다) created_at, id 순서로 1, 2, 3… 채운다. 채우는 동안 LWW 트리거를 꺼 synced_at이 바뀌지 않는다(모든 기기가 다시 받지 않는다). 로컬 `supabase test db`로 `supabase/tests/item_position.test.sql` 통과 확인함.
 - **이 앱 버전(로컬 스키마 v6)을 배포하기 전에 적용해야 한다.** 적용 전에는 서버가 `position` 열을 몰라 items·someday 올리기가 통째로 거절되고 outbox에 남는다(데이터는 잃지 않고, days·회고 등 다른 표는 올라간다. 화면에는 "아직 올리지 못했어요"). 적용하면 다음 동기화에 모두 올라간다.
 - [ ] 적용 뒤 확인: 한 기기에서 끌어 바꾼 순서가 다른 기기에서도 같은지. 예전 앱(이 열을 모름)이 고친 줄도 순서가 지워지지 않는지.
 
