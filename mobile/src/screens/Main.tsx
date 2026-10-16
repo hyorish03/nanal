@@ -20,7 +20,7 @@ import { Cover } from '../ui/Cover';
 import { confirmDeleteAccount, confirmSignOut } from '../lib/account';
 import { FadeIn } from '../ui/FadeIn';
 import { LAMP_PAPER, LAMP_SHADE } from '../ui/lamp';
-import { EASE_OUT } from '../ui/motion';
+import { EASE_IN_OUT, EASE_OUT } from '../ui/motion';
 import { dimPressed } from '../ui/press';
 import { colors } from '../ui/theme';
 import { Txt } from '../ui/Txt';
@@ -39,6 +39,7 @@ import { OnboardingScreen } from './OnboardingScreen';
 import { TodayScreen } from './TodayScreen';
 
 const SIDEBAR_KEY = 'nanal.sidebarCollapsed';
+const SIDEBAR_MS = 260;
 
 export function Main({ db, userId }: { db: Db; userId: string }) {
   const [claim, setClaim] = useState<'pending' | 'ok' | 'mismatch' | 'error'>('pending');
@@ -133,20 +134,43 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   // 아이패드·Mac(넓은 배치)에서는 왼쪽 사이드바가 오늘·하루 마무리·지난 기록을 바꾼다. 온보딩에는 없다.
   const wide = useLayoutClass() !== 'compact';
   // 아이패드·Mac에서 사이드바를 접어 둘 수 있다. 접은 상태는 기기에 기억한다(읽기 실패면 펼친 채로).
+  // 접고 펼 때 사이드바가 왼쪽으로 미끄러지며 칸 폭이 줄고(본문이 그만큼 부드럽게 넓어진다), 펼 때는 거꾸로.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarMounted, setSidebarMounted] = useState(true); // 접히는 동안에도 그려 둔다(다 접힌 뒤 뺀다)
+  const sidebarOpen = useRef(new Animated.Value(1)).current; // 1 펼침, 0 접힘
   useEffect(() => {
     AsyncStorage.getItem(SIDEBAR_KEY)
-      .then((v) => setSidebarCollapsed(v === '1'))
+      .then((v) => {
+        const collapsed = v === '1';
+        sidebarOpen.setValue(collapsed ? 0 : 1);
+        setSidebarMounted(!collapsed);
+        setSidebarCollapsed(collapsed);
+      })
       .catch(() => {});
-  }, []);
+  }, [sidebarOpen]);
   const toggleSidebar = useCallback(() => {
-    if (!reduce) LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
-    setSidebarCollapsed((c) => {
-      AsyncStorage.setItem(SIDEBAR_KEY, c ? '0' : '1').catch(() => {});
-      return !c;
-    });
-  }, [reduce]);
+    const collapse = !sidebarCollapsed;
+    AsyncStorage.setItem(SIDEBAR_KEY, collapse ? '1' : '0').catch(() => {});
+    sidebarOpen.stopAnimation();
+    if (collapse) {
+      // 다 접힌 뒤에 상태를 바꾼다: 본문 칸 폭(pane)과 안전 여백이 그때 한 번만 바뀐다
+      const done = () => {
+        setSidebarCollapsed(true);
+        setSidebarMounted(false);
+      };
+      if (reduce) {
+        sidebarOpen.setValue(0);
+        done();
+      } else Animated.timing(sidebarOpen, { toValue: 0, duration: SIDEBAR_MS, easing: EASE_IN_OUT, useNativeDriver: false }).start(done);
+    } else {
+      setSidebarCollapsed(false);
+      setSidebarMounted(true);
+      if (reduce) sidebarOpen.setValue(1);
+      else Animated.timing(sidebarOpen, { toValue: 1, duration: SIDEBAR_MS, easing: EASE_IN_OUT, useNativeDriver: false }).start();
+    }
+  }, [reduce, sidebarCollapsed, sidebarOpen]);
   const sidebar = wide && screen === 'today' && !sidebarCollapsed;
+  const sidebarDrawn = wide && screen === 'today' && sidebarMounted;
   const canReopenSidebar = wide && screen === 'today' && sidebarCollapsed;
   const insets = useSafeAreaInsets();
   const { width: windowW } = useWindowDimensions();
@@ -329,16 +353,37 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
       <EveningBackdrop on={screen === 'today' && route === 'evening'} />
       <Paper />
       <View style={styles.shell}>
-        {sidebar && (
-          <Sidebar
-            current={route === 'today' ? 'today' : route === 'evening' ? 'evening' : 'archive'}
-            onSelect={selectSection}
-            onCollapse={toggleSidebar}
-            onSignOut={() => void confirmSignOut(db)}
-            onDeleteAccount={() => confirmDeleteAccount(db)}
-          />
+        {sidebarDrawn && (
+          <Animated.View
+            style={{
+              width: sidebarOpen.interpolate({ inputRange: [0, 1], outputRange: [0, WIDE.sidebarWidth + insets.left] }),
+              overflow: 'hidden',
+            }}
+          >
+            <Animated.View
+              style={{
+                flex: 1,
+                flexDirection: 'row', // 사이드바가 칸 높이 끝까지 늘어나게(가로 줄의 자식으로 둔다)
+                width: WIDE.sidebarWidth + insets.left,
+                opacity: sidebarOpen.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }),
+                transform: [{ translateX: sidebarOpen.interpolate({ inputRange: [0, 1], outputRange: [-48, 0] }) }],
+              }}
+            >
+              <Sidebar
+                current={route === 'today' ? 'today' : route === 'evening' ? 'evening' : 'archive'}
+                onSelect={selectSection}
+                onCollapse={toggleSidebar}
+                onSignOut={() => void confirmSignOut(db)}
+                onDeleteAccount={() => confirmDeleteAccount(db)}
+              />
+            </Animated.View>
+          </Animated.View>
         )}
-        <SafeAreaView style={styles.container} edges={sidebar ? ['top', 'bottom', 'right'] : undefined}>
+        {/* 사이드바를 접으면 왼쪽 위에 펴기 버튼이 뜬다. 화면 머리(계정·'‹ 오늘')를 덮지 않게 그만큼 아래로 내린다 */}
+        <SafeAreaView
+          style={[styles.container, canReopenSidebar && styles.belowOpenButton]}
+          edges={sidebar ? ['top', 'bottom', 'right'] : undefined}
+        >
           <SyncBar pending={pending} error={error} reduce={reduce} />
           <ScreenEnter key={screen ?? 'none'} reduce={reduce}>
             {screen === 'onboarding' && (
@@ -522,7 +567,8 @@ const styles = StyleSheet.create({
   evening: { backgroundColor: LAMP_PAPER },
   shell: { flex: 1, flexDirection: 'row' },
   onboardingWide: { flex: 1, width: '100%', maxWidth: ONBOARDING_MAX_W, alignSelf: 'center' },
-  container: { flex: 1 }, // 배경은 root와 각 화면이 칠한다(저녁은 EveningBackdrop과 하루 마무리 화면이 칠한다)
+  container: { flex: 1 },
+  belowOpenButton: { paddingTop: 40 }, // 배경은 root와 각 화면이 칠한다(저녁은 EveningBackdrop과 하루 마무리 화면이 칠한다)
   page: { backgroundColor: colors.paper },
   center: { justifyContent: 'center', alignItems: 'center' },
   blocked: { padding: 24, gap: 20 },

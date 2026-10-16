@@ -29,7 +29,6 @@ import { dimPressed } from '../ui/press';
 import { Chip } from '../ui/Chip';
 import { PageHeader } from '../ui/PageHeader';
 import { useReduceMotion } from '../ui/useReduceMotion';
-import { usePane } from '../ui/pane';
 import { type LayoutClass, useLayoutClass, WIDE } from '../ui/responsive';
 
 type Props = { db: Db; version: number; onChanged: () => void; onClose: () => void };
@@ -61,10 +60,9 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
   const frame = useRef<View>(null);
   const { onScroll, keep } = useKeepVisible(scroll, frame);
   const layout = useLayoutClass();
-  const pane = usePane();
-  // 두 칸은 칸 폭이 충분할 때만(아이패드 가로·넓은 Mac 창). 세로 아이패드처럼 좁으면 한 칸을 가운데로 모은다
-  const split = layout !== 'compact' && pane.width >= SPLIT_MIN;
-  const centered = layout !== 'compact' && !split;
+  // 넓은 화면(아이패드·Mac)에서는 한 칸을 읽기 폭으로 가운데에 모은다.
+  // 예전 두 칸 배치는 넓은 Mac 창에서 왼쪽 칸이 좁아 잉크병이 두 줄로 꺾이고, 템플릿을 고르기 전 오른쪽이 비어 한쪽으로 쏠려 보였다
+  const centered = layout !== 'compact';
   const rule = useRule();
 
   // 쓰던 답은 날마다 따로 보관한다. 불러오기 전에는 덮어쓰지 않는다.
@@ -238,7 +236,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
       <Txt variant="hand" accessibilityRole="header" style={styles.h2}>
         오늘 마음은 어땠나요?
       </Txt>
-      <View style={[styles.moods, split && styles.moodsSplit]}>
+      <View style={styles.moods}>
         {MOODS.map((m) => {
           const selected = mood === m;
           return (
@@ -248,7 +246,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
               accessibilityRole="button"
               accessibilityLabel={`기분 ${m}점, ${moodWord(m)}`}
               accessibilityState={{ selected }}
-              style={dimPressed([styles.mood, split && styles.moodSplit])}
+              style={dimPressed(styles.mood)}
               onPress={() => pickMood(m)}
             >
               <MoodWell selected={selected} animate={moodPicked}>
@@ -475,49 +473,6 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     />
   );
 
-  // 넓은 화면: 왼쪽은 마음·템플릿·도장, 오른쪽은 줄 노트. 두 칸은 따로 스크롤되고,
-  // 키보드가 오르면 오른쪽 칸(frame)을 기준으로 쓰는 칸을 맞춘다.
-  if (split) {
-    return (
-      <View style={styles.flex}>
-        <Paper />
-        <View style={styles.splitPage}>
-          {header}
-          <View style={styles.columns}>
-            <ScrollView style={styles.left} contentContainerStyle={styles.column} keyboardShouldPersistTaps="handled">
-              {moodSection}
-              {templateSection}
-              {stamp}
-              {doneList}
-            </ScrollView>
-            <View ref={frame} style={styles.right}>
-              <ScrollView
-                ref={scroll}
-                contentContainerStyle={[styles.column, styles.rightColumn]}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
-                onScroll={onScroll}
-                scrollEventThrottle={16}
-              >
-                {errorText}
-                {form}
-                {savedSection}
-                {!current && saved.length === 0 && (
-                  <RuledPaper lineHeight={rule.line} firstLineTop={rule.line - rule.sit} style={[styles.savedCard, styles.blank]}>
-                    <Txt variant="hand" style={[handLine, styles.blankText]}>
-                      어떤 날이었는지 고르면 여기에 적어요
-                    </Txt>
-                  </RuledPaper>
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        </View>
-        {sheet}
-      </View>
-    );
-  }
-
   return (
     <View ref={frame} style={styles.flex}>
       <Paper />
@@ -550,10 +505,6 @@ const TEXT_MAX_SCALE = 1.3; // 큰 글씨에서도 잉크병 줄과 도장이 �
 // 넓은 화면에서는 잉크병과 이름표를 키운다
 const WELL_SCALE: Record<LayoutClass, number> = { compact: 1, regular: 1.1, wide: 1.3 };
 const MOOD_WORD: Record<LayoutClass, number> = { compact: 13, regular: 14, wide: 15 };
-const LEFT_MIN = 300;
-const LEFT_MAX = 440;
-// 왼쪽 칸 최소 + 사이 + 오른쪽 글 칸 최소(440) + 좌우 여백
-const SPLIT_MIN = LEFT_MIN + WIDE.gutter + 440 + WIDE.pageX * 2;
 const WET_INK = colors.navy; // 막 쓴 잉크는 남색으로 젖어 있다가 먹색으로 마른다
 
 // 색은 네이티브 드라이버로 바꿀 수 없어서, 먹색 글씨 위에 남색 글씨를 겹쳐 두고 남색만 흐리게 한다.
@@ -600,7 +551,9 @@ function MoodWell({ selected, animate, children }: { selected: boolean; animate:
 const FORM_TOP = 22;
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 }, // 바탕은 Main의 EveningBackdrop(등잔 불빛)이 칠한다
+  // 바탕은 Main의 EveningBackdrop(등잔 불빛)과 같은 종이색. 이 화면도 직접 칠한다:
+  // 아이패드·Mac에서 사이드바를 접어 칸이 넓어지면 화면 틀(stack)이 예전 폭에 머물러 오른쪽에 오늘 화면 종이가 비쳤다
+  flex: { flex: 1, backgroundColor: LAMP_PAPER },
   container: { paddingHorizontal: SCREEN_X, paddingTop: 4, paddingBottom: 24, gap: 20 },
   section: { gap: 10 },
   h2: { fontSize: 26 },
@@ -608,8 +561,6 @@ const styles = StyleSheet.create({
   moods: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-evenly', rowGap: 8 },
   mood: { minWidth: 60, padding: 4, alignItems: 'center', gap: 6 },
   // 넓은 칸에서는 다섯 병을 한 줄에 고르게 늘어놓는다
-  moodsSplit: { justifyContent: 'space-between' },
-  moodSplit: { minWidth: 0, paddingHorizontal: 2 },
   moodWord: { paddingBottom: 2, borderBottomWidth: 2 },
   moodWordOn: { borderBottomColor: colors.navy },
   moodWordOff: { color: colors.inkSoft, borderBottomColor: 'transparent' },
@@ -660,21 +611,6 @@ const styles = StyleSheet.create({
   done: { paddingHorizontal: 14 },
   doneLabel: { fontSize: 12, color: colors.muted, marginBottom: 2 },
   doneItem: { fontSize: 20, lineHeight: 26, color: colors.muted },
-  // 두 칸 배치: 머리는 두 칸 위에 걸치고, 칸마다 따로 스크롤한다
-  splitPage: {
-    flex: 1,
-    width: '100%',
-    maxWidth: LEFT_MAX + WIDE.gutter + WIDE.readingWidth + WIDE.pageX * 2,
-    alignSelf: 'center',
-    paddingHorizontal: WIDE.pageX,
-    paddingTop: 4,
-    gap: 16,
-  },
-  columns: { flex: 1, flexDirection: 'row', gap: WIDE.gutter },
-  left: { flex: 2, minWidth: LEFT_MIN, maxWidth: LEFT_MAX },
-  right: { flex: 3, maxWidth: WIDE.readingWidth },
-  column: { paddingTop: 8, paddingBottom: 32, gap: 24 },
-  rightColumn: { paddingTop: 18 },
   // 넓은 화면의 한 칸 배치: 읽기 폭으로 가운데
   centered: { width: '100%', maxWidth: WIDE.readingWidth + WIDE.pageX * 2, alignSelf: 'center', paddingHorizontal: WIDE.pageX }, // 테이프가 칸 위로 잘리지 않게
 });

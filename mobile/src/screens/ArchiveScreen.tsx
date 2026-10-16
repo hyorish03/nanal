@@ -1,7 +1,7 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, type LayoutRectangle, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { calendarPaneWidth, isTwoPane } from '../archive/layout';
+import { CALENDAR_PANE_MAX, calendarPaneWidth, isTwoPane } from '../archive/layout';
 import { type ArchiveEntry, type DaySummary, lastPlannedDate, listMonthSummary, listReflectionFilters, listReflectionPage, type ReflectionFilter } from '../archive/repo';
 import type { Db } from '../db/types';
 import { listItemsForDate, type Item } from '../items/repo';
@@ -278,8 +278,9 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
     ]);
 
   const showBanner = !!onOpenReview && canOfferReview(reviewOffer);
-  // 넓은 화면의 글 칸: 두 칸이면 왼쪽 여백에 붙이고, 한 칸이면 가운데에 읽기 폭으로 모은다
-  const column = large ? [styles.page, !twoPane && styles.centered] : null;
+  // 넓은 화면의 글 칸: 두 칸이면 달력+기록 폭(FRAME)으로, 한 칸이면 읽기 폭으로 가운데에 모은다.
+  // 탭(달력·회고 모아보기·언젠가)이 모두 같은 틀을 써서, 탭을 바꿔도 머리가 제자리에 있고 한쪽으로 쏠리지 않는다
+  const column = large ? [styles.page, twoPane ? styles.frame : styles.centered] : null;
 
   const head = (
     <>
@@ -491,16 +492,20 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
   );
 }
 
+// 두 칸 배치의 전체 폭: 달력 칸(최대) + 사이 + 기록 칸(읽기 폭) + 좌우 여백. 이보다 넓은 창에서는 가운데에 놓는다
+const FRAME = CALENDAR_PANE_MAX + WIDE.gutter + WIDE.readingWidth + WIDE.pageX * 2;
+
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
   scroll: { flex: 1 },
   container: { paddingHorizontal: SCREEN_X, paddingTop: 4, paddingBottom: 40, gap: 14 },
   page: { width: '100%', paddingHorizontal: WIDE.pageX },
   centered: { maxWidth: WIDE.readingWidth + WIDE.pageX * 2, alignSelf: 'center' },
+  frame: { maxWidth: FRAME, alignSelf: 'center' },
   fixedHead: { paddingTop: 4, paddingBottom: 12, gap: 14 },
   stackLarge: { paddingTop: 8, gap: 24 },
-  listLarge: { paddingTop: 8, gap: 16, maxWidth: WIDE.readingWidth + WIDE.pageX * 2 },
-  panes: { flex: 1, flexDirection: 'row', paddingHorizontal: WIDE.pageX, gap: WIDE.gutter },
+  listLarge: { paddingTop: 8, gap: 16 },
+  panes: { flex: 1, flexDirection: 'row', paddingHorizontal: WIDE.pageX, gap: WIDE.gutter, width: '100%', maxWidth: FRAME, alignSelf: 'center' },
   pane: { paddingTop: 8, paddingBottom: 40, gap: 20 },
   detailPane: { maxWidth: WIDE.readingWidth },
   listHead: { gap: 14 },
