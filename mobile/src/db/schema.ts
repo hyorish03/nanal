@@ -152,6 +152,11 @@ const MIGRATIONS = [
     WHERE o.created_at < someday.created_at OR (o.created_at = someday.created_at AND o.id <= someday.id)
   );
   `,
+  // v7: 오래 머문 일을 옮기거나 내려놓을 때 고른 '왜 계속 밀렸는지'(월초 정리). 고르지 않으면 비워 둔다
+  `
+  ALTER TABLE items ADD COLUMN delay_reason TEXT
+    CHECK (delay_reason IN ('too_big', 'not_wanted', 'blocked', 'low_energy', 'stressed'));
+  `,
 ];
 
 // target은 테스트에서 이전 버전 데이터를 만들 때만 쓴다.

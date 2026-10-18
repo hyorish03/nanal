@@ -24,6 +24,11 @@
 - **이 앱 버전(로컬 스키마 v6)을 배포하기 전에 적용해야 한다.** 적용 전에는 서버가 `position` 열을 몰라 items·someday 올리기가 통째로 거절되고 outbox에 남는다(데이터는 잃지 않고, days·회고 등 다른 표는 올라간다. 화면에는 "아직 올리지 못했어요"). 적용하면 다음 동기화에 모두 올라간다.
 - [ ] 적용 뒤 확인: 한 기기에서 끌어 바꾼 순서가 다른 기기에서도 같은지. 예전 앱(이 열을 모름)이 고친 줄도 순서가 지워지지 않는지.
 
+### 오래 머문 일 사유 칩(월초 정리) 서버 반영 — 적용 완료, 화면 확인 남음
+- [x] (2026-10-18 적용, 원격 기록 확인, 비로그인 `42501` 확인) `supabase/migrations/20261019000000_delay_reason.sql` 적용(`supabase db push`). items에 `delay_reason text`(비워 둘 수 있음, 다섯 값만)를 더한다. 로컬 `supabase test db`로 `supabase/tests/delay_reason.test.sql` 확인(아직 못 돌림, Docker 없음).
+- **이 앱 버전(로컬 스키마 v7)을 배포하기 전에 적용해야 한다.** 적용 전에는 서버가 `delay_reason` 열을 몰라 items 올리기가 통째로 거절되고 outbox에 남는다(데이터는 잃지 않는다). 적용하면 다음 동기화에 올라간다.
+- [ ] 화면 확인: 새 달 첫 실행 → 두 달 넘게 넘어온 일이 "오래 머문 일" 카드에 칩과 함께, 나머지는 "처음 넘어온 일" 아래 날짜별로. 칩은 다시 누르면 풀림. 내려놓기 → 그날 장에 줄 그어 남음, 되돌리기.
+
 ### 사용자가 직접 할 일
 - [ ] Supabase → Settings → API Keys의 Secret keys에 만든 `anthropic_api_key`(Supabase 관리자 키)를 지웠는지 확인한다. Anthropic 키는 Edge Functions → Secrets의 `ANTHROPIC_API_KEY`에만 둔다.
 - [ ] Anthropic Console에서 월 사용 한도를 건다.

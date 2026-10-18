@@ -522,3 +522,39 @@ describe('줄 순서(position)', () => {
     expect(await texts('2026-10-06')).toEqual(['a', 'b', '어제 일']);
   });
 });
+
+const reasonOf = async (id: string) =>
+  (await db.getFirstAsync<{ delay_reason: string | null }>('SELECT delay_reason FROM items WHERE id = ?', [id]))?.delay_reason;
+
+test('migrateToToday(사유): 고른 사유는 옮겨진 원래 줄에 남고 새 줄은 비어 있다. 되돌리면 지운다', async () => {
+  const item = await addItem(db, { kind: 'task', text: '운동' }, MON);
+  const created = await migrateToToday(db, item.id, TUE, 'low_energy');
+  expect(await reasonOf(item.id)).toBe('low_energy');
+  expect(created.delay_reason).toBeNull();
+  expect(await reasonOf(created.id)).toBeNull();
+  await undoMigration(db, created.id, 'open', TUE);
+  expect(await reasonOf(item.id)).toBeNull();
+});
+
+test('migrateToToday: 사유를 고르지 않으면 남기지 않는다', async () => {
+  const item = await addItem(db, { kind: 'task', text: '운동' }, MON);
+  await migrateToToday(db, item.id, TUE);
+  expect(await reasonOf(item.id)).toBeNull();
+});
+
+test('dropItem(사유): 내려놓은 줄에 사유가 남고, 되돌리거나 다시 할 일로 돌리면 지운다', async () => {
+  const a = await addItem(db, { kind: 'task', text: 'a' }, MON);
+  const prev = await dropItem(db, a.id, TUE, 'not_wanted');
+  expect(await reasonOf(a.id)).toBe('not_wanted');
+  await undoDrop(db, a.id, prev, TUE);
+  expect(await reasonOf(a.id)).toBeNull();
+
+  await dropItem(db, a.id, TUE, 'stressed');
+  await advanceStatus(db, a.id, TUE);
+  expect(await reasonOf(a.id)).toBeNull();
+});
+
+test('목록에 없는 사유는 DB가 거부한다', async () => {
+  const a = await addItem(db, { kind: 'task', text: 'a' }, MON);
+  await expect(db.runAsync('UPDATE items SET delay_reason = ? WHERE id = ?', ['lazy', a.id])).rejects.toThrow();
+});

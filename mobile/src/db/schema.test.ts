@@ -14,7 +14,7 @@ test('테이블을 만들고 두 번 실행해도 안전하다', async () => {
   expect(tables.map((t) => t.name)).toEqual([
     'days', 'items', 'monthly_reviews', 'outbox', 'reflections', 'someday', 'sync_state', 'templates',
   ]);
-  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 6 });
+  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 7 });
 });
 
 test('task는 status가 필요하고, 그 외 종류는 status가 없어야 한다', async () => {
@@ -65,7 +65,7 @@ test('v1 데이터를 v2로 옮긴다: 일정은 할 일, 놓아준 일은 삭�
 
   await migrate(db);
 
-  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 6 });
+  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 7 });
   expect(await db.getAllAsync('SELECT id, kind, status, priority, deleted_at FROM items ORDER BY id', [])).toEqual([
     { id: 'dr', kind: 'task', status: 'open', priority: 0, deleted_at: TS2 },
     { id: 'ev', kind: 'task', status: 'open', priority: 0, deleted_at: null },
@@ -185,7 +185,7 @@ test('v5 → v6: 줄 순서(position)를 더하고, 이미 있는 줄은 적은 
 
   await migrate(db);
 
-  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 6 });
+  expect(await db.getFirstAsync('PRAGMA user_version', [])).toEqual({ user_version: 7 });
   // 원래 열은 그대로
   expect(await db.getAllAsync(`SELECT ${cols} FROM items ORDER BY id`, [])).toEqual(
     [...items].sort((x, y) => x.id.localeCompare(y.id)),

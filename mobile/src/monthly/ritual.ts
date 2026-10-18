@@ -1,5 +1,5 @@
 import type { Db } from '../db/types';
-import { type Item, listMigrationCandidates } from '../items/repo';
+import { type DelayReason, type Item, listMigrationCandidates } from '../items/repo';
 import { logicalDate, monthOf } from '../lib/date';
 import type { KeyValueStore } from '../lib/onboarding';
 
@@ -26,6 +26,70 @@ export function shouldShowMonthRitual(lastMonth: string | null, now: Date, lefto
 export function listMonthLeftovers(db: Db, today: string): Promise<Item[]> {
   return listMigrationCandidates(db, monthStart(today));
 }
+
+// 오래 머문 일: 처음 적은 달에서 이번 달까지 두 달 이상(달 경계를 두 번 넘음). 포스트잇으로 날마다 옮겨
+// 줄이 길어져도 몇 번 옮겼는지가 아니라 처음 적은 날로 센다
+export const CHRONIC_MONTHS = 2;
+
+export type ChronicItem = { item: Item; months: number };
+export type MonthLeftovers = { chronic: ChronicItem[]; fresh: Item[] };
+
+// 처음 적은 달부터 이번 달까지 몇 달째인지('2026-08-04', '2026-11-01' → 3)
+export function monthsSince(firstDate: string, today: string): number {
+  const [y1, m1] = monthOf(firstDate).split('-').map(Number);
+  const [y2, m2] = monthOf(today).split('-').map(Number);
+  return (y2 - y1) * 12 + (m2 - m1);
+}
+
+// 옮긴 줄을 migrated_from으로 거슬러 올라가 처음 적은 날을 찾는다. 키는 받은 줄의 id.
+// 옮길 때마다 원래 줄은 지우지 않고 migrated로 남으므로 지운 줄도 따라간다. UNION이라 고리가 있어도 멈춘다
+export async function listFirstDates(db: Db, ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const rows = await db.getAllAsync<{ leaf: string; first: string }>(
+    `WITH RECURSIVE chain(leaf, date, prev) AS (
+       SELECT id, date, migrated_from FROM items WHERE id IN (${ids.map(() => '?').join(', ')})
+       UNION
+       SELECT chain.leaf, items.date, items.migrated_from FROM chain JOIN items ON items.id = chain.prev
+     )
+     SELECT leaf, MIN(date) AS first FROM chain GROUP BY leaf`,
+    ids,
+  );
+  return new Map(rows.map((r) => [r.leaf, r.first]));
+}
+
+// 오래 머문 일(오래된 순)과 처음 넘어온 일(받은 순서 그대로)로 나눈다
+export function splitChronic(items: Item[], firstDates: Map<string, string>, today: string): MonthLeftovers {
+  const chronic: ChronicItem[] = [];
+  const fresh: Item[] = [];
+  for (const item of items) {
+    const months = monthsSince(firstDates.get(item.id) ?? item.date, today);
+    if (months >= CHRONIC_MONTHS) chronic.push({ item, months });
+    else fresh.push(item);
+  }
+  chronic.sort((a, b) => b.months - a.months);
+  return { chronic, fresh };
+}
+
+export async function listMonthLeftoversSplit(db: Db, today: string): Promise<MonthLeftovers> {
+  const items = await listMonthLeftovers(db, today);
+  return splitChronic(items, await listFirstDates(db, items.map((i) => i.id)), today);
+}
+
+const MONTH_COUNT = ['', '한', '두', '석', '넉'];
+
+// '석 달째 넘어온 일'. 다섯 달부터는 숫자로
+export function chronicLabel(months: number): string {
+  return `${MONTH_COUNT[months] ? `${MONTH_COUNT[months]} ` : months}달째 넘어온 일`;
+}
+
+// 칩 순서와 말. 모두 '왜 계속 밀렸을까요?'의 대답('~해서')으로 읽힌다
+export const DELAY_REASON_LABELS: Record<DelayReason, string> = {
+  too_big: '일이 너무 커서',
+  not_wanted: '마음이 안 가서',
+  blocked: '먼저 풀 일이 있어서',
+  low_energy: '기운이 없어서',
+  stressed: '부담스러워서',
+};
 
 // 원래 날짜별 묶기는 오늘 포스트잇과 같이 쓴다(items/carryOver.ts)
 export { type DateGroup, groupByDate } from '../items/carryOver';
