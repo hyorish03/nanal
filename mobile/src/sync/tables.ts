@@ -3,7 +3,8 @@ export const TABLES = {
     key: 'id',
     // position: 끌어서 바꾼 줄 순서. 서버 마이그레이션 20261016000000_item_position 전에는 서버가 이 열을 몰라
     // items·someday를 올리지 못하고 outbox에 남는다(다른 표는 그대로 오간다)
-    columns: ['id', 'date', 'kind', 'text', 'status', 'priority', 'migrated_from', 'position', 'created_at', 'updated_at', 'deleted_at'],
+    // delay_reason: 월초 정리에서 고른 밀린 사유. 서버 마이그레이션 20261019000000_delay_reason 전에는 마찬가지로 items를 올리지 못한다
+    columns: ['id', 'date', 'kind', 'text', 'status', 'priority', 'migrated_from', 'delay_reason', 'position', 'created_at', 'updated_at', 'deleted_at'],
   },
   days: {
     key: 'date',

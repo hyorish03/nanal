@@ -3,8 +3,12 @@ import { migrate } from '../db/schema';
 import type { Db } from '../db/types';
 import { addItem, advanceStatus, deleteItem, type Item, migrateToToday } from '../items/repo';
 import {
+  chronicLabel,
   groupByDate,
+  listFirstDates,
   listMonthLeftovers,
+  listMonthLeftoversSplit,
+  monthsSince,
   MONTH_RITUAL_KEY,
   markMonthRitual,
   monthRitualDue,
@@ -88,6 +92,7 @@ const item = (id: string, date: string): Item => ({
   status: 'open',
   priority: false,
   migrated_from: null,
+  delay_reason: null,
   position: null,
   created_at: '',
   updated_at: '',
@@ -129,4 +134,44 @@ describe('listMonthLeftovers', () => {
     // 10월 안에서는 대상이 아니다
     expect(await listMonthLeftovers(db, '2026-10-25')).toEqual([]);
   });
+});
+
+test('monthsSince: 처음 적은 달에서 이번 달까지 몇 달째인지(해를 넘겨도)', () => {
+  expect(monthsSince('2026-10-31', '2026-11-01')).toBe(1);
+  expect(monthsSince('2026-08-04', '2026-11-01')).toBe(3);
+  expect(monthsSince('2026-11-15', '2027-01-01')).toBe(2);
+});
+
+test('chronicLabel: 두·석·넉 달째, 다섯 달부터는 숫자', () => {
+  expect(chronicLabel(2)).toBe('두 달째 넘어온 일');
+  expect(chronicLabel(3)).toBe('석 달째 넘어온 일');
+  expect(chronicLabel(4)).toBe('넉 달째 넘어온 일');
+  expect(chronicLabel(5)).toBe('5달째 넘어온 일');
+});
+
+test('오래 머문 일: 옮긴 줄을 거슬러 처음 적은 날로 센다(날마다 옮겨도 몇 번 옮겼는지로 세지 않는다)', async () => {
+  const db = openTestDb();
+  await migrate(db);
+  // 8월에 적고 9월·10월로 옮긴 일 → 11월에 석 달째
+  const old = await addItem(db, { kind: 'task', text: '운동' }, new Date(2026, 7, 4, 9));
+  const sep = await migrateToToday(db, old.id, new Date(2026, 8, 1, 9));
+  await migrateToToday(db, sep.id, new Date(2026, 9, 6, 9));
+  // 10월에 적고 날마다 사흘 옮긴 일 → 처음 넘어온 일
+  let daily = await addItem(db, { kind: 'task', text: '세탁소' }, new Date(2026, 9, 26, 9));
+  for (const d of [27, 28, 29]) daily = await migrateToToday(db, daily.id, new Date(2026, 9, d, 9));
+  // 9월에 적고 그대로 둔 일 → 두 달째
+  await addItem(db, { kind: 'task', text: '포트폴리오' }, new Date(2026, 8, 20, 9));
+
+  const { chronic, fresh } = await listMonthLeftoversSplit(db, '2026-11-01');
+  expect(chronic.map((c) => [c.item.text, c.months])).toEqual([
+    ['운동', 3],
+    ['포트폴리오', 2],
+  ]);
+  expect(fresh.map((i) => i.text)).toEqual(['세탁소']);
+});
+
+test('listFirstDates: 빈 목록이면 묻지 않는다', async () => {
+  const db = openTestDb();
+  await migrate(db);
+  expect((await listFirstDates(db, [])).size).toBe(0);
 });

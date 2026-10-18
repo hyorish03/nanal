@@ -8,6 +8,9 @@ import { markDirty } from '../sync/outbox';
 export type ItemKind = 'task' | 'note';
 // dropped: 안 하기로 한 일. 지우지 않고 줄을 그어 남긴다(끝낸 일로 세지 않는다)
 export type TaskStatus = 'open' | 'doing' | 'done' | 'migrated' | 'dropped';
+// 오래 머문 일을 옮기거나 내려놓을 때 고른 '왜 계속 밀렸는지'. 옮겨진(내려놓은) 그 줄에 남는다
+export const DELAY_REASONS = ['too_big', 'not_wanted', 'blocked', 'low_energy', 'stressed'] as const;
+export type DelayReason = (typeof DELAY_REASONS)[number];
 
 export type Item = {
   id: string;
@@ -17,6 +20,7 @@ export type Item = {
   status: TaskStatus | null;
   priority: boolean;
   migrated_from: string | null;
+  delay_reason: DelayReason | null;
   position: number | null; // 그날 장의 줄 순서(끌어서 바꾼다). 없으면 맨 뒤에 적은 순서대로
   created_at: string;
   updated_at: string;
@@ -29,7 +33,7 @@ export const MAX_PRIORITY_PER_DAY = 3;
 export const MAX_TEXT = 200; // 한 줄에 쓸 수 있는 글자 수
 // 안 하기로 한 일은 기호를 누르면 다시 할 일로 돌아온다
 const NEXT_STATUS: Partial<Record<TaskStatus, TaskStatus>> = { open: 'doing', doing: 'done', done: 'open', dropped: 'open' };
-const COLUMNS = 'id, date, kind, text, status, priority, migrated_from, position, created_at, updated_at, deleted_at';
+const COLUMNS = 'id, date, kind, text, status, priority, migrated_from, delay_reason, position, created_at, updated_at, deleted_at';
 // 종이 다이어리처럼 적은 순서 그대로(새 줄은 그날 맨 뒤에 붙는다). 끌어서 바꾼 순서는 저장한다.
 // 상태를 바꾸거나 형광펜을 칠해도 줄이 자리를 옮기지 않는다
 const ORDER = POSITION_ORDER;
@@ -40,7 +44,7 @@ const toItem = (row: ItemRow): Item => ({ ...row, priority: row.priority === 1 }
 async function insertItem(tx: Tx, input: Omit<Item, 'position'>): Promise<Item> {
   const last = await tx.getFirstAsync<{ max: number | null }>('SELECT MAX(position) AS max FROM items WHERE date = ?', [input.date]);
   const item: Item = { ...input, position: appendPosition(last?.max ?? null) };
-  await tx.runAsync(`INSERT INTO items (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+  await tx.runAsync(`INSERT INTO items (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
     item.id,
     item.date,
     item.kind,
@@ -48,6 +52,7 @@ async function insertItem(tx: Tx, input: Omit<Item, 'position'>): Promise<Item> 
     item.status,
     item.priority ? 1 : 0,
     item.migrated_from,
+    item.delay_reason,
     item.position,
     item.created_at,
     item.updated_at,
@@ -63,9 +68,11 @@ async function requireItem(tx: Tx, id: string): Promise<Item> {
   return toItem(row);
 }
 
-async function update(tx: Tx, id: string, fields: { status?: TaskStatus; priority?: boolean }, now: Date) {
+type Fields = { status?: TaskStatus; priority?: boolean; delay_reason?: DelayReason | null };
+
+async function update(tx: Tx, id: string, fields: Fields, now: Date) {
   const sets: string[] = [];
-  const params: (string | number)[] = [];
+  const params: (string | number | null)[] = [];
   if (fields.status !== undefined) {
     sets.push('status = ?');
     params.push(fields.status);
@@ -73,6 +80,10 @@ async function update(tx: Tx, id: string, fields: { status?: TaskStatus; priorit
   if (fields.priority !== undefined) {
     sets.push('priority = ?');
     params.push(fields.priority ? 1 : 0);
+  }
+  if (fields.delay_reason !== undefined) {
+    sets.push('delay_reason = ?');
+    params.push(fields.delay_reason);
   }
   await tx.runAsync(`UPDATE items SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`, [
     ...params,
@@ -108,6 +119,7 @@ export async function addItem(
       status: input.kind === 'task' ? 'open' : null,
       priority: false,
       migrated_from: null,
+      delay_reason: null,
       created_at: ts,
       updated_at: ts,
       deleted_at: null,
@@ -129,6 +141,7 @@ export async function insertTaskInTx(tx: Tx, text: string, date: string, now: Da
     status: 'open',
     priority: false,
     migrated_from: null,
+    delay_reason: null,
     created_at: ts,
     updated_at: ts,
     deleted_at: null,
@@ -140,7 +153,8 @@ export async function advanceStatus(db: Db, id: string, now = new Date()): Promi
     const item = await requireItem(tx, id);
     const next = item.status ? NEXT_STATUS[item.status] : undefined;
     if (!next) throw new Error('상태를 바꿀 수 없는 항목입니다');
-    await update(tx, id, { status: next }, now);
+    // 내려놓은 일을 다시 할 일로 돌리면 그때 고른 사유도 지운다
+    await update(tx, id, item.status === 'dropped' ? { status: next, delay_reason: null } : { status: next }, now);
   });
 }
 
@@ -160,7 +174,13 @@ export async function setPriority(db: Db, id: string, on: boolean, now = new Dat
   });
 }
 
-async function migrateInTx(tx: Tx, id: string, target: (today: string) => string, now: Date): Promise<Item> {
+async function migrateInTx(
+  tx: Tx,
+  id: string,
+  target: (today: string) => string,
+  now: Date,
+  reason: DelayReason | null = null,
+): Promise<Item> {
   const ts = now.toISOString();
   const item = await requireItem(tx, id);
   if (item.status !== 'open' && item.status !== 'doing') throw new Error('끝나지 않은 할 일만 옮길 수 있습니다');
@@ -170,7 +190,7 @@ async function migrateInTx(tx: Tx, id: string, target: (today: string) => string
   // 지난 일은 오늘·앞날로, 오늘 일은 앞날로. 같은 날이나 더 앞 날짜로는 옮기지 않는다
   if (item.date >= dest) throw new Error('이전 날짜의 할 일만 옮길 수 있습니다');
   if (dest < today) throw new Error('지난 날짜로는 옮길 수 없어요');
-  await update(tx, id, { status: 'migrated' }, now);
+  await update(tx, id, reason ? { status: 'migrated', delay_reason: reason } : { status: 'migrated' }, now);
   // 옮겨 간 날 장의 맨 뒤에 붙는다(자리값은 insertItem이 새로 매긴다)
   return insertItem(tx, {
     ...item,
@@ -179,18 +199,20 @@ async function migrateInTx(tx: Tx, id: string, target: (today: string) => string
     status: 'open',
     priority: false,
     migrated_from: item.id,
+    delay_reason: null,
     created_at: ts,
     updated_at: ts,
     deleted_at: null,
   });
 }
 
-function migrateTo(db: Db, id: string, target: (today: string) => string, now: Date): Promise<Item> {
-  return db.transaction((tx) => migrateInTx(tx, id, target, now));
+function migrateTo(db: Db, id: string, target: (today: string) => string, now: Date, reason?: DelayReason | null): Promise<Item> {
+  return db.transaction((tx) => migrateInTx(tx, id, target, now, reason));
 }
 
-export function migrateToToday(db: Db, id: string, now = new Date()): Promise<Item> {
-  return migrateTo(db, id, (today) => today, now);
+// reason: 월초 정리에서 오래 머문 일을 옮기며 고른 사유(고르지 않으면 남기지 않는다)
+export function migrateToToday(db: Db, id: string, now = new Date(), reason?: DelayReason | null): Promise<Item> {
+  return migrateTo(db, id, (today) => today, now, reason);
 }
 
 // 포스트잇의 '모두 오늘 하기'. 하나라도 못 옮기면 아무것도 옮기지 않는다.
@@ -235,12 +257,13 @@ export async function reopen(db: Db, id: string, prevStatus: 'open' | 'doing', n
   });
 }
 
-// 안 하기: 끝나지 않은 할 일에 줄을 긋는다. 되돌리기·다시 하기를 위해 바꾸기 전 상태를 돌려준다
-export async function dropItem(db: Db, id: string, now = new Date()): Promise<'open' | 'doing'> {
+// 안 하기: 끝나지 않은 할 일에 줄을 긋는다. 되돌리기·다시 하기를 위해 바꾸기 전 상태를 돌려준다.
+// reason: 월초 정리에서 오래 머문 일을 내려놓으며 고른 사유
+export async function dropItem(db: Db, id: string, now = new Date(), reason?: DelayReason | null): Promise<'open' | 'doing'> {
   return db.transaction(async (tx) => {
     const item = await requireItem(tx, id);
     if (item.status !== 'open' && item.status !== 'doing') throw new Error('끝나지 않은 할 일만 안 하기로 할 수 있어요');
-    await update(tx, id, { status: 'dropped' }, now);
+    await update(tx, id, reason ? { status: 'dropped', delay_reason: reason } : { status: 'dropped' }, now);
     return item.status;
   });
 }
@@ -250,7 +273,7 @@ export async function undoDrop(db: Db, id: string, prevStatus: 'open' | 'doing',
   await db.transaction(async (tx) => {
     const item = await requireItem(tx, id);
     if (item.status !== 'dropped') throw new Error('안 하기로 한 일이 아니라 되돌릴 수 없습니다');
-    await update(tx, id, { status: prevStatus }, now);
+    await update(tx, id, { status: prevStatus, delay_reason: null }, now);
   });
 }
 
@@ -275,7 +298,7 @@ export async function undoMigration(
     if (!source || source.status !== 'migrated') throw new Error('원래 할 일이 옮긴 상태가 아니라 되돌릴 수 없습니다');
     await tx.runAsync('UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?', [ts, ts, createdId]);
     await markDirty(tx, 'items', createdId);
-    await update(tx, source.id, { status: prevStatus }, now);
+    await update(tx, source.id, { status: prevStatus, delay_reason: null }, now);
   });
 }
 
