@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AccountLinks } from './AccountLinks';
 import { EASE_OUT } from './motion';
 import { dimPressed } from './press';
 import { colors, HIT } from './theme';
@@ -16,7 +17,7 @@ type Props = {
   onDismissed?: () => void; // 시트가 완전히 내려간 뒤. 확인 창은 여기서 띄운다(모달이 닫히는 중에 띄우면 iOS가 삼킨다)
 };
 
-// 오늘 화면 계정 버튼을 누르면 아래에서 올라오는 작은 종이 시트: 이 노트의 주인(이메일)과 로그아웃
+// 오늘 화면 계정 버튼을 누르면 아래에서 올라오는 작은 종이 시트: 이 노트의 주인(이메일), 로그아웃, 처리방침·문의하기·계정 삭제
 export function AccountSheet({ visible, email, onClose, onSignOut, onDeleteAccount, onDismissed }: Props) {
   const insets = useSafeAreaInsets();
   const reduce = useReduceMotion();
@@ -60,10 +61,7 @@ export function AccountSheet({ visible, email, onClose, onSignOut, onDeleteAccou
         <Pressable accessibilityRole="button" style={dimPressed(styles.signOut)} onPress={onSignOut}>
           <Txt style={styles.signOutText}>로그아웃</Txt>
         </Pressable>
-        {/* 되돌릴 수 없는 일이라 작고 조용하게, 누르면 한 번 더 묻는다 */}
-        <Pressable accessibilityRole="button" style={dimPressed(styles.delete)} onPress={onDeleteAccount}>
-          <Txt style={styles.deleteText}>계정 삭제</Txt>
-        </Pressable>
+        <AccountLinks onDeleteAccount={onDeleteAccount} />
       </Animated.View>
     </Modal>
   );
@@ -109,8 +107,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   signOutText: { fontSize: 15, color: colors.inkSoft },
-  delete: { alignSelf: 'center', minHeight: HIT, paddingHorizontal: 12, justifyContent: 'center' },
-  deleteText: { fontSize: 13, color: colors.danger, textDecorationLine: 'underline' },
   busy: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(42, 37, 32, 0.3)' },
   busyCard: { backgroundColor: colors.card, borderRadius: 16, paddingHorizontal: 28, paddingVertical: 22, alignItems: 'center', gap: 12 },
   busyText: { fontSize: 15, color: colors.inkSoft },

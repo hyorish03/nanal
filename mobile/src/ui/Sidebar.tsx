@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line, Path, Rect } from 'react-native-svg';
 import { useAccountEmail } from '../lib/account';
+import { AccountLinks } from './AccountLinks';
 import { Paper } from './Paper';
 import { WIDE } from './responsive';
 import { colors, HIT } from './theme';
@@ -63,11 +64,7 @@ export function Sidebar({ current, onSelect, onCollapse, onSignOut, onDeleteAcco
             >
               <Txt style={styles.signOutText}>로그아웃</Txt>
             </Pressable>
-            {onDeleteAccount && (
-              <Pressable accessibilityRole="button" onPress={onDeleteAccount} style={({ pressed }) => [styles.delete, pressed && styles.rowHover]}>
-                <Txt style={styles.deleteText}>계정 삭제</Txt>
-              </Pressable>
-            )}
+            <AccountLinks compact onDeleteAccount={onDeleteAccount} />
           </View>
         )}
       </View>
@@ -187,8 +184,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   signOutText: { fontSize: 13, color: colors.inkSoft },
-  delete: { alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center', paddingHorizontal: 2 },
-  deleteText: { fontSize: 12, color: colors.danger, textDecorationLine: 'underline' },
   row: {
     minHeight: HIT,
     paddingHorizontal: 12,
