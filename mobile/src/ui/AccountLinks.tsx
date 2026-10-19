@@ -21,10 +21,16 @@ type Props = {
   compact?: boolean; // 사이드바: 글자를 조금 작게, 왼쪽 정렬
 };
 
-// 계정 시트·사이드바 아래 작은 링크 한 줄: 개인정보 처리방침 · 문의하기 (· 계정 삭제)
+// 계정 시트·사이드바 아래 작은 링크: 개인정보 처리방침 · 문의하기 (· 계정 삭제, 사이드바는 다음 줄)
 export function AccountLinks({ onDeleteAccount, compact = false }: Props) {
   const text = compact ? styles.textCompact : styles.text;
-  return (
+  const remove = onDeleteAccount && (
+    // 되돌릴 수 없는 일이라 작고 조용하게, 누르면 한 번 더 묻는다
+    <Pressable accessibilityRole="button" style={dimPressed(styles.link)} onPress={onDeleteAccount}>
+      <Txt style={[text, styles.danger]}>계정 삭제</Txt>
+    </Pressable>
+  );
+  const links = (
     <View style={[styles.row, compact && styles.rowCompact]}>
       <Pressable accessibilityRole="link" style={dimPressed(styles.link)} onPress={openPrivacy}>
         <Txt style={text}>개인정보 처리방침</Txt>
@@ -35,17 +41,22 @@ export function AccountLinks({ onDeleteAccount, compact = false }: Props) {
       <Pressable accessibilityRole="link" accessibilityHint="메일 앱이 열려요" style={dimPressed(styles.link)} onPress={openSupport}>
         <Txt style={text}>문의하기</Txt>
       </Pressable>
-      {onDeleteAccount && (
+      {!compact && remove && (
         <>
           <Txt style={styles.dot} accessible={false}>
             ·
           </Txt>
-          {/* 되돌릴 수 없는 일이라 작고 조용하게, 누르면 한 번 더 묻는다 */}
-          <Pressable accessibilityRole="button" style={dimPressed(styles.link)} onPress={onDeleteAccount}>
-            <Txt style={[text, styles.danger]}>계정 삭제</Txt>
-          </Pressable>
+          {remove}
         </>
       )}
+    </View>
+  );
+  // 사이드바는 폭이 좁아 계정 삭제를 따로 한 줄에 둔다(줄 끝에 ·만 남지 않게)
+  if (!compact || !remove) return links;
+  return (
+    <View>
+      {links}
+      <View style={[styles.rowCompact, styles.alone]}>{remove}</View>
     </View>
   );
 }
@@ -56,6 +67,7 @@ const styles = StyleSheet.create({
   link: { minHeight: HIT, paddingHorizontal: 6, justifyContent: 'center' },
   text: { fontSize: 14, color: colors.inkSoft, textDecorationLine: 'underline' },
   textCompact: { fontSize: 12, color: colors.inkSoft, textDecorationLine: 'underline' },
+  alone: { alignItems: 'flex-start' },
   danger: { color: colors.danger },
   dot: { color: colors.faint },
 });
