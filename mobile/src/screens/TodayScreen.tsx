@@ -123,6 +123,19 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     setOrganizeInput(input);
     setOrganizeOpen(true);
   };
+  // 말로 적기 시트가 내려간 뒤 정리 시트를 연다. 한 번 꺼내 쓰면 비워서 두 번 열지 않는다.
+  const openAfterVoice = () => {
+    const next = afterVoice.current;
+    afterVoice.current = null;
+    if (next) openOrganize(next);
+  };
+  // onDismiss가 오지 않는 경우(Fabric pageSheet)를 위해, 닫고 나서도 남아 있으면 조금 뒤 연다
+  useEffect(() => {
+    if (voiceOpen || !afterVoice.current) return;
+    const id = setTimeout(openAfterVoice, AFTER_VOICE_MS);
+    return () => clearTimeout(id);
+    // openAfterVoice는 매 렌더 새 함수라 의존성에서 뺀다
+  }, [voiceOpen]);
   const openCapture = () => {
     if (VoiceSheet) {
       setNotice(null);
@@ -519,11 +532,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
             afterVoice.current = { text: spoken, auto: false };
             setVoiceOpen(false);
           }}
-          onDismissed={() => {
-            const next = afterVoice.current;
-            afterVoice.current = null;
-            if (next) openOrganize(next);
-          }}
+          onDismissed={openAfterVoice}
         />
       )}
       <PostponeSheet visible={postponing !== null} today={today} onPick={(date) => void postponeTo(date)} onClose={() => setPostponing(null)} />
@@ -556,6 +565,7 @@ const RIBBON_GAP = 16;
 const REVEAL_GAP = 12; // 고치는 줄을 목록 아래 끝에서 이만큼 띄운다
 // 오른쪽 칸을 둘 만한 폭: 바깥 여백 + 공책 최소 480 + 칸 사이 + 오른쪽 칸
 const PANEL_MIN = WIDE.pageX * 2 + 480 + WIDE.gutter + PANEL_W;
+const AFTER_VOICE_MS = 600; // 말로 적기 시트가 내려가는 애니메이션보다 조금 길게
 const LOAD_FAILED = '오늘 기록을 불러오지 못했어요. 잠시 뒤에 다시 열어 주세요';
 const EMPTY_TITLE = '아직 적은 줄이 없어요';
 const EMPTY_HINT = '위 칸에 한 줄 적어 볼까요?';

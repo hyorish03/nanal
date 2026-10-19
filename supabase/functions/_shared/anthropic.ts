@@ -1,9 +1,10 @@
 import Anthropic from 'npm:@anthropic-ai/sdk@0.131.0';
 
+// 엣지 함수 시간 안에, 앱이 기다리는 시간(정리 30초)보다 먼저 끝나게 13초 × 2번(재시도 1번)
 export function anthropic(options: { timeout?: number; maxRetries?: number } = {}): Anthropic {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY가 없습니다');
-  return new Anthropic({ apiKey, timeout: options.timeout ?? 60_000, maxRetries: options.maxRetries ?? 2 });
+  return new Anthropic({ apiKey, timeout: options.timeout ?? 13_000, maxRetries: options.maxRetries ?? 1 });
 }
 
 // 일시적인 문제(429, 529 과부하, 5xx, 연결 실패)는 ai_busy, 그 밖(형식 오류, 거절 등)은 ai_failed.

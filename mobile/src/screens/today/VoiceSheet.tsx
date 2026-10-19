@@ -8,7 +8,7 @@ import { Txt } from '../../ui/Txt';
 import { Paper } from '../../ui/Paper';
 import { useReduceMotion } from '../../ui/useReduceMotion';
 import { voiceErrorMessage } from '../../voice/errors';
-import { initialVoiceState, voiceReducer } from '../../voice/machine';
+import { initialVoiceState, voiceReducer, watchVoice } from '../../voice/machine';
 import { dimPressed } from '../../ui/press';
 import { useKeyboardResizePaused } from '../../ui/KeyboardResize';
 
@@ -70,6 +70,7 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
       dispatch({ type: 'denied' });
       return;
     }
+    dispatch({ type: 'granted' });
     const onDevice = ExpoSpeechRecognitionModule.supportsOnDeviceRecognition();
     triedOnDevice.current = onDevice;
     retriedOnline.current = false;
@@ -93,6 +94,16 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
     start().catch(() => dispatch({ type: 'error', code: 'client' }));
     return () => ExpoSpeechRecognitionModule.abort();
   }, [visible]);
+
+  // 인식기가 켜지거나 끝나기를 너무 오래 기다리면 스피너만 돌지 않게 끊는다
+  useEffect(
+    () =>
+      watchVoice(state.kind, () => {
+        dispatch({ type: 'timeout' });
+        ExpoSpeechRecognitionModule.abort();
+      }),
+    [state.kind],
+  );
 
   useEffect(() => {
     if (state.kind === 'done' && !handedOff.current) {

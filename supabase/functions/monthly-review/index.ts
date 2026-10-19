@@ -41,7 +41,8 @@ Deno.serve(async (req) => {
     // 대상 달마다 1번(이용권이 있으면 더). 여기서는 확인만 하고, 저장에 성공한 뒤에 센다.
     if ((await quotaRemaining(user.client, 'monthly', input.month)) < 1) return fail('paid_required');
 
-    const message = await anthropic({ timeout: 120_000, maxRetries: 1 }).messages.create({
+    // 앱은 90초까지 기다린다. 그보다 먼저 끝나게 80초 한 번만
+    const message = await anthropic({ timeout: 80_000, maxRetries: 0 }).messages.create({
       model: REVIEW_MODEL,
       max_tokens: REVIEW_MAX_TOKENS,
       system: REVIEW_SYSTEM,
