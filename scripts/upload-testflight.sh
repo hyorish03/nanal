@@ -25,6 +25,18 @@ PLIST
 AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
 
 cd "$ROOT/mobile"
+# Supabase 주소·키가 빠진 채 빌드되면 앱이 서버에 붙지 못한다. 값은 출력하지 않는다.
+if [[ ! -f .env ]]; then
+  echo "✗ mobile/.env 파일이 없어요. mobile/.env.example을 복사해 Supabase 값을 채운 뒤 다시 실행해 주세요." >&2
+  exit 1
+fi
+for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY; do
+  if ! grep -qE "^[[:space:]]*(export[[:space:]]+)?${name}=[\"']?[^\"'[:space:]]" .env; then
+    echo "✗ mobile/.env에 ${name} 값이 없어요. 채운 뒤 다시 실행해 주세요." >&2
+    exit 1
+  fi
+done
+
 echo "▸ prebuild"; npx expo prebuild --platform ios --clean > "$OUT/prebuild.log" 2>&1
 cd ios
 echo "▸ archive"; xcodebuild -workspace app.xcworkspace -scheme app -configuration Release -destination "generic/platform=iOS" \
