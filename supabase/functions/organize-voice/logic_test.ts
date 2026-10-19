@@ -17,6 +17,13 @@ Deno.test('buildOrganizeMessage: 오늘 날짜와 요일, 글을 담는다', () 
   assertStringIncludes(msg, '<transcript>\n내일 치과 전화\n</transcript>');
 });
 
+Deno.test('buildOrganizeMessage: 요일을 직접 세지 않게 오늘부터 3주치 달력을 준다', () => {
+  const msg = buildOrganizeMessage('금요일 3시 팀 회의', '2026-10-19');
+  assertStringIncludes(msg, '<calendar>\n2026-10-19 월 (오늘)\n2026-10-20 화 (내일)\n2026-10-21 수 (모레)');
+  assertStringIncludes(msg, '2026-10-23 금');
+  assertStringIncludes(msg, '2026-11-08 일\n</calendar>');
+});
+
 Deno.test('validateOrganized: 올바른 항목만 남기고 날짜를 바로잡는다', () => {
   const items = validateOrganized(
     {

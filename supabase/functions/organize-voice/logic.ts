@@ -38,7 +38,10 @@ export const ORGANIZE_SYSTEM = [
   '- task(할 일): 해야 하거나 하려는 행동. "~하기"로 끝나는 짧은 한 줄(예: "프론트엔드 펀더멘탈 책 사기").',
   '- note(메모): 행동은 아니지만 남겨 둘 만한 사실이나 생각.',
   '- 망설임, 혼잣말, 같은 말의 반복은 버린다. 글에 없는 내용은 지어내지 않는다.',
-  '- date는 YYYY-MM-DD. "내일", "모레", "다음 주 월요일"처럼 날짜를 말했으면 오늘을 기준으로 계산하고, 말하지 않았으면 오늘 날짜를 쓴다.',
+  '- date는 YYYY-MM-DD. 날짜를 말하지 않았으면 오늘 날짜를 쓴다.',
+  '- "내일", "모레", "금요일", "다음 주 월요일"처럼 날짜를 말했으면 요일을 직접 계산하지 말고 메시지의 <calendar>에서 골라 그 날짜를 그대로 쓴다.',
+  '  요일만 말하면(예: "금요일") 오늘 이후 가장 가까운 그 요일(오늘이 그 요일이면 오늘), "다음 주 X요일"은 다음 주(월요일 시작)의 그 요일이다.',
+  '- 날짜는 date에만 담고 글에서는 뺀다(예: "모레 엄마 생신 선물 사기" → "엄마 생신 선물 사기", date는 모레).',
   '- 시각을 말했으면 글 앞에 붙인다(예: "15:00 치과 전화하기").',
   `- 많아도 ${MAX_ITEMS}개까지. 정리할 것이 없으면 items를 빈 배열로 둔다.`,
 ].join('\n');
@@ -52,8 +55,16 @@ export function parseOrganizeInput(body: unknown): OrganizeInput | null {
   return { text: trimmed, today };
 }
 
+// 모델이 요일을 틀리게 세지 않도록(예: 금요일을 토요일로) 오늘부터 3주치 날짜와 요일을 함께 준다
+export const CALENDAR_DAYS = 21;
+const RELATIVE = ['오늘', '내일', '모레', '글피'];
+
 export function buildOrganizeMessage(text: string, today: string): string {
-  return `오늘 날짜: ${today} (${weekdayKo(today)}요일)\n받아 적은 글:\n<transcript>\n${text}\n</transcript>`;
+  const calendar = Array.from({ length: CALENDAR_DAYS }, (_, i) => {
+    const d = addDays(today, i);
+    return `${d} ${weekdayKo(d)}${RELATIVE[i] ? ` (${RELATIVE[i]})` : ''}`;
+  }).join('\n');
+  return `오늘 날짜: ${today} (${weekdayKo(today)}요일)\n<calendar>\n${calendar}\n</calendar>\n받아 적은 글:\n<transcript>\n${text}\n</transcript>`;
 }
 
 // 형식을 지킨 출력이라도 한 번 더 거른다: 모르는 종류·빈 글은 버리고, 잘못되거나 지난 날짜, 1년 넘게 먼 날짜는 오늘로 바꾼다.

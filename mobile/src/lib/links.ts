@@ -6,5 +6,5 @@ export const PRIVACY_URL = 'https://hyorinleee.notion.site/3c3b7bc9ffaa8003a919c
 export const AUTH_CONFIRMED_URL = 'nanal://auth/confirmed';
 
 // 문의하기(계정 시트·사이드바). App Store Connect의 지원 URL과 같은 곳을 쓴다
-export const SUPPORT_EMAIL = 'TODO@example.com'; // TODO(출시 전): 운영자 문의 이메일로 바꾼다
+export const SUPPORT_EMAIL = 'hyorindev@gmail.com';
 export const SUPPORT_URL = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('[나날] 문의')}`;
