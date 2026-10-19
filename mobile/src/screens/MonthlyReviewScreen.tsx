@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { createMonthlyReview } from '../ai/client';
 import { AiError } from '../ai/errors';
 import { userMessage } from '../lib/userError';
@@ -134,11 +134,11 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
               {label}에 남긴 기분, 회고, 할 일 기록을 읽고 반복된 흐름을 정리해 드려요. 판단이나 진단이 아니라, 기록에서 보이는 모양을 함께 보는 거예요.
             </Txt>
             <View style={styles.infoBox}>
-              <InfoLine label="읽는 것" text="기분 점수, 회고 답변, 할 일 개수와 이월 횟수" />
-              <InfoLine label="보내는 곳" text="Claude(Anthropic). 결과는 내 기록에만 저장돼요" />
+              <InfoLine label="읽는 것" text="기분 점수, 회고 질문과 답변, 할 일 개수와 이월 횟수" />
+              <InfoLine label="보내는 곳" text="Claude(Anthropic). 결과는 내 계정의 기록에 저장돼요" />
               <InfoLine label="보내지 않는 것" text="할 일 내용" />
             </View>
-            <Txt style={styles.muted}>한 달에 한 번 무료로 만들 수 있어요.</Txt>
+            <Txt style={styles.muted}>한 달에 한 번 만들 수 있어요.</Txt>
             <Pressable accessibilityRole="button" style={dimPressed(styles.primary)} onPress={make}>
               <Txt style={styles.primaryText}>{label} 돌아보기 만들기</Txt>
             </Pressable>
@@ -294,10 +294,21 @@ function ReviewResult({
         <Txt style={styles.disclaimer}>
           기록한 {stats.recordedDays}일을 읽고 정리했어요{written ? ` · ${written} 작성` : ''}. 진단이 아니라 기록에서 보이는 흐름이에요. 마음이 오래 힘들면 주변이나 전문가와 이야기해 보세요.
         </Txt>
+        <Txt style={styles.disclaimer}>
+          지금 많이 힘들다면 자살예방상담전화{' '}
+          <Txt
+            style={[styles.disclaimer, styles.callLink]}
+            accessibilityRole="link"
+            accessibilityLabel="자살예방상담전화 109에 전화하기"
+            onPress={() => void Linking.openURL('tel:109').catch(() => {})}
+          >
+            109
+          </Txt>
+        </Txt>
       </FadeIn>
 
-      {/* 한 달에 한 번은 무료. 더 만드는 기능(유료)은 아직 없어서 누르는 버튼 대신 안내만 둔다 */}
-      <Txt style={styles.muted}>이번 달 돌아보기는 이미 만들었어요. 더 만드는 기능은 준비 중이에요</Txt>
+      {/* 돌아보기는 달마다 하나라 다시 만드는 버튼 대신 안내만 둔다 */}
+      <Txt style={styles.muted}>이 달 돌아보기는 이미 만들었어요. 돌아보기는 한 달에 한 번 만들 수 있어요</Txt>
     </FadeIn>
   );
 }
@@ -377,4 +388,5 @@ const styles = StyleSheet.create({
   causes: { gap: 4 },
   oneThing: { fontSize: 24, lineHeight: 30 },
   disclaimer: { fontSize: 12, lineHeight: 18, color: colors.muted },
+  callLink: { color: colors.navy, textDecorationLine: 'underline' },
 });

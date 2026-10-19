@@ -52,15 +52,72 @@ export function confirmDeleteAccount(db: Db): void {
   ]);
 }
 
-async function deleteAccount(db: Db): Promise<void> {
-  const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
-  if (error) {
-    Alert.alert(
-      '계정을 삭제하지 못했어요',
-      error instanceof FunctionsFetchError ? '인터넷 연결을 확인한 뒤 다시 해 주세요.' : '잠시 뒤에 다시 해 주세요. 계속 안 되면 문의해 주세요.',
-    );
-    return;
+// 삭제 중인지. 계정 시트·사이드바 어디서 눌렀든 앱 전체를 덮는 "삭제하는 중…"이 이것을 본다
+let deleting = false;
+const deletingListeners = new Set<(v: boolean) => void>();
+function setDeleting(v: boolean) {
+  deleting = v;
+  deletingListeners.forEach((l) => l(v));
+}
+export function useDeletingAccount(): boolean {
+  const [v, setV] = useState(deleting);
+  useEffect(() => {
+    deletingListeners.add(setV);
+    setV(deleting);
+    return () => {
+      deletingListeners.delete(setV);
+    };
+  }, []);
+  return v;
+}
+
+// 서버가 오래 답하지 않으면 실패로 보고 다시 하게 한다
+export const DELETE_TIMEOUT_MS = 20_000;
+
+export class DeleteTimeoutError extends Error {
+  constructor() {
+    super('delete-account timed out');
+    this.name = 'DeleteTimeoutError';
   }
-  await wipeLocalData(db).catch(() => {});
-  await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+}
+
+// ms 안에 끝나지 않으면 DeleteTimeoutError로 끝낸다(원래 요청은 fetch의 timeout이 끊는다)
+export function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new DeleteTimeoutError()), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
+export async function deleteAccount(db: Db): Promise<void> {
+  if (deleting) return;
+  setDeleting(true);
+  try {
+    const { error } = await withTimeout(
+      supabase.functions.invoke('delete-account', { method: 'POST', timeout: DELETE_TIMEOUT_MS }),
+      DELETE_TIMEOUT_MS,
+    ).catch((e: unknown) => ({ error: e }));
+    if (error) {
+      Alert.alert(
+        '계정을 삭제하지 못했어요',
+        error instanceof FunctionsFetchError || error instanceof DeleteTimeoutError
+          ? '인터넷 연결을 확인한 뒤 다시 해 주세요.'
+          : '잠시 뒤에 다시 해 주세요. 계속 안 되면 문의해 주세요.',
+      );
+      return;
+    }
+    await wipeLocalData(db).catch(() => {});
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+  } finally {
+    setDeleting(false);
+  }
 }

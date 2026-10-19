@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EASE_OUT } from './motion';
 import { dimPressed } from './press';
@@ -7,27 +7,42 @@ import { colors, HIT } from './theme';
 import { Txt } from './Txt';
 import { useReduceMotion } from './useReduceMotion';
 
-type Props = { visible: boolean; email: string | null; onClose: () => void; onSignOut: () => void; onDeleteAccount: () => void };
+type Props = {
+  visible: boolean;
+  email: string | null;
+  onClose: () => void;
+  onSignOut: () => void;
+  onDeleteAccount: () => void;
+  onDismissed?: () => void; // 시트가 완전히 내려간 뒤. 확인 창은 여기서 띄운다(모달이 닫히는 중에 띄우면 iOS가 삼킨다)
+};
 
 // 오늘 화면 계정 버튼을 누르면 아래에서 올라오는 작은 종이 시트: 이 노트의 주인(이메일)과 로그아웃
-export function AccountSheet({ visible, email, onClose, onSignOut, onDeleteAccount }: Props) {
+export function AccountSheet({ visible, email, onClose, onSignOut, onDeleteAccount, onDismissed }: Props) {
   const insets = useSafeAreaInsets();
   const reduce = useReduceMotion();
   const show = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(visible);
+  const dismissed = useRef(onDismissed);
+  useEffect(() => {
+    dismissed.current = onDismissed;
+  }, [onDismissed]);
 
   useEffect(() => {
     if (visible) setMounted(true);
     Animated.timing(show, { toValue: visible ? 1 : 0, duration: reduce ? 0 : visible ? 260 : 180, easing: EASE_OUT, useNativeDriver: true }).start(
       ({ finished }) => {
-        if (finished && !visible) setMounted(false);
+        if (finished && !visible) {
+          setMounted(false);
+          // iOS는 Modal의 onDismiss가 알려 준다
+          if (Platform.OS !== 'ios') dismissed.current?.();
+        }
       },
     );
   }, [visible, reduce, show]);
 
   const lift = show.interpolate({ inputRange: [0, 1], outputRange: [280, 0] });
   return (
-    <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose} onDismiss={Platform.OS === 'ios' ? onDismissed : undefined} statusBarTranslucent>
       <Animated.View style={[styles.backdrop, { opacity: show }]}>
         <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="닫기" onPress={onClose} />
       </Animated.View>
@@ -50,6 +65,20 @@ export function AccountSheet({ visible, email, onClose, onSignOut, onDeleteAccou
           <Txt style={styles.deleteText}>계정 삭제</Txt>
         </Pressable>
       </Animated.View>
+    </Modal>
+  );
+}
+
+// 계정을 지우는 동안 앱 전체를 덮는다. 끝나면 로그아웃되거나 실패 안내가 뜬다
+export function DeletingAccountOverlay({ visible }: { visible: boolean }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
+      <View style={styles.busy} accessibilityViewIsModal accessibilityLiveRegion="polite">
+        <View style={styles.busyCard}>
+          <ActivityIndicator color={colors.navy} />
+          <Txt style={styles.busyText}>삭제하는 중…</Txt>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -82,4 +111,7 @@ const styles = StyleSheet.create({
   signOutText: { fontSize: 15, color: colors.inkSoft },
   delete: { alignSelf: 'center', minHeight: HIT, paddingHorizontal: 12, justifyContent: 'center' },
   deleteText: { fontSize: 13, color: colors.danger, textDecorationLine: 'underline' },
+  busy: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(42, 37, 32, 0.3)' },
+  busyCard: { backgroundColor: colors.card, borderRadius: 16, paddingHorizontal: 28, paddingVertical: 22, alignItems: 'center', gap: 12 },
+  busyText: { fontSize: 15, color: colors.inkSoft },
 });

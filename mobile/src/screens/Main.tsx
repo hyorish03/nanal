@@ -17,7 +17,8 @@ import { claimOwner } from '../sync/owner';
 import { createSupabaseRemote } from '../sync/supabaseRemote';
 import { useSync } from '../sync/useSync';
 import { Cover } from '../ui/Cover';
-import { confirmDeleteAccount, confirmSignOut } from '../lib/account';
+import { confirmDeleteAccount, confirmSignOut, useDeletingAccount } from '../lib/account';
+import { DeletingAccountOverlay } from '../ui/AccountSheet';
 import { FadeIn } from '../ui/FadeIn';
 import { LAMP_PAPER, LAMP_SHADE } from '../ui/lamp';
 import { EASE_IN_OUT, EASE_OUT } from '../ui/motion';
@@ -341,6 +342,8 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     nav.dispatch(CommonActions.reset({ index: 1, routes: [{ key: base.key, name: base.name }, { name: key }] }));
   }, [nav]);
 
+  const deletingAccount = useDeletingAccount();
+
   const finishOnboarding = useCallback(() => {
     markOnboardingSeen(AsyncStorage);
     setScreen('today');
@@ -486,6 +489,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
         opening={coverOpening}
       >
       </Cover>
+      <DeletingAccountOverlay visible={deletingAccount} />
     </View>
   );
 }

@@ -76,6 +76,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const [notice, setNotice] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastSpec | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
+  const afterAccount = useRef<(() => void) | null>(null); // 계정 시트가 다 내려간 뒤 할 일(삭제 확인 창)
   const [postponing, setPostponing] = useState<{ id: string; prev: 'open' | 'doing' } | null>(null); // 언제로 미룰지 고르는 줄
   const email = useAccountEmail();
   const busy = useRef(false);
@@ -387,7 +388,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="계정"
-              accessibilityHint="이메일을 보고 로그아웃할 수 있어요"
+              accessibilityHint="이메일을 보고 로그아웃하거나 계정을 삭제할 수 있어요"
               hitSlop={CHIP_SLOP}
               style={dimPressed(styles.account)}
               onPress={() => setAccountOpen(true)}
@@ -532,12 +533,17 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         email={email}
         onClose={() => setAccountOpen(false)}
         onSignOut={() => {
+          afterAccount.current = () => void confirmSignOut(db);
           setAccountOpen(false);
-          void confirmSignOut(db);
         }}
         onDeleteAccount={() => {
+          afterAccount.current = () => confirmDeleteAccount(db);
           setAccountOpen(false);
-          confirmDeleteAccount(db);
+        }}
+        onDismissed={() => {
+          const next = afterAccount.current;
+          afterAccount.current = null;
+          next?.();
         }}
       />
     </View>

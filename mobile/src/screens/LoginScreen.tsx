@@ -346,7 +346,7 @@ export function LoginScreen() {
         style={styles.checkHit}
         accessibilityRole="checkbox"
         accessibilityState={{ checked: consent }}
-        accessibilityLabel="개인정보 처리방침을 읽었고 동의해요. 회고 정리에 AI를 쓸 때 그 글이 Anthropic으로 보내져요"
+        accessibilityLabel="개인정보 처리방침을 읽었고 동의해요. AI 정리나 월간 돌아보기를 쓰면 그때 적은 글과 기록이 Anthropic으로 보내져요"
         accessibilityActions={[{ name: 'activate' }, { name: 'privacy', label: '개인정보 처리방침 열기' }]}
         onAccessibilityAction={(e) => (e.nativeEvent.actionName === 'privacy' ? openPrivacy() : toggleConsent())}
         onPress={toggleConsent}
@@ -363,7 +363,7 @@ export function LoginScreen() {
         <Txt style={styles.consentLink} onPress={openPrivacy} accessibilityRole="link">
           개인정보 처리방침
         </Txt>
-        을 읽었고 동의해요. 회고 정리에 AI를 쓸 때 그 글이 Anthropic으로 보내져요.
+        을 읽었고 동의해요. AI 정리나 월간 돌아보기를 쓰면 그때 적은 글과 기록이 Anthropic으로 보내져요.
       </Txt>
     </View>
   );
