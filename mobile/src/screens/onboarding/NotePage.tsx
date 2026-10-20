@@ -5,13 +5,13 @@ import { logicalDate } from '../../lib/date';
 import { StatusSymbol } from '../../ui/StatusSymbol';
 import { colors } from '../../ui/theme';
 import { useReduceMotion } from '../../ui/useReduceMotion';
-import { DownArrow, InfoMark, InkBottle, LongArrow, RibbonTab, Star, TimeIcon, Timeline, UpArrow } from './NoteDoodles';
+import { DownArrow, InfoMark, InkBottle, RibbonTab, Star, TimeIcon, Timeline, UpArrow } from './NoteDoodles';
 import { Ink, Marked, NOTE_FONT_SCALE, NoteContext, NoteText, useNote } from './NoteInk';
 import { MARGIN_X, NOTE_BAR_H, type NoteMode, noteScale, type NoteStep, ROW_TOP, RULE_FIRST, RULE_GAP, TEXT_X } from './notebook';
 import { noteDateText, noteLabel } from './notePages';
 
 const EDGE = 16; // 글이 종이 오른쪽 끝에 닿지 않게 남기는 폭
-const NOTE_X = 236; // 둘째 장 기호 설명(← 할 일)이 시작하는 x
+const NOTE_X = 236; // 첫 장 기호 설명(← 할 일)이 시작하는 x
 const BIND_W = 20; // 제본 쪽 그늘 폭
 
 // 노트 한 장(종이·줄·여백선·그 장의 손글씨 메모)을 width×height로 그린다.
@@ -96,37 +96,9 @@ function useGrid() {
   };
 }
 
-// 1장: 인사
-function Greeting({ date }: { date: string }) {
-  const { s, x, row, room, fitX, above } = useGrid();
-  return (
-    <>
-      <Ink i={0} right={x(28)} top={row(-1)}>
-        <NoteText face="date">{noteDateText(date)}</NoteText>
-      </Ink>
-      <Ink i={1} left={x(TEXT_X)} top={row(0)} maxWidth={room(TEXT_X)}>
-        <Marked kind="title">
-          <NoteText face="title">나날 쓰는 법</NoteText>
-        </Marked>
-      </Ink>
-      <Ink i={2} left={x(236)} top={x(108)} grid={false}>
-        <Star s={s} />
-      </Ink>
-      <Body i={3} r={2} text="하루를 한 줄씩 적는 불렛 노트예요." />
-      <Body i={4} r={3} text="할 일과 메모는 기호 하나로 빠르게," />
-      <Body i={5} r={4} text="저녁엔 일기처럼 마음을 돌아봐요." />
-      <Ink i={7} left={x(TEXT_X)} top={row(6)} maxWidth={room(TEXT_X)}>
-        <NoteText face="note">한 장씩 넘기면서 알려 줄게요</NoteText>
-      </Ink>
-      <Ink i={8} left={fitX(210, 140)} top={x(372)} grid={false}>
-        <LongArrow s={s} maxH={above(x(372))} />
-      </Ink>
-    </>
-  );
-}
-
-// 2장: 기호. 왼쪽은 기호와 예시 줄, 오른쪽은 붉은 글씨 설명
-function Symbols() {
+// 1장: 쓰는 법과 기호. 왼쪽은 기호와 예시 줄, 오른쪽은 붉은 글씨 설명
+// 줄 자리: 날짜 -1, 제목 0, 머리말 2–3, 기호 4–8, 맺음 10. 아이폰 SE(칸 높이 약 647)에서도 조작 줄 위에 들어간다
+function Guide({ date }: { date: string }) {
   const { s, x, row, room } = useGrid();
   const rows = [
     { kind: 'open', text: '보고서 초안', note: '← 할 일', marked: true },
@@ -138,10 +110,18 @@ function Symbols() {
   const line = [styles.line, { gap: 10 * s }];
   return (
     <>
-      <Title i={0} text="기호 하나로 적어요" />
+      <Ink i={0} right={x(28)} top={row(-1)}>
+        <NoteText face="date">{noteDateText(date)}</NoteText>
+      </Ink>
+      <Title i={1} text="나날 쓰는 법" />
+      <Ink i={2} left={x(236)} top={x(108)} grid={false}>
+        <Star s={s} />
+      </Ink>
+      <Body i={3} r={2} text="하루를 한 줄씩, 기호 하나로" />
+      <Body i={4} r={3} text="적는 불렛 노트예요." />
       {rows.map((r, n) => (
         <Fragment key={r.kind}>
-          <Ink i={1 + n * 2} left={x(TEXT_X)} top={row(2 + n)} maxWidth={Math.min(x(NOTE_X - TEXT_X - 12), room(TEXT_X))} style={line}>
+          <Ink i={5 + n * 2} left={x(TEXT_X)} top={row(4 + n)} maxWidth={Math.min(x(NOTE_X - TEXT_X - 12), room(TEXT_X))} style={line}>
             <StatusSymbol kind={r.kind} size={18 * s} />
             {'marked' in r ? (
               <Marked kind="word" shrink>
@@ -153,35 +133,17 @@ function Symbols() {
               </NoteText>
             )}
           </Ink>
-          <Ink i={2 + n * 2} left={x(NOTE_X)} top={row(2 + n)} maxWidth={room(NOTE_X)}>
+          <Ink i={6 + n * 2} left={x(NOTE_X)} top={row(4 + n)} maxWidth={room(NOTE_X)}>
             <NoteText face="note">{r.note}</NoteText>
           </Ink>
         </Fragment>
       ))}
-      <Ink i={12} left={x(TEXT_X)} top={row(8)} maxWidth={room(TEXT_X)} style={[styles.line, { gap: 8 * s }]}>
-        <NoteText face="note" shrink>
-          기호를 톡 누르면
-        </NoteText>
-        <StatusSymbol kind="open" size={15 * s} />
-        <NoteText face="note">→</NoteText>
-        <StatusSymbol kind="doing" size={15 * s} />
-        <NoteText face="note">→</NoteText>
-        <StatusSymbol kind="done" size={15 * s} />
-      </Ink>
-      <Ink i={13} left={x(TEXT_X)} top={row(9)} maxWidth={room(TEXT_X)} style={styles.line}>
-        <Marked kind="word">
-          <NoteText face="note">형광펜</NoteText>
-        </Marked>
-        <NoteText face="note" shrink>
-          은 중요한 일 · 하루 3개까지
-        </NoteText>
-      </Ink>
-      <Note i={14} r={10} text="줄을 밀면 → 형광펜 · ← 미루기·지우기" />
+      <Note i={15} r={10} text="기호를 톡 누르면 상태가 바뀌어요" />
     </>
   );
 }
 
-// 3장: 하루의 흐름. 왼쪽 여백에 점선과 아침·낮·저녁 아이콘
+// 2장: 하루의 흐름. 왼쪽 여백에 점선과 아침·낮·저녁 아이콘
 function Flow() {
   const { s, x, fitX } = useGrid();
   return (
@@ -214,7 +176,7 @@ function Flow() {
   );
 }
 
-// 4장: 책갈피와 다시 보기
+// 3장: 책갈피와 다시 보기
 function Finale() {
   const { s, x, row, room, fitX, above } = useGrid();
   const { width } = useNote();
@@ -248,15 +210,16 @@ function Finale() {
           <View style={[styles.tape, { top: -12 * s, width: 80 * s, height: 24 * s, marginLeft: -40 * s }]} />
         </View>
       </Ink>
-      <Note i={9} r={12} text="이제 오늘의 첫 줄을 써 볼까요" />
-      <Ink i={10} left={fitX(270, 80)} top={x(590)} grid={false}>
-        <DownArrow s={s} maxH={above(x(590))} />
+      {/* 아이폰 SE에서도 조작 줄(쪽 번호)에 겹치지 않게 포스트잇 바로 아래 칸에 둔다 */}
+      <Note i={9} r={11} text="이제 오늘의 첫 줄을 써 볼까요" />
+      <Ink i={10} left={fitX(270, 80)} top={x(554)} grid={false}>
+        <DownArrow s={s} maxH={above(x(554))} />
       </Ink>
     </>
   );
 }
 
-const PAGES = [Greeting, Symbols, Flow, Finale] as const;
+const PAGES = [Guide, Flow, Finale] as const;
 
 // 한 칸짜리 글줄들(TEXT_X에서 시작)
 function Title({ i, text }: { i: number; text: string }) {

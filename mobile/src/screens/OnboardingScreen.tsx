@@ -23,7 +23,7 @@ type Turn = { dir: 1 | -1; from: NoteStep; to: NoteStep };
 const pageLabel = (step: number) => `${NOTE_STEPS}장 중 ${step + 1}장`;
 
 // 처음 여는 사람에게 책 한 권을 건넨다. 표지를 펼치면 오른쪽 장으로 다가가 그 장이 그대로 첫 노트가 되고,
-// 노트가 저절로 써진다. 장을 넘겨(버튼이나 옆으로 밀기) 네 장을 보고 첫 줄을 쓰러 간다.
+// 노트가 저절로 써진다. 장을 넘겨(버튼이나 옆으로 밀기) 세 장을 보고 첫 줄을 쓰러 간다.
 export function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const reduce = useReduceMotion();
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);

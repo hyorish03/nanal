@@ -11,10 +11,10 @@ export function noteScale(width: number): number {
   return Math.min(1.35, Math.max(1, width / NOTE_BASE_W));
 }
 
-export type NoteStep = 0 | 1 | 2 | 3;
+export type NoteStep = 0 | 1 | 2;
 // write: 글씨가 한 줄씩 써진다, still: 다 써진 채로, leave: 글씨가 흐려지며 사라진다, blank: 줄만 그은 빈 장
 export type NoteMode = 'write' | 'still' | 'leave' | 'blank';
-export const NOTE_STEPS = 4;
+export const NOTE_STEPS = 3;
 
 // 노트 아래 조작 줄(이전 장·쪽 번호·다음 장)의 높이. 손그림 화살표가 이 위에서 멈춘다
 export const NOTE_BAR_H = 104;
