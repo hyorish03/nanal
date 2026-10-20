@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -11,6 +12,7 @@ import { addMonths, formatShortDate } from '../lib/date';
 import type { MonthlyReviewContent } from '../monthly/content';
 import { monthLabel } from '../monthly/labels';
 import { getMonthlyReview, saveMonthlyReview } from '../monthly/repo';
+import { consentView, hasSeenReviewIntro, markReviewIntroSeen } from '../monthly/reviewIntro';
 import { supabase } from '../supabase';
 import { FadeIn } from '../ui/FadeIn';
 import { colors, SCREEN_X } from '../ui/theme';
@@ -22,6 +24,7 @@ import { PageHeader } from '../ui/PageHeader';
 import { useLayoutClass, WIDE } from '../ui/responsive';
 import { inkNeedsLightText } from './archive/ink';
 import { InkDot } from './archive/InkDot';
+import { ReviewIntro } from './archive/ReviewIntro';
 
 type Props = { db: Db; month: string; version: number; onChanged: () => void; onClose: () => void };
 type Step = 'loading' | 'consent' | 'making' | 'result';
@@ -44,6 +47,7 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
   const [writtenAt, setWrittenAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [justMade, setJustMade] = useState(false); // 이 화면에서 방금 만들었다
+  const [introSeen, setIntroSeen] = useState<boolean | null>(null); // 첫 돌아보기 소개를 이 기기에서 봤는지(이 화면에 있는 동안은 처음 읽은 값)
   const alive = useRef(true);
   const busy = useRef(false);
   const label = monthLabel(month);
@@ -55,6 +59,20 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
       alive.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    hasSeenReviewIntro(AsyncStorage).then((seen) => !cancelled && setIntroSeen(seen));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const view = step === 'consent' ? consentView(introSeen) : null;
+  // 소개를 보여 줬으면 다음부터는 그대로인 화면이다
+  useEffect(() => {
+    if (view === 'intro') void markReviewIntroSeen(AsyncStorage);
+  }, [view]);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,11 +143,15 @@ export function MonthlyReviewScreen({ db, month, version, onChanged, onClose }: 
 
         {step === 'loading' && <ActivityIndicator accessibilityLabel="불러오는 중" />}
 
-        {step === 'consent' && (
+        {(view === 'intro' || view === 'plain') && (
           <View style={styles.block}>
-            <Txt variant="title" style={styles.lead}>
-              한 달을 같이 읽어 볼까요?
-            </Txt>
+            {view === 'intro' ? (
+              <ReviewIntro db={db} month={month} />
+            ) : (
+              <Txt variant="title" style={styles.lead}>
+                한 달을 같이 읽어 볼까요?
+              </Txt>
+            )}
             <Txt style={styles.body}>
               {label}에 남긴 기분, 회고, 할 일 기록을 읽고 반복된 흐름을 정리해 드려요. 판단이나 진단이 아니라, 기록에서 보이는 모양을 함께 보는 거예요.
             </Txt>

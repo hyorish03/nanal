@@ -5,7 +5,7 @@ import { colors } from '../../ui/theme';
 import { inkOpacity, inkSize } from './ink';
 
 // 살짝 일그러진 잉크 번짐(24×24 기준). 가로가 조금 넓고 가장자리가 고르지 않다.
-const BLOT =
+export const BLOT =
   'M12.6 3.1C15.9 2.6 19.6 4.0 21.2 7.2C22.6 10.0 22.2 13.9 20.4 16.6C18.5 19.5 15.1 21.2 11.7 20.9C8.1 20.7 4.6 19.0 3.0 15.9C1.7 13.2 1.9 9.6 3.6 7.0C5.4 4.4 9.0 3.5 12.6 3.1Z';
 
 type Props = {

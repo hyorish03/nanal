@@ -1,7 +1,10 @@
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
-import { useEffect, useReducer, useRef } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
+import { giveAiConsent, hasAiConsent } from '../../ai/consent';
+import { userMessage } from '../../lib/userError';
+import { supabase } from '../../supabase';
 import { EASE_OUT } from '../../ui/motion';
 import { colors, HIT, SCREEN_X } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
@@ -9,6 +12,8 @@ import { Paper } from '../../ui/Paper';
 import { useReduceMotion } from '../../ui/useReduceMotion';
 import { voiceErrorMessage } from '../../voice/errors';
 import { initialVoiceState, voiceReducer, watchVoice } from '../../voice/machine';
+import { voiceStep } from '../../voice/intro';
+import { VoiceIntro } from './VoiceIntro';
 import { dimPressed } from '../../ui/press';
 import { useKeyboardResizePaused } from '../../ui/KeyboardResize';
 
@@ -25,8 +30,13 @@ const VOLUME = { enabled: true, intervalMillis: 100 };
 const MAX_VOLUME = 10;
 
 // 말로 적기(스펙 11.5, Voice 목업). 음성 파일은 남기지 않고 받아 적은 글만 넘긴다.
+// AI 정리에 아직 동의하지 않았으면 듣기 전에 소개(VoiceIntro)를 보여 주고 거기서 동의를 받는다.
 export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDismissed }: Props) {
   const [state, dispatch] = useReducer(voiceReducer, initialVoiceState);
+  const [consented, setConsented] = useState<boolean | null>(null);
+  const [agreeing, setAgreeing] = useState(false);
+  const [agreeError, setAgreeError] = useState<string | null>(null);
+  const opened = useRef(0); // 시트를 닫았다 다시 열면 이전에 물은 동의 결과는 버린다
   const handedOff = useRef(false);
   const triedOnDevice = useRef(false);
   const retriedOnline = useRef(false);
@@ -85,15 +95,46 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
     });
   };
 
-  // 열리면 바로 듣기 시작하고, 닫히면 인식을 버린다.
+  const listen = () => start().catch(() => dispatch({ type: 'error', code: 'client' }));
+
+  // 열리면(동의했으면) 바로 듣기 시작하고, 닫히면 인식을 버린다.
   useEffect(() => {
+    opened.current += 1;
     if (!visible) return;
+    const id = opened.current;
     handedOff.current = false;
     retriedOnline.current = false;
     dispatch({ type: 'reset' });
-    start().catch(() => dispatch({ type: 'error', code: 'client' }));
+    setAgreeing(false);
+    setAgreeError(null);
+    // 동의는 계정에 있다(로그인한 세션에서 읽어 빠르다). 계정을 바꿨을 수도 있어 열 때마다 본다
+    setConsented(null);
+    hasAiConsent(supabase).then((ok) => {
+      if (id !== opened.current) return;
+      setConsented(ok);
+      if (ok) listen();
+    });
     return () => ExpoSpeechRecognitionModule.abort();
   }, [visible]);
+
+  // 소개에서 "동의하고 말해 보기": 저장되면 그 자리에서 듣기 시작한다. 못 하면(오프라인) 소개에 오류를 보인다
+  const agree = async () => {
+    if (agreeing) return;
+    const id = opened.current;
+    setAgreeing(true);
+    setAgreeError(null);
+    try {
+      await giveAiConsent(supabase);
+      if (id !== opened.current) return;
+      setConsented(true);
+      listen();
+    } catch (e) {
+      if (id === opened.current) setAgreeError(userMessage(e));
+    } finally {
+      if (id === opened.current) setAgreeing(false);
+    }
+  };
+  const step = voiceStep(consented);
 
   // 인식기가 켜지거나 끝나기를 너무 오래 기다리면 스피너만 돌지 않게 끊는다
   useEffect(
@@ -144,73 +185,78 @@ export function VoiceSheet({ visible, onClose, onTranscript, onTypeInstead, onDi
           <View style={styles.headerButton} />
         </View>
 
-        <Txt variant="title" style={styles.lead}>
-          편하게 말해 보세요
-        </Txt>
-        <Txt style={styles.hint}>{denied ? '말로 적으려면 마이크와 음성 인식 권한이 있어야 해요.' : '정리되지 않아도 괜찮아요. 할 일만 골라 둘게요.'}</Txt>
-
-        {!denied && (
-          <ScrollView style={styles.transcriptBox} contentContainerStyle={styles.transcriptInner}>
-            <Txt style={text ? styles.transcript : styles.placeholder} accessibilityLiveRegion="polite">
-              {text || (listening ? '듣고 있어요…' : ' ')}
+        {step === 'intro' && <VoiceIntro busy={agreeing} error={agreeError} onAgree={agree} onTypeInstead={() => onTypeInstead('')} />}
+        {step === 'listen' && (
+          <>
+            <Txt variant="title" style={styles.lead}>
+              편하게 말해 보세요
             </Txt>
-          </ScrollView>
-        )}
+            <Txt style={styles.hint}>{denied ? '말로 적으려면 마이크와 음성 인식 권한이 있어야 해요.' : '정리되지 않아도 괜찮아요. 할 일만 골라 둘게요.'}</Txt>
 
-        {failed ? (
-          <View style={styles.actions}>
-            <Txt style={styles.error} accessibilityRole="alert">
-              {voiceErrorMessage(failed.code)}
-            </Txt>
-            {denied ? (
-              <Pressable accessibilityRole="button" style={dimPressed(styles.outline)} onPress={() => Linking.openSettings()}>
-                <Txt>설정 열기</Txt>
-              </Pressable>
-            ) : (
-              <Pressable accessibilityRole="button" style={dimPressed(styles.secondary)} onPress={() => start().catch(() => dispatch({ type: 'error', code: 'client' }))}>
-                <Txt>다시 말하기</Txt>
-              </Pressable>
+            {!denied && (
+              <ScrollView style={styles.transcriptBox} contentContainerStyle={styles.transcriptInner}>
+                <Txt style={text ? styles.transcript : styles.placeholder} accessibilityLiveRegion="polite">
+                  {text || (listening ? '듣고 있어요…' : ' ')}
+                </Txt>
+              </ScrollView>
             )}
-            <Pressable accessibilityRole="button" style={dimPressed(styles.primary)} onPress={() => onTypeInstead(failed.text)}>
-              <Txt style={styles.primaryText}>글로 적기</Txt>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.actions}>
-            <View style={styles.micWrap}>
-              {listening && (
-                <Animated.View
-                  pointerEvents="none"
-                  style={[styles.ring, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]}
-                />
-              )}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={listening ? '말하기 끝내기' : '받아 적는 중'}
-                accessibilityHint={listening ? '누르면 정리를 시작해요' : undefined}
-                accessibilityState={{ disabled: !listening }}
-                disabled={!listening}
-                style={dimPressed([styles.mic, !listening && styles.micBusy])}
-                onPress={() => {
-                  dispatch({ type: 'stop' });
-                  ExpoSpeechRecognitionModule.stop();
-                }}
-              >
-                {listening ? (
-                  <Svg width={28} height={28} viewBox="0 0 18 18" fill="none">
-                    <Rect x={6} y={1.5} width={6} height={10} rx={3} stroke={colors.onDark} strokeWidth={1.4} />
-                    <Path d="M3 8.5a6 6 0 0 0 12 0M9 14.5v2.5" stroke={colors.onDark} strokeWidth={1.4} strokeLinecap="round" />
-                  </Svg>
-                ) : (
-                  <ActivityIndicator color={colors.onDark} />
-                )}
-              </Pressable>
-            </View>
-            <Txt style={styles.micHint}>{listening ? '다 말했으면 눌러 주세요' : '받아 적고 있어요'}</Txt>
-          </View>
-        )}
 
-        <Txt style={styles.privacy}>음성은 저장하지 않아요. 정리할 때 받아 적은 글이 Claude(Anthropic)로 보내져요</Txt>
+            {failed ? (
+              <View style={styles.actions}>
+                <Txt style={styles.error} accessibilityRole="alert">
+                  {voiceErrorMessage(failed.code)}
+                </Txt>
+                {denied ? (
+                  <Pressable accessibilityRole="button" style={dimPressed(styles.outline)} onPress={() => Linking.openSettings()}>
+                    <Txt>설정 열기</Txt>
+                  </Pressable>
+                ) : (
+                  <Pressable accessibilityRole="button" style={dimPressed(styles.secondary)} onPress={listen}>
+                    <Txt>다시 말하기</Txt>
+                  </Pressable>
+                )}
+                <Pressable accessibilityRole="button" style={dimPressed(styles.primary)} onPress={() => onTypeInstead(failed.text)}>
+                  <Txt style={styles.primaryText}>글로 적기</Txt>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.actions}>
+                <View style={styles.micWrap}>
+                  {listening && (
+                    <Animated.View
+                      pointerEvents="none"
+                      style={[styles.ring, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]}
+                    />
+                  )}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={listening ? '말하기 끝내기' : '받아 적는 중'}
+                    accessibilityHint={listening ? '누르면 정리를 시작해요' : undefined}
+                    accessibilityState={{ disabled: !listening }}
+                    disabled={!listening}
+                    style={dimPressed([styles.mic, !listening && styles.micBusy])}
+                    onPress={() => {
+                      dispatch({ type: 'stop' });
+                      ExpoSpeechRecognitionModule.stop();
+                    }}
+                  >
+                    {listening ? (
+                      <Svg width={28} height={28} viewBox="0 0 18 18" fill="none">
+                        <Rect x={6} y={1.5} width={6} height={10} rx={3} stroke={colors.onDark} strokeWidth={1.4} />
+                        <Path d="M3 8.5a6 6 0 0 0 12 0M9 14.5v2.5" stroke={colors.onDark} strokeWidth={1.4} strokeLinecap="round" />
+                      </Svg>
+                    ) : (
+                      <ActivityIndicator color={colors.onDark} />
+                    )}
+                  </Pressable>
+                </View>
+                <Txt style={styles.micHint}>{listening ? '다 말했으면 눌러 주세요' : '받아 적고 있어요'}</Txt>
+              </View>
+            )}
+
+            <Txt style={styles.privacy}>음성은 저장하지 않아요. 정리할 때 받아 적은 글이 Claude(Anthropic)로 보내져요</Txt>
+          </>
+        )}
       </View>
     </Modal>
   );
