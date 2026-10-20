@@ -18,7 +18,7 @@ import { claimOwner } from '../sync/owner';
 import { createSupabaseRemote } from '../sync/supabaseRemote';
 import { useSync } from '../sync/useSync';
 import { Cover } from '../ui/Cover';
-import { confirmDeleteAccount, confirmSignOut, useDeletingAccount } from '../lib/account';
+import { confirmDeleteAccount, confirmSignOut, confirmStartFresh, useDeletingAccount } from '../lib/account';
 import { DeletingAccountOverlay } from '../ui/AccountSheet';
 import { FadeIn } from '../ui/FadeIn';
 import { LAMP_PAPER, LAMP_SHADE } from '../ui/lamp';
@@ -70,27 +70,41 @@ export function Main({ db, userId }: { db: Db; userId: string }) {
       </SafeAreaView>
     );
   if (claim === 'mismatch' || claim === 'error') {
+    const mismatch = claim === 'mismatch';
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.blocked}>
           <Txt style={styles.blockedText} accessibilityRole="alert">
-            {claim === 'mismatch'
-              ? '이 기기에는 다른 계정의 기록이 있어요. 그 계정으로 다시 로그인해 주세요'
+            {mismatch
+              ? '이 기기에는 다른 계정의 기록이 있어요. 그 계정으로 다시 로그인하거나, 이 기기의 기록을 지우고 지금 계정으로 시작할 수 있어요'
               : '이 기기의 기록을 확인하지 못했어요. 잠시 뒤에 다시 해 주세요'}
           </Txt>
           <View style={styles.blockedActions}>
-            <Pressable accessibilityRole="button" style={dimPressed(styles.blockedPrimary)} onPress={() => setAttempt((n) => n + 1)}>
-              <Txt variant="medium" style={styles.blockedPrimaryText}>
-                다시 시도
-              </Txt>
-            </Pressable>
+            {mismatch ? (
+              // 기록이 섞이지 않게 이전 계정 기록을 비우고 지금 계정을 주인으로 둔다(서버에 올라간 것은 남는다)
+              <Pressable
+                accessibilityRole="button"
+                style={dimPressed(styles.blockedPrimary)}
+                onPress={() => void confirmStartFresh(db, userId, () => setAttempt((n) => n + 1))}
+              >
+                <Txt variant="medium" style={styles.blockedPrimaryText}>
+                  기록 지우고 이 계정으로 시작
+                </Txt>
+              </Pressable>
+            ) : (
+              <Pressable accessibilityRole="button" style={dimPressed(styles.blockedPrimary)} onPress={() => setAttempt((n) => n + 1)}>
+                <Txt variant="medium" style={styles.blockedPrimaryText}>
+                  다시 시도
+                </Txt>
+              </Pressable>
+            )}
             {/* 이 기기에서만 로그아웃한다(오프라인이어도 로그인 화면으로 돌아가게) */}
             <Pressable
               accessibilityRole="button"
               style={dimPressed(styles.blockedSecondary)}
               onPress={() => supabase.auth.signOut({ scope: 'local' }).catch(() => {})}
             >
-              <Txt>로그아웃</Txt>
+              <Txt>{mismatch ? '로그아웃하고 이전 계정으로' : '로그아웃'}</Txt>
             </Pressable>
           </View>
         </View>

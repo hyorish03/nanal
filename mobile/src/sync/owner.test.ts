@@ -2,7 +2,8 @@ import { openTestDb } from '../../test/sqlite';
 import { migrate } from '../db/schema';
 import { addItem } from '../items/repo';
 import { addSomeday } from '../someday/repo';
-import { claimOwner, wipeLocalData } from './owner';
+import { pendingCount } from './outbox';
+import { claimOwner, switchOwner, wipeLocalData } from './owner';
 
 test('처음 claim하면 ok', async () => {
   const db = openTestDb();
@@ -36,4 +37,18 @@ test('wipeLocalData: 기록·보낼 목록·소유자를 비워 다른 계정이
   expect(await db.getAllAsync('SELECT id FROM someday', [])).toEqual([]);
   expect(await db.getAllAsync('SELECT row_key FROM outbox', [])).toEqual([]);
   expect(await claimOwner(db, 'user-b')).toBe('ok');
+});
+
+test('switchOwner: 이전 계정의 기록·보낼 목록을 비우고 지금 계정을 소유자로 둔다', async () => {
+  const db = openTestDb();
+  await migrate(db);
+  await claimOwner(db, 'u1');
+  await addItem(db, { kind: 'task', text: '이전 계정 할 일' });
+  expect(await pendingCount(db)).toBeGreaterThan(0);
+  expect(await claimOwner(db, 'u2')).toBe('mismatch');
+  await switchOwner(db, 'u2');
+  expect(await claimOwner(db, 'u2')).toBe('ok');
+  expect(await claimOwner(db, 'u1')).toBe('mismatch');
+  expect(await pendingCount(db)).toBe(0);
+  expect((await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM items', []))?.n).toBe(0);
 });

@@ -3,7 +3,8 @@ import { Alert } from 'react-native';
 import type { Db } from '../db/types';
 import { supabase } from '../supabase';
 import { pendingCount } from '../sync/outbox';
-import { wipeLocalData } from '../sync/owner';
+import { switchOwner, wipeLocalData } from '../sync/owner';
+import { reloadWidgets } from '../widget/reload';
 import { FunctionsFetchError } from '@supabase/supabase-js';
 
 // 로그인한 계정의 이메일. 세션이 바뀌면(로그아웃 등) 따라 바뀐다
@@ -40,6 +41,31 @@ export async function confirmSignOut(db: Db): Promise<void> {
   Alert.alert('로그아웃할까요?', message, [
     { text: '취소', style: 'cancel' },
     { text: '로그아웃', style: 'destructive', onPress: () => void supabase.auth.signOut({ scope: 'local' }).catch(() => {}) },
+  ]);
+}
+
+// 다른 계정의 기록이 있는 기기에서 지금 계정으로 새로 시작할지 묻는다. 서버에 다 올라갔으면 잃는 것이 없다고,
+// 아직 못 올린 기록이 있으면 그만큼 사라진다고 알린다. 지운 뒤 onDone(다시 소유자 확인)을 부른다.
+export async function confirmStartFresh(db: Db, userId: string, onDone: () => void): Promise<void> {
+  const pending = await pendingCount(db).catch(() => 0);
+  const message =
+    pending > 0
+      ? `이전 계정의 기록 중 ${pending}개는 아직 서버에 올리지 못했어요. 지우면 이 기록은 사라져요. 지키려면 먼저 이전 계정으로 로그인해 올려 주세요.`
+      : '이전 계정의 기록은 서버에 그대로 있어서, 그 계정으로 다시 로그인하면 돌아와요. 이 기기에서만 지우고 지금 계정으로 새로 시작해요.';
+  Alert.alert('이 기기의 기록을 지울까요?', message, [
+    { text: '취소', style: 'cancel' },
+    {
+      text: pending > 0 ? '그래도 지우기' : '지우고 시작',
+      style: 'destructive',
+      onPress: () =>
+        void switchOwner(db, userId).then(
+          () => {
+            reloadWidgets();
+            onDone();
+          },
+          () => Alert.alert('지우지 못했어요', '잠시 뒤에 다시 해 주세요.'),
+        ),
+    },
   ]);
 }
 
