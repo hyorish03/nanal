@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, type Ref, useEffect, useMemo, useRef, useState } from 'react';
 import { type AccessibilityActionEvent, Animated, Keyboard, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { type ItemKind, MAX_TEXT, type TaskStatus } from '../../items/repo';
@@ -44,6 +44,9 @@ type Props = {
   canMoveUp?: boolean;
   canMoveDown?: boolean;
   onMove?: (id: string, delta: -1 | 1) => void;
+  // 오늘 장 첫 줄에만: 처음 한 번 코치마크가 줄과 기호를 가리킨다(늘 같은 ref라 다시 그리지 않는다)
+  tourRowRef?: Ref<View>;
+  tourSymbolRef?: Ref<View>;
 };
 
 export const ItemRow = memo(function ItemRow(props: Props) {
@@ -169,6 +172,19 @@ export const ItemRow = memo(function ItemRow(props: Props) {
   const input = useRef<TextInput>(null);
   const finished = useRef(false); // 완료 키와 포커스 잃기가 잇달아 와도 한 번만 저장한다
   const row = useRef<View>(null);
+  // 코치마크가 첫 줄을 잴 수 있게 같은 줄 View를 함께 넘긴다
+  const tourRowRef = props.tourRowRef;
+  const rowRef = useMemo<Ref<View>>(
+    () =>
+      tourRowRef
+        ? (node: View | null) => {
+            row.current = node;
+            if (typeof tourRowRef === 'function') tourRowRef(node);
+            else tourRowRef.current = node;
+          }
+        : row,
+    [tourRowRef],
+  );
   const edit = (from: 'tap' | 'menu' = 'tap') => {
     closeSwipe();
     finished.current = false;
@@ -367,7 +383,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
 
   return (
     <Animated.View
-      ref={row}
+      ref={rowRef}
       style={[
         styles.row,
         menu.anchor !== null && styles.rowOpen,
@@ -460,6 +476,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
             {/* 상태는 기호만 눌러 바꾼다 */}
             {advance ? (
               <Pressable
+                ref={props.tourSymbolRef}
                 style={tintPressed([styles.symbol, { height: lineH }])}
                 hitSlop={SYMBOL_SLOP}
                 onPress={unlessOpen(() => onAdvance(id))}
@@ -467,7 +484,7 @@ export const ItemRow = memo(function ItemRow(props: Props) {
                 <StatusSymbol kind={kind} />
               </Pressable>
             ) : (
-              <View style={[styles.symbol, { height: lineH }]}>
+              <View ref={props.tourSymbolRef} style={[styles.symbol, { height: lineH }]}>
                 <StatusSymbol kind={kind} />
               </View>
             )}

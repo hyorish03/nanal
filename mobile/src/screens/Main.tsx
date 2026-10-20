@@ -11,6 +11,7 @@ import { type CoverOpening, markCoverOpened, readCoverOpening } from '../lib/cov
 import { consumeInitialUrl, type LinkAction, parseDeepLink } from '../lib/deepLink';
 import { logicalDate } from '../lib/date';
 import { hasSeenOnboarding, markOnboardingSeen } from '../lib/onboarding';
+import { isTourDue, markTourDue, markTourSeen } from '../lib/todayTour';
 import { listMonthLeftovers, markMonthRitual, readMonthRitualDue } from '../monthly/ritual';
 import { supabase } from '../supabase';
 import { claimOwner } from '../sync/owner';
@@ -126,6 +127,8 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   const linkActionRef = useRef<LinkAction | null>(null);
   linkActionRef.current = linkAction;
   const [ritualOpen, setRitualOpen] = useState(false); // 월초 정리 시트
+  const [tourDue, setTourDue] = useState(false); // 온보딩 뒤 오늘 장 코치마크를 아직 안 봤다(그동안 입력칸 키보드를 올리지 않는다)
+  const sidebarArchiveRef = useRef<View>(null); // 넓은 배치에서 코치마크가 가리키는 사이드바 '지난 기록'
   const [ritualChecked, setRitualChecked] = useState(false); // 첫 실행에 월초 정리를 따져 봤다(그 전에는 입력칸 키보드를 올리지 않는다)
   const [resumeTick, setResumeTick] = useState(0); // 앱이 다시 앞으로 나올 때마다 하나씩(새 달이 됐을 수 있다)
   const screenRef = useRef<Screen | null>(null);
@@ -227,8 +230,10 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
   }, [runAction]);
 
   useEffect(() => {
-    hasSeenOnboarding(AsyncStorage).then((seen) => {
+    hasSeenOnboarding(AsyncStorage).then(async (seen) => {
       if (!seen) setLinkAction(null); // 온보딩보다 먼저 도착한 링크 동작은 버린다
+      // 온보딩을 마치고 코치마크를 끝내기 전에 앱을 껐으면 이번에 이어서 본다
+      if (seen) setTourDue(await isTourDue(AsyncStorage));
       setScreen(seen ? 'today' : 'onboarding');
     });
   }, []);
@@ -344,10 +349,19 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
 
   const deletingAccount = useDeletingAccount();
 
+  // 끝내도 건너뛰어도 오늘 장에서 코치마크를 한 번 본다(이 기기에서 온보딩을 거친 사람만)
   const finishOnboarding = useCallback(() => {
     markOnboardingSeen(AsyncStorage);
+    void markTourDue(AsyncStorage);
+    setTourDue(true);
     setScreen('today');
   }, []);
+  const finishTour = useCallback(() => {
+    void markTourSeen(AsyncStorage);
+    setTourDue(false); // 이제 입력칸에 포커스가 간다
+  }, []);
+  // 표지가 펼쳐지고 월초 정리를 따져 본 뒤, 시트·위젯 동작·다른 화면이 없을 때만 띄운다(있으면 닫힐 때까지 미룬다)
+  const tourReady = tourDue && coverSettled && ritualChecked && !ritualOpen && route === 'today' && !linkAction && !deletingAccount;
 
   return (
     <View style={styles.root}>
@@ -378,6 +392,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                 onCollapse={toggleSidebar}
                 onSignOut={() => void confirmSignOut(db)}
                 onDeleteAccount={() => confirmDeleteAccount(db)}
+                archiveRef={sidebarArchiveRef}
               />
             </Animated.View>
           </Animated.View>
@@ -424,10 +439,13 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                             Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
                             navigation.navigate('archive');
                           }}
-                          focusReady={coverSettled && ritualChecked && focusPending}
+                          focusReady={coverSettled && ritualChecked && focusPending && !tourDue}
                           onFocused={() => setFocusPending(false)}
                           pendingAction={coverSettled ? linkAction : null}
                           onActionHandled={() => setLinkAction(null)}
+                          tourReady={tourReady}
+                          onTourDone={finishTour}
+                          sidebarArchiveRef={sidebarArchiveRef}
                         />
                       )}
                     </Stack.Screen>

@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
+import { type Ref, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, useWindowDimensions, type StyleProp, type View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { CHIP_H } from '../../ui/Chip';
@@ -20,11 +20,11 @@ const CAPTION_GAP = 6;
 const CAPTION_W = 96; // 글씨를 키워도(최대 1.4배) 한 줄에 들어가는 폭
 const CAPTION_SCALE = 1.4;
 
-type Props = { onPress: () => void; style?: StyleProp<ViewStyle> };
+type Props = { onPress: () => void; style?: StyleProp<ViewStyle>; targetRef?: Ref<View> }; // targetRef: 처음 한 번 코치마크가 가리킨다
 
 // 손으로 끌어내리는 동작은 없다(react-native-gesture-handler가 없어서). 누르는 동안 살짝 당겨지고, 떼면 돌아오며 열린다.
 // 끈 왼쪽에 작은 "지난 기록" 글씨를 붙여 무엇인지 알 수 있게 한다(하루 마무리 버튼과 같은 줄, 상태 막대 아래).
-export function Ribbon({ onPress, style }: Props) {
+export function Ribbon({ onPress, style, targetRef }: Props) {
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const reduce = useReduceMotion();
@@ -42,6 +42,7 @@ export function Ribbon({ onPress, style }: Props) {
 
   return (
     <Pressable
+      ref={targetRef}
       accessibilityRole="button"
       accessibilityLabel="지난 기록"
       accessibilityHint="지난 날의 기록을 봐요"

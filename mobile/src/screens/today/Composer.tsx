@@ -17,6 +17,8 @@ const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
 
 type Props = {
   inputRef?: Ref<TextInput>;
+  rowRef?: Ref<View>; // 처음 한 번 코치마크가 가리키는 입력줄
+  captureRef?: Ref<View>; // 〃 마이크·연필
   voice?: boolean; // 말로 적기를 쓸 수 있으면 마이크, 아니면 정리해서 넣기
   onCapture?: () => void; // 없으면 마이크·정리 버튼을 두지 않는다
   // 할 일만 받는 칸(언젠가 목록): 할 일·메모 칩과 기호 설명 없이 입력줄 하나. placeholder·읽는 이름을 바꾼다
@@ -26,7 +28,7 @@ type Props = {
 };
 
 // 입력칸과 종류 칩. 글자를 칠 때마다 여기만 다시 그려진다(목록 줄은 그대로).
-export const Composer = memo(function Composer({ inputRef, voice = false, onCapture, taskOnly, onSubmit }: Props) {
+export const Composer = memo(function Composer({ inputRef, rowRef, captureRef, voice = false, onCapture, taskOnly, onSubmit }: Props) {
   const [kind, setKind] = useState<ItemKind>('task');
   const [text, setText] = useState('');
   const info = useAnchor();
@@ -48,7 +50,7 @@ export const Composer = memo(function Composer({ inputRef, voice = false, onCapt
 
   return (
     <View style={styles.inputBlock}>
-      <View style={styles.inputRow}>
+      <View ref={rowRef} style={styles.inputRow}>
         <TextInput
           style={inputStyle}
           ref={inputRef}
@@ -64,6 +66,7 @@ export const Composer = memo(function Composer({ inputRef, voice = false, onCapt
         />
         {onCapture && (
           <Pressable
+            ref={captureRef}
             accessibilityRole="button"
             accessibilityLabel={voice ? '말로 적기' : '정리해서 넣기'}
             accessibilityHint={voice ? '말한 내용을 할 일과 메모로 정리해요' : '두서없이 쓴 글을 할 일과 메모로 정리해요'}

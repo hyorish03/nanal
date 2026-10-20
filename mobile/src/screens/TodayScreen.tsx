@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Keyboard, LayoutAnimation, type ListRenderItem, Pressable, StyleSheet, type TextInput, View } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
 import type { Db } from '../db/types';
@@ -54,15 +54,30 @@ import { useSpace } from '../ui/typeScale';
 import { PANEL_W, TodayPanel } from './today/TodayPanel';
 import { accountInitial, confirmDeleteAccount, confirmSignOut, useAccountEmail } from '../lib/account';
 import { AccountSheet } from '../ui/AccountSheet';
+import { TodayTour, type TourRefs } from './today/TodayTour';
 
 // 개발용·출시 빌드에서만 말로 적기 시트를 불러온다(Expo Go에서는 네이티브 모듈이 없어 import 시 오류).
 const VoiceSheet: typeof import('./today/VoiceSheet').VoiceSheet | null = voiceAvailable
   ? require('./today/VoiceSheet').VoiceSheet
   : null;
 
-type Props = { db: Db; version: number; onChanged: () => void; onOpenEvening: () => void; onOpenArchive?: () => void; focusReady?: boolean; onFocused?: () => void; pendingAction?: LinkAction | null; onActionHandled?: () => void };
+type Props = {
+  db: Db;
+  version: number;
+  onChanged: () => void;
+  onOpenEvening: () => void;
+  onOpenArchive?: () => void;
+  focusReady?: boolean;
+  onFocused?: () => void;
+  pendingAction?: LinkAction | null;
+  onActionHandled?: () => void;
+  // 온보딩 뒤 처음 한 번 코치마크. Main이 띄워도 될 때(월초 정리·위젯 동작이 없을 때)만 true로 준다
+  tourReady?: boolean;
+  onTourDone?: () => void;
+  sidebarArchiveRef?: RefObject<View | null>; // 넓은 배치: 사이드바의 '지난 기록' 줄
+};
 
-export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchive, focusReady = true, onFocused, pendingAction = null, onActionHandled }: Props) {
+export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchive, focusReady = true, onFocused, pendingAction = null, onActionHandled, tourReady = false, onTourDone, sidebarArchiveRef }: Props) {
   const today = logicalDate(new Date());
   const [items, setItems] = useState<Item[]>([]);
   const [candidates, setCandidates] = useState<Item[]>([]);
@@ -99,6 +114,14 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const panel = roomy && layout === 'wide' && pane.width >= PANEL_MIN;
   const s = useSpace();
   const ruleGap = useRuleGap();
+  // 코치마크가 가리키는 것들
+  const composerRowRef = useRef<View>(null);
+  const captureRef = useRef<View>(null);
+  const firstRowRef = useRef<View>(null);
+  const firstSymbolRef = useRef<View>(null);
+  const emptyRef = useRef<View>(null);
+  const ribbonRef = useRef<View>(null);
+  const noRef = useRef<View>(null);
 
   // 표지가 다 펼쳐진 뒤에만 true가 된다(Main이 Cover의 onOpened로 알려 준다). 그래서 기다리지 않고 바로 포커스한다.
   useEffect(() => {
@@ -361,6 +384,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         canMoveUp={index > 0}
         canMoveDown={index < count - 1}
         onMove={onMove}
+        tourRowRef={index === 0 ? firstRowRef : undefined}
+        tourSymbolRef={index === 0 ? firstSymbolRef : undefined}
       />
     ),
     [priorityFull, count, onAdvance, onTogglePriority, onEdit, onPostpone, onDrop, onDelete, onPriorityFull, onRevealEdit, drag.reorder, onMove],
@@ -435,12 +460,14 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       </Pressable>
   
       {/* 지난 기록 책갈피 끈: 하루 마무리 버튼 왼쪽, 화면 맨 위에 매달린다 */}
-      {showNav && onOpenArchive && eveningW > 0 && <Ribbon onPress={onOpenArchive} style={{ right: SCREEN_X + eveningW + RIBBON_GAP }} />}
+      {showNav && onOpenArchive && eveningW > 0 && (
+        <Ribbon targetRef={ribbonRef} onPress={onOpenArchive} style={{ right: SCREEN_X + eveningW + RIBBON_GAP }} />
+      )}
   
       {/* 입력칸과 할 일·메모 칩은 고정. 그 아래 목록만 스크롤된다.
           칩과 목록 사이는 좁게 두고, 숨 쉴 자리는 목록 맨 위 여백(LIST_TOP)으로 넣어 스크롤하면 함께 올라가게 한다 */}
       <View style={styles.writing}>
-        <Composer inputRef={inputRef} voice={VoiceSheet !== null} onCapture={onCapture} onSubmit={submit} />
+        <Composer inputRef={inputRef} rowRef={composerRowRef} captureRef={captureRef} voice={VoiceSheet !== null} onCapture={onCapture} onSubmit={submit} />
 
         {/* 공책 한 쪽: 여백선은 목록 뒤에 깔리고, 빈 줄은 목록 꼬리에서 함께 스크롤된다 */}
         <View ref={pageRef} style={styles.page}>
@@ -467,7 +494,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
             onScrollBeginDrag={openRow.closeAll} // 목록을 굴리면 밀어 연 줄을 닫는다
             ListEmptyComponent={
               // 빈 날은 첫 두 줄에 흐리게 적어 두고, 그 아래로 빈 줄이 이어진다. 스크린 리더는 한 번에 읽는다
-              <View accessible accessibilityLabel={`${EMPTY_TITLE}. ${EMPTY_HINT}`}>
+              <View ref={emptyRef} accessible accessibilityLabel={`${EMPTY_TITLE}. ${EMPTY_HINT}`}>
                 <View style={[styles.emptyRow, { minHeight: ruleGap }]}>
                   <Txt style={styles.empty}>{EMPTY_TITLE}</Txt>
                 </View>
@@ -492,6 +519,22 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       </View>
     </>
   );
+
+  // 처음 한 번 코치마크: 시트·메뉴가 떠 있거나 줄을 끄는 중에는 숨겼다가, 닫히면 그 단계부터 다시 띄운다.
+  // 빈 날은 기호·밀기 단계가 빈 자리를 가리킨다. 넓은 배치에서 사이드바가 보이면 끈 대신 사이드바 '지난 기록'
+  const empty = items.length === 0;
+  const tourRefs = useMemo<TourRefs>(
+    () => ({
+      page: pageRef,
+      composer: composerRowRef,
+      capture: captureRef,
+      symbol: empty ? emptyRef : firstSymbolRef,
+      swipe: empty ? emptyRef : firstRowRef,
+      archive: showNav ? ribbonRef : (sidebarArchiveRef ?? noRef),
+    }),
+    [empty, showNav, sidebarArchiveRef],
+  );
+  const tourOn = tourReady && loaded && !organizeOpen && !voiceOpen && !accountOpen && postponing === null && dragging === null;
 
   // 밀어 연 줄 바깥 어디를 만져도 그 줄을 닫는다(줄 안의 만짐은 줄이 먼저 알려 둔다)
   return (
@@ -537,6 +580,9 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       )}
       <PostponeSheet visible={postponing !== null} today={today} onPick={(date) => void postponeTo(date)} onClose={() => setPostponing(null)} />
       <Toast toast={toast} onHide={hideToast} />
+      {tourReady && onTourDone && (
+        <TodayTour active={tourOn} refs={tourRefs} voice={VoiceSheet !== null} empty={empty} sidebar={!showNav} onDone={onTourDone} />
+      )}
       <AccountSheet
         visible={accountOpen}
         email={email}

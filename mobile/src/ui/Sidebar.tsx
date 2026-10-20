@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, type Ref, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line, Path, Rect } from 'react-native-svg';
@@ -12,14 +12,15 @@ import { useSpace } from './typeScale';
 
 export type SidebarKey = 'today' | 'evening' | 'archive';
 
-type Props = { current: SidebarKey; onSelect: (key: SidebarKey) => void; onCollapse?: () => void; onSignOut?: () => void; onDeleteAccount?: () => void };
+// archiveRef: 오늘 장 처음 한 번 코치마크가 '지난 기록' 줄을 가리킨다
+type Props = { current: SidebarKey; onSelect: (key: SidebarKey) => void; onCollapse?: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; archiveRef?: Ref<View> };
 
 const ICON = 20;
 const SPINE_W = 10; // 왼쪽 끝 남색 천 책등
 
 // 아이패드·Mac의 왼쪽 칸. 공책 왼쪽에 붙은 남색 책등과 면지 한 장에 오늘·하루 마무리·지난 기록을 적어 둔다.
 // 휴대폰의 하루 마무리 버튼과 지난 기록 책갈피 끈을 대신한다.
-export function Sidebar({ current, onSelect, onCollapse, onSignOut, onDeleteAccount }: Props) {
+export function Sidebar({ current, onSelect, onCollapse, onSignOut, onDeleteAccount, archiveRef }: Props) {
   const insets = useSafeAreaInsets();
   const email = useAccountEmail();
   const s = useSpace();
@@ -48,7 +49,7 @@ export function Sidebar({ current, onSelect, onCollapse, onSignOut, onDeleteAcco
         <View style={styles.list}>
           <Row label="오늘" icon={<TodayIcon />} selected={current === 'today'} onPress={() => onSelect('today')} />
           <Row label="하루 마무리" icon={<LampIcon />} selected={current === 'evening'} onPress={() => onSelect('evening')} />
-          <Row label="지난 기록" icon={<RibbonIcon />} selected={current === 'archive'} onPress={() => onSelect('archive')} />
+          <Row label="지난 기록" icon={<RibbonIcon />} selected={current === 'archive'} onPress={() => onSelect('archive')} rowRef={archiveRef} />
         </View>
         {/* 맨 아래: 이 노트의 주인(이메일)과 로그아웃 */}
         {onSignOut && (
@@ -72,10 +73,11 @@ export function Sidebar({ current, onSelect, onCollapse, onSignOut, onDeleteAcco
   );
 }
 
-function Row({ label, icon, selected, onPress }: { label: string; icon: ReactNode; selected: boolean; onPress: () => void }) {
+function Row({ label, icon, selected, onPress, rowRef }: { label: string; icon: ReactNode; selected: boolean; onPress: () => void; rowRef?: Ref<View> }) {
   const [hover, setHover] = useState(false); // Mac 포인터·아이패드 트랙패드가 올라왔다
   return (
     <Pressable
+      ref={rowRef}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
