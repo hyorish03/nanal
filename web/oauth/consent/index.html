@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>나날 연결 허락</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Nanum+Pen+Script&display=swap">
+<link rel="stylesheet" href="/style.css">
+<script src="/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+</head>
+<body>
+<main>
+  <div class="hand">나날에 연결하기</div>
+
+  <!-- 불러오는 중 / 오류 -->
+  <p id="status" aria-live="polite">불러오는 중…</p>
+
+  <!-- 로그인 -->
+  <form id="login" class="hidden" novalidate>
+    <h1>먼저 나날에 로그인해 주세요</h1>
+    <p>앱에서 쓰는 이메일과 비밀번호예요. 아직 계정이 없으면 나날 앱에서 먼저 가입해 주세요.</p>
+    <label>이메일<input id="email" type="email" autocomplete="username" required></label>
+    <label>비밀번호<input id="password" type="password" autocomplete="current-password" required></label>
+    <p id="login-error" class="error hidden" role="alert"></p>
+    <button class="primary" type="submit">로그인</button>
+  </form>
+
+  <!-- 동의 -->
+  <section id="consent" class="hidden">
+    <h1><span id="client-name">AI 앱</span>이 내 나날 기록에 접근하도록 허락할까요?</h1>
+    <p id="account" class="small"></p>
+    <div class="card">
+      <h2>할 수 있는 것</h2>
+      <ul>
+        <li>날짜별 할 일·메모, 밀린 할 일, 언젠가 목록 읽기</li>
+        <li>기분, 하루 마무리 회고, 월간 돌아보기 읽기</li>
+        <li>할 일·메모를 새로 적고, 할 일의 상태(하는 중·끝냄·안 하기) 바꾸기</li>
+      </ul>
+      <h2>할 수 없는 것</h2>
+      <ul>
+        <li>기록 지우기, 글 고치기, 계정 정보 바꾸기</li>
+      </ul>
+    </div>
+    <p class="small">허락하면 이 앱이 가져간 기록은 그 앱의 개인정보 정책을 따라요. 연결을 끊으려면 AI 앱에서 나날 연결을 지우거나, 고객 지원(hyorindev@gmail.com)으로 알려 주세요.</p>
+    <p id="consent-error" class="error hidden" role="alert"></p>
+    <button id="approve" class="primary" type="button">허락하기</button>
+    <button id="deny" class="secondary" type="button">거절하기</button>
+    <button id="switch" class="link" type="button">다른 계정으로 로그인</button>
+  </section>
+
+  <p class="small"><a href="https://hyorinleee.notion.site/3c3b7bc9ffaa8003a919ce49d8ecb34a">개인정보 처리방침</a></p>
+</main>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const show = (id, on) => $(id).classList.toggle('hidden', !on);
+  const status = (text) => { $('status').textContent = text; show('status', !!text); };
+  const authorizationId = new URLSearchParams(location.search).get('authorization_id');
+  const sb = window.supabase.createClient(window.NANAL_SUPABASE_URL, window.NANAL_SUPABASE_ANON_KEY);
+
+  async function load() {
+    if (!authorizationId) return status('연결 요청을 찾지 못했어요. AI 앱에서 연결을 다시 시작해 주세요.');
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      status('');
+      show('consent', false);
+      show('login', true);
+      $('email').focus();
+      return;
+    }
+    const { data, error } = await sb.auth.oauth.getAuthorizationDetails(authorizationId);
+    if (error) return status('연결 요청이 만료됐거나 잘못됐어요. AI 앱에서 연결을 다시 시작해 주세요.');
+    // 이미 허락한 앱이면 바로 돌려보낸다
+    if (data.redirect_url && !data.authorization_id) return location.assign(data.redirect_url);
+    $('client-name').textContent = (data.client && data.client.name) || 'AI 앱';
+    $('account').textContent = `${session.user.email} 계정으로 연결해요`;
+    status('');
+    show('login', false);
+    show('consent', true);
+  }
+
+  $('login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    show('login-error', false);
+    const { error } = await sb.auth.signInWithPassword({ email: $('email').value.trim(), password: $('password').value });
+    if (error) {
+      $('login-error').textContent = error.message.includes('Invalid login')
+        ? '이메일이나 비밀번호가 맞지 않아요. 다시 확인해 주세요'
+        : error.message.includes('Email not confirmed')
+          ? '아직 이메일 인증을 하지 않았어요. 받은 메일함에서 인증 링크를 눌러 주세요'
+          : '로그인하지 못했어요. 잠시 뒤에 다시 해 주세요';
+      show('login-error', true);
+      return;
+    }
+    load();
+  });
+
+  async function decide(approve) {
+    $('approve').disabled = $('deny').disabled = true;
+    show('consent-error', false);
+    const { data, error } = approve
+      ? await sb.auth.oauth.approveAuthorization(authorizationId)
+      : await sb.auth.oauth.denyAuthorization(authorizationId);
+    if (error || !data || !data.redirect_url) {
+      $('consent-error').textContent = '처리하지 못했어요. 잠시 뒤에 다시 해 주세요';
+      show('consent-error', true);
+      $('approve').disabled = $('deny').disabled = false;
+      return;
+    }
+    location.assign(data.redirect_url);
+  }
+  $('approve').addEventListener('click', () => decide(true));
+  $('deny').addEventListener('click', () => decide(false));
+  $('switch').addEventListener('click', async () => { await sb.auth.signOut({ scope: 'local' }); load(); });
+
+  load();
+})();
+</script>
+</body>
+</html>
