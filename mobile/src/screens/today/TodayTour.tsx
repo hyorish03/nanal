@@ -19,7 +19,7 @@ import {
 import { haptic } from '../../ui/haptics';
 import { EASE_IN_OUT } from '../../ui/motion';
 import { dimPressed } from '../../ui/press';
-import { colors, fonts } from '../../ui/theme';
+import { colors, fonts, SLIM_H, SLIM_SLOP } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { useReduceMotion } from '../../ui/useReduceMotion';
 
@@ -263,7 +263,7 @@ export function TodayTour({ active, refs, voice, empty, sidebar, onDone }: Props
                 <View key={s.id} style={[styles.dot, i === index && styles.dotOn]} />
               ))}
             </View>
-            <Pressable accessibilityRole="button" style={dimPressed(styles.next)} onPress={next}>
+            <Pressable accessibilityRole="button" hitSlop={SLIM_SLOP} style={dimPressed(styles.next)} onPress={next}>
               <Txt variant="medium" style={styles.nextText}>
                 {last ? '시작하기' : '다음'}
               </Txt>
@@ -313,6 +313,6 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.dotOff },
   dotOn: { width: 16, backgroundColor: colors.navy },
-  next: { minHeight: 44, minWidth: 44, paddingHorizontal: 20, borderRadius: 22, backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center' },
+  next: { minHeight: SLIM_H, minWidth: 44, paddingHorizontal: 16, borderRadius: SLIM_H / 2, backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center' },
   nextText: { fontSize: 15, color: colors.onDark },
 });

@@ -5,7 +5,7 @@ import { MAX_ANSWER_LENGTH } from '../../reflections/repo';
 import type { TemplateQuestion } from '../../reflections/templates';
 import { dimPressed } from '../../ui/press';
 import { RuledPaper } from '../../ui/RuledPaper';
-import { colors, fonts } from '../../ui/theme';
+import { colors, fonts, SLIM_H, SLIM_SLOP } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { macText } from '../../ui/desktop';
 import { answerLines, useRule } from './rule';
@@ -23,10 +23,6 @@ type Props = {
   top?: number; // 카드 위쪽 여백
   style?: StyleProp<ViewStyle>;
 };
-
-// 버튼은 보이는 높이를 줄이고, 누르는 영역은 hitSlop으로 44pt를 지킨다
-const BUTTON_H = 34;
-const SLOP = { top: (44 - BUTTON_H) / 2, bottom: (44 - BUTTON_H) / 2 };
 
 // 회고 답을 적는 줄 노트. 새로 남길 때와 고칠 때 함께 쓴다.
 export function ReflectionForm({ title, questions, values, onChange, submitLabel, canSubmit, onSubmit, onCancel, keep, top = 0, style }: Props) {
@@ -54,7 +50,7 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
       </Svg>
       <View style={styles.actions}>
         {onCancel && (
-          <Pressable accessibilityRole="button" hitSlop={SLOP} style={dimPressed(styles.cancel)} onPress={onCancel}>
+          <Pressable accessibilityRole="button" hitSlop={SLIM_SLOP} style={dimPressed(styles.cancel)} onPress={onCancel}>
             <Txt style={styles.cancelText}>취소</Txt>
           </Pressable>
         )}
@@ -63,7 +59,7 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
           accessibilityState={{ disabled: !canSubmit }}
           accessibilityHint={canSubmit ? undefined : '한 줄이라도 적으면 남길 수 있어요'}
           disabled={!canSubmit}
-          hitSlop={SLOP}
+          hitSlop={SLIM_SLOP}
           style={dimPressed([styles.save, !canSubmit && styles.saveOff])}
           onPress={onSubmit}
         >
@@ -127,12 +123,12 @@ const styles = StyleSheet.create({
   footer: { marginTop: 8, paddingBottom: 10 },
   dash: { marginBottom: 10 },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 },
-  cancel: { minHeight: BUTTON_H, paddingHorizontal: 12, justifyContent: 'center' },
+  cancel: { minHeight: SLIM_H, paddingHorizontal: 12, justifyContent: 'center' },
   cancelText: { fontSize: 14, color: colors.inkSoft },
   save: {
-    minHeight: BUTTON_H,
+    minHeight: SLIM_H,
     paddingHorizontal: 16,
-    borderRadius: BUTTON_H / 2,
+    borderRadius: SLIM_H / 2,
     backgroundColor: colors.ink,
     justifyContent: 'center',
   },

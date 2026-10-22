@@ -83,6 +83,10 @@ export const type = {
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const;
 
 export const HIT = 44; // 최소 터치 크기
+// 카드·시트 안에 놓이는 작은 알약 버튼의 보이는 높이. 누르는 영역은 SLIM_SLOP으로 HIT를 지킨다.
+// 화면 아래를 가로지르는 큰 버튼(로그인·온보딩 등)에는 쓰지 않는다.
+export const SLIM_H = 34;
+export const SLIM_SLOP = { top: (HIT - SLIM_H) / 2, bottom: (HIT - SLIM_H) / 2 };
 export const SCREEN_X = 24; // 화면 좌우 여백
 
 // 넓은 배치(regular·wide: 아이패드, Mac)의 글자 눈금. 휴대폰 눈금(type)보다 한 단계 크고 줄 사이가 넉넉하다.

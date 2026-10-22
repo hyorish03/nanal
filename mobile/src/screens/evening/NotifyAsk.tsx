@@ -5,7 +5,7 @@ import { ALL_OFF, ALL_ON } from '../../notifications/plan';
 import { readPrefs, writePrefs } from '../../notifications/prefs';
 import { notificationsAvailable, requestNotificationPermission, rescheduleNotifications } from '../../notifications/scheduler';
 import { dimPressed } from '../../ui/press';
-import { colors, HIT } from '../../ui/theme';
+import { colors, SLIM_H, SLIM_SLOP } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 
 // 알림을 아직 켜지도 끄지도 않았다(한 번만 묻는다)
@@ -30,12 +30,12 @@ export function NotifyAsk({ db, onDone }: { db: Db; onDone: () => void }) {
       </Txt>
       <Txt style={styles.body}>아침 8시에 오늘 장을, 평일 저녁 6시에 남은 일을, 밤 10시에 마무리를 알려 드려요. 계정 메뉴에서 언제든 끌 수 있어요.</Txt>
       <View style={styles.actions}>
-        <Pressable accessibilityRole="button" style={dimPressed([styles.button, styles.primary])} onPress={() => void answer(true)}>
+        <Pressable accessibilityRole="button" hitSlop={SLIM_SLOP} style={dimPressed([styles.button, styles.primary])} onPress={() => void answer(true)}>
           <Txt variant="medium" style={styles.primaryText}>
             알림 받기
           </Txt>
         </Pressable>
-        <Pressable accessibilityRole="button" style={dimPressed([styles.button, styles.secondary])} onPress={() => void answer(false)}>
+        <Pressable accessibilityRole="button" hitSlop={SLIM_SLOP} style={dimPressed([styles.button, styles.secondary])} onPress={() => void answer(false)}>
           <Txt style={styles.secondaryText}>괜찮아요</Txt>
         </Pressable>
       </View>
@@ -62,9 +62,9 @@ const styles = StyleSheet.create({
   title: { color: colors.ink },
   body: { fontSize: 14, lineHeight: 21, color: colors.postitText },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  button: { flexGrow: 1, flexBasis: 120, minHeight: Math.max(HIT, 48), borderRadius: 24, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  button: { flexGrow: 1, flexBasis: 120, minHeight: SLIM_H, borderRadius: SLIM_H / 2, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   primary: { backgroundColor: colors.navy },
-  primaryText: { fontSize: 15, color: colors.onDark },
+  primaryText: { fontSize: 14, color: colors.onDark },
   secondary: { borderWidth: 1, borderColor: colors.chipBorder },
-  secondaryText: { fontSize: 15, color: colors.inkSoft },
+  secondaryText: { fontSize: 14, color: colors.inkSoft },
 });
