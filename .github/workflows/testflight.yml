@@ -21,13 +21,13 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -54,6 +54,8 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           BUILD_NUMBER: auto
+          # 첫 실행(run_number 1)이 빌드 16이었다. 실행마다 1씩 올라가 처리 중인 빌드와 겹치지 않는다.
+          MIN_BUILD_NUMBER: ${{ github.run_number + 15 }}
           TMPDIR: ${{ runner.temp }}
         run: scripts/upload-testflight.sh
 

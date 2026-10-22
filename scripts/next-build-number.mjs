@@ -1,5 +1,7 @@
 // App Store Connect에 올라간 나날 빌드 중 가장 큰 번호 + 1을 출력한다. CI가 빌드 번호를 정할 때 쓴다.
 // 환경: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH(.p8 경로)
+//       MIN_BUILD_NUMBER(선택): 이보다 작게는 주지 않는다. 막 올린 빌드는 처리되는 몇 분 동안 목록에 안 보여서,
+//       그 사이 다음 실행이 같은 번호를 고르지 않게 CI가 실행 번호로 하한을 준다.
 import { sign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
@@ -40,4 +42,4 @@ while (url) {
   for (const b of page.data) max = Math.max(max, Number(b.attributes.version) || 0);
   url = page.links?.next;
 }
-console.log(max + 1);
+console.log(Math.max(max + 1, Number(process.env.MIN_BUILD_NUMBER) || 0));
