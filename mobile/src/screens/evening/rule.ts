@@ -8,9 +8,15 @@ export type Rule = {
   sit: number; // 선이 줄 상자 맨 아래에서 올라오는 만큼(글자 기준선 바로 밑)
   hand: number; // 손글씨 질문 글자 크기
   body: number; // 답 글자 크기
+  inputLift: number; // 답 입력칸을 끌어올릴 만큼. 아래 INPUT_LINE_RATIO 설명
 };
 
-const BASE: Record<LayoutClass, Omit<Rule, 'line'>> = {
+// iOS 입력칸(TextInput)은 lineHeight에서 남는 간격을 전부 글자 위에 둬서 글자가 줄 상자 바닥에 붙는다.
+// 글(Text)은 남는 간격을 위아래로 나눠 가운데에 둔다. 그래서 같은 눈금이어도 답 글자만 선을 깔고 앉았다.
+// 남는 간격의 절반만큼 올리면 글과 같은 자리에 앉는다. 1.5는 IBM Plex Sans KR의 자연 줄 높이(hhea 1085+415 / 1000).
+const INPUT_LINE_RATIO = 1.5;
+
+const BASE: Record<LayoutClass, Omit<Rule, 'line' | 'inputLift'>> = {
   compact: { lineHeight: 32, sit: 6, hand: 23, body: 15 },
   regular: { lineHeight: 36, sit: 7, hand: 25, body: 16 },
   wide: { lineHeight: 40, sit: 8, hand: 27, body: 17 },
@@ -18,9 +24,12 @@ const BASE: Record<LayoutClass, Omit<Rule, 'line'>> = {
 
 export function ruleFor(layout: LayoutClass, onMac = ON_MAC): Rule {
   const b = BASE[layout];
-  if (!onMac) return { ...b, line: b.lineHeight };
   // macText와 같은 방식으로 반올림해야 선과 글자 줄이 어긋나지 않는다
-  return { ...b, line: Math.round(b.lineHeight * MAC_TEXT_SCALE), sit: Math.round(b.sit * MAC_TEXT_SCALE) };
+  const line = onMac ? Math.round(b.lineHeight * MAC_TEXT_SCALE) : b.lineHeight;
+  const body = onMac ? Math.round(b.body * MAC_TEXT_SCALE) : b.body;
+  const inputLift = Math.max(0, Math.round((line - body * INPUT_LINE_RATIO) / 2));
+  if (!onMac) return { ...b, line, inputLift };
+  return { ...b, line, sit: Math.round(b.sit * MAC_TEXT_SCALE), inputLift };
 }
 
 export function useRule(): Rule {

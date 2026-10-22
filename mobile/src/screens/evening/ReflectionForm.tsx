@@ -34,7 +34,13 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
   const rule = useRule();
   const formQ = { fontSize: rule.hand, lineHeight: rule.lineHeight };
   // 적을 자리를 넉넉히 비워 둔다(질문 하나면 5줄). 글이 길어지면 칸이 따라 늘어난다.
-  const answer = { minHeight: rule.line * answerLines(questions.length), fontSize: rule.body, lineHeight: rule.lineHeight };
+  // 입력칸 글자는 줄 상자 바닥에 붙어 그려지므로(rule.ts) 칸을 inputLift만큼 올려 질문 글씨와 같은 자리에 앉힌다
+  const answer = {
+    minHeight: rule.line * answerLines(questions.length),
+    fontSize: rule.body,
+    lineHeight: rule.lineHeight,
+    transform: [{ translateY: -rule.inputLift }],
+  };
 
   // 버튼은 쓰는 줄 위에 얹지 않고, 줄 아래 점선으로 나눈 칸에 따로 둔다
   const footer = (
