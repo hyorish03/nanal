@@ -16,7 +16,7 @@ import { registerTools, type ToolContext } from './tools/index.ts';
 const INSTRUCTIONS = [
   '나날(Nanal) is a Korean bullet-journal app. These tools act as the signed-in user; Row Level Security applies.',
   'A day starts at 04:00 Asia/Seoul time, so before 04:00 "today" is still the previous date.',
-  'Day pages hold tasks and notes in the order written. Task status: open (•, to do), doing (◐), done (✓), migrated (›, moved to another day — a copy exists there), dropped (×, decided not to do).',
+  'Day pages hold tasks and notes in the order written. Task status: open (○, to do), doing (◐), done (✓), migrated (›, moved to another day — a copy exists there), dropped (×, decided not to do).',
   'Mood is 1-5: 1 힘듦, 2 가라앉음, 3 보통, 4 괜찮음, 5 좋음. Reflections are short evening journal answers.',
   'Write tools only add lines or change task status; editing text, deleting and moving are done in the app. Keep added lines short, in Korean if the user writes Korean.',
   'Records can include personal feelings; summarize gently and do not diagnose.',
