@@ -13,6 +13,7 @@ import { logicalDate } from '../lib/date';
 import { hasSeenOnboarding, markOnboardingSeen } from '../lib/onboarding';
 import { isTourDue, markTourDue, markTourSeen } from '../lib/todayTour';
 import { listMonthLeftovers, markMonthRitual, readMonthRitualDue } from '../monthly/ritual';
+import { useNotificationOpen, useNotificationSchedule } from '../notifications/scheduler';
 import { supabase } from '../supabase';
 import { claimOwner } from '../sync/owner';
 import { createSupabaseRemote } from '../sync/supabaseRemote';
@@ -361,6 +362,26 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
     nav.dispatch(CommonActions.reset({ index: 1, routes: [{ key: base.key, name: base.name }, { name: key }] }));
   }, [nav]);
 
+  // 기록이 바뀔 때마다 앞으로 7일 치 알림을 다시 짠다(스펙 "알림")
+  useNotificationSchedule(db, version);
+
+  // 하루 마무리 알림을 눌러 열면 표지가 다 펼쳐진 뒤 하루 마무리로 간다. 온보딩·코치마크 중이면 오늘 장에 둔다.
+  const [notifyScreen, setNotifyScreen] = useState<'evening' | null>(null);
+  useNotificationOpen(
+    useCallback((target: 'evening' | null) => {
+      if (!target) return;
+      setFocusPending(false); // 오늘 입력칸 키보드가 올라오지 않게
+      setNotifyScreen(target);
+    }, []),
+  );
+  useEffect(() => {
+    if (!notifyScreen || !coverSettled || screen === null) return;
+    setNotifyScreen(null);
+    if (screen !== 'today' || tourDue) return;
+    setRitualOpen(false);
+    selectSection(notifyScreen);
+  }, [notifyScreen, coverSettled, screen, tourDue, selectSection]);
+
   const deletingAccount = useDeletingAccount();
 
   // 끝내도 건너뛰어도 오늘 장에서 코치마크를 한 번 본다(이 기기에서 온보딩을 거친 사람만)
@@ -401,6 +422,7 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
               }}
             >
               <Sidebar
+                db={db}
                 current={route === 'today' ? 'today' : route === 'evening' ? 'evening' : 'archive'}
                 onSelect={selectSection}
                 onCollapse={toggleSidebar}

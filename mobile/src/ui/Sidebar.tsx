@@ -3,7 +3,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line, Path, Rect } from 'react-native-svg';
 import { useAccountEmail } from '../lib/account';
+import type { Db } from '../db/types';
 import { AccountLinks } from './AccountLinks';
+import { NotificationSettings } from './NotificationSettings';
 import { Paper } from './Paper';
 import { WIDE } from './responsive';
 import { colors, HIT } from './theme';
@@ -13,14 +15,14 @@ import { useSpace } from './typeScale';
 export type SidebarKey = 'today' | 'evening' | 'archive';
 
 // archiveRef: 오늘 장 처음 한 번 코치마크가 '지난 기록' 줄을 가리킨다
-type Props = { current: SidebarKey; onSelect: (key: SidebarKey) => void; onCollapse?: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; archiveRef?: Ref<View> };
+type Props = { db?: Db; current: SidebarKey; onSelect: (key: SidebarKey) => void; onCollapse?: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; archiveRef?: Ref<View> };
 
 const ICON = 20;
 const SPINE_W = 10; // 왼쪽 끝 남색 천 책등
 
 // 아이패드·Mac의 왼쪽 칸. 공책 왼쪽에 붙은 남색 책등과 면지 한 장에 오늘·하루 마무리·지난 기록을 적어 둔다.
 // 휴대폰의 하루 마무리 버튼과 지난 기록 책갈피 끈을 대신한다.
-export function Sidebar({ current, onSelect, onCollapse, onSignOut, onDeleteAccount, archiveRef }: Props) {
+export function Sidebar({ db, current, onSelect, onCollapse, onSignOut, onDeleteAccount, archiveRef }: Props) {
   const insets = useSafeAreaInsets();
   const email = useAccountEmail();
   const s = useSpace();
@@ -51,9 +53,14 @@ export function Sidebar({ current, onSelect, onCollapse, onSignOut, onDeleteAcco
           <Row label="하루 마무리" icon={<LampIcon />} selected={current === 'evening'} onPress={() => onSelect('evening')} />
           <Row label="지난 기록" icon={<RibbonIcon />} selected={current === 'archive'} onPress={() => onSelect('archive')} rowRef={archiveRef} />
         </View>
-        {/* 맨 아래: 이 노트의 주인(이메일)과 로그아웃 */}
+        {/* 맨 아래: 알림 켜기·끄기, 이 노트의 주인(이메일)과 로그아웃 */}
         {onSignOut && (
           <View style={styles.account}>
+            {db && (
+              <View style={styles.notifications}>
+                <NotificationSettings db={db} compact />
+              </View>
+            )}
             <Txt variant="hand">이 노트의 주인</Txt>
             <Txt style={styles.email} numberOfLines={1}>
               {email ?? ''}
@@ -173,6 +180,7 @@ const styles = StyleSheet.create({
   brand: { fontSize: 24, letterSpacing: 4, paddingHorizontal: 12, color: colors.navy },
   list: { gap: 2 },
   // 남은 자리를 밀어내고 맨 아래에 붙는다
+  notifications: { marginBottom: 10 },
   account: { marginTop: 'auto', paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.lineSoft, gap: 4 },
   email: { fontSize: 13, color: colors.inkSoft },
   signOut: {

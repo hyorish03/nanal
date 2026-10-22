@@ -584,6 +584,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         <TodayTour active={tourOn} refs={tourRefs} voice={VoiceSheet !== null} empty={empty} sidebar={!showNav} onDone={onTourDone} />
       )}
       <AccountSheet
+        db={db}
         visible={accountOpen}
         email={email}
         onClose={() => setAccountOpen(false)}
