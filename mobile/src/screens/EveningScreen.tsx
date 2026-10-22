@@ -21,6 +21,7 @@ import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
 import { type Draft, hasAnswer, readDraft, withoutTemplate, writeDraft } from './evening/draft';
+import { NotifyAsk, shouldAskNotifications } from './evening/NotifyAsk';
 import { ReflectionForm } from './evening/ReflectionForm';
 import { useRule } from './evening/rule';
 import { TemplateSheet } from './evening/TemplateSheet';
@@ -53,6 +54,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     setSheetVisible(true);
   };
   const [error, setError] = useState<string | null>(null);
+  const [askNotify, setAskNotify] = useState(false); // 처음 마무리를 남긴 뒤 알림을 한 번 묻는다
   const busy = useRef(false);
   const reduce = useReduceMotion();
   const stampIn = useRef(new Animated.Value(1)).current;
@@ -122,6 +124,12 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     };
   }, [db, today, version]);
 
+  // 기분이나 회고를 남긴 뒤, 알림을 아직 정하지 않았으면 포스트잇으로 묻는다
+  const offerNotifications = () => {
+    if (askNotify) return;
+    shouldAskNotifications().then((ask) => ask && setAskNotify(true), () => {});
+  };
+
   const run = async (action: () => Promise<unknown>): Promise<boolean> => {
     if (busy.current) return false;
     busy.current = true;
@@ -147,6 +155,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     setMoodState(next);
     const ok = await run(() => setMood(db, today, next));
     if (!ok) setMoodState(prev);
+    else if (next !== null) offerNotifications();
   };
 
   // 남기면 기록한 날 도장이 새 숫자로 찍힌다. 동작 줄이기에서는 흐려졌다 나타나기만 한다.
@@ -170,7 +179,10 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
       setTemplate(null);
       setAnswers(rest.answers);
     });
-    if (ok) dropStamp();
+    if (ok) {
+      dropStamp();
+      offerNotifications();
+    }
   };
 
   const saveEdit = () => {
@@ -492,6 +504,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
         {errorText}
         {savedSection}
         {stamp}
+        {askNotify && <NotifyAsk db={db} onDone={() => setAskNotify(false)} />}
         {doneList}
       </ScrollView>
       {sheet}

@@ -136,6 +136,7 @@
       ],
       "@bacons/apple-targets",
       "./plugins/withSceneLifecycle",
+      "./plugins/withLocalNotifications",
       [
         "expo-splash-screen",
         {
