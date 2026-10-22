@@ -54,10 +54,10 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           BUILD_NUMBER: auto
-          # 첫 실행(run_number 1)이 빌드 16이었다. 실행마다 1씩 올라가 처리 중인 빌드와 겹치지 않는다.
-          MIN_BUILD_NUMBER: ${{ github.run_number + 15 }}
           TMPDIR: ${{ runner.temp }}
-        run: scripts/upload-testflight.sh
+        # 첫 실행(run_number 1)이 빌드 16이었다. 실행마다 1씩 올라가 처리 중인 빌드와 겹치지 않는다.
+        # (표현식 안에서는 덧셈을 못 해서 셸에서 더한다)
+        run: MIN_BUILD_NUMBER=$((GITHUB_RUN_NUMBER + 15)) scripts/upload-testflight.sh
 
       # 실패하면 단계별 로그(prebuild·archive·export·upload)를 받아 볼 수 있게 남긴다.
       - if: failure()
