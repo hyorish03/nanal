@@ -6,7 +6,7 @@ import { Txt } from './Txt';
 type Props = Omit<PressableProps, 'style' | 'children'> & {
   label: string;
   selected?: boolean;
-  symbol?: string; // 앞에 붙는 기호(•, – 등)
+  symbol?: string; // 앞에 붙는 기호(○, – 등)
   dashed?: boolean; // 새로 만들기처럼 아직 없는 것을 가리킬 때
   style?: StyleProp<ViewStyle>;
 };

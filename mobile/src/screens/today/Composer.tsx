@@ -11,7 +11,7 @@ import { LegendClose, SymbolLegend } from './SymbolLegend';
 import { useScaledText } from '../../ui/typeScale';
 
 const KINDS: { kind: ItemKind; symbol: string; label: string }[] = [
-  { kind: 'task', symbol: '•', label: '할 일' },
+  { kind: 'task', symbol: '○', label: '할 일' },
   { kind: 'note', symbol: '–', label: '메모' },
 ];
 

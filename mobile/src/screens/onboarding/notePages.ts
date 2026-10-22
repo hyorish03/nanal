@@ -32,7 +32,7 @@ export function noteLabel(step: NoteStep, date: string): string {
         formatLongDate(date),
         '나날 쓰는 법.',
         '하루를 한 줄씩, 기호 하나로 적는 불렛 노트예요.',
-        '점은 할 일. 보고서 초안.',
+        '빈 동그라미는 할 일. 보고서 초안.',
         '반쯤 칠한 동그라미는 하는 중. 3시 팀 회의.',
         '체크한 동그라미는 끝. 우유 사기.',
         '줄표는 메모. 창가 자리 최고.',
