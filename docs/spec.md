@@ -16,7 +16,7 @@
 | 저장 | 기기 SQLite가 원본, Supabase(Postgres)와 동기화 |
 | AI | 정리해서 넣기 Claude Haiku 4.5, 월간 돌아보기 Claude Sonnet 5.5 (Supabase Edge Function 경유) |
 | 번들 ID | `nanal.mengle.zen` (위젯 `nanal.mengle.zen.widget`) |
-| 배포 | TestFlight, 현재 빌드 10 |
+| 배포 | TestFlight, 현재 빌드 14 |
 
 **설계 원칙**
 
