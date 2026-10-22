@@ -31,6 +31,7 @@ import { Chip } from '../ui/Chip';
 import { PageHeader } from '../ui/PageHeader';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { type LayoutClass, useLayoutClass, WIDE } from '../ui/responsive';
+import { TrashButton } from '../ui/TrashButton';
 
 type Props = { db: Db; version: number; onChanged: () => void; onClose: () => void };
 
@@ -207,11 +208,6 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
 
   const startEdit = (r: Reflection) => setEditing({ id: r.id, answers: { ...r.answers } });
 
-  const reflectionActions = (r: Reflection) =>
-    showActionSheet(`‘${r.templateName}’`, [
-      { label: '고치기', onPress: () => startEdit(r) },
-      { label: '지우기', destructive: true, onPress: () => askDeleteReflection(r) },
-    ]);
 
   const askDelete = (t: TemplateDef) =>
     // ‘이름’ 뒤 조사: 받침이 있으면 은, 없으면 는
@@ -377,30 +373,21 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
             style={styles.savedCard}
           />
         ) : (
-          // 카드를 길게 눌러도 고치기·지우기가 나온다. 글은 줄마다 따로 읽히도록 카드 자체는 접근성 요소로 묶지 않는다.
-          <Pressable key={r.id} accessible={false} onLongPress={() => reflectionActions(r)}>
+          // 카드를 누르면 바로 고친다. 글은 줄마다 따로 읽히도록 카드는 접근성 요소로 묶지 않고, 제목을 고치기 버튼으로 읽힌다.
+          <Pressable key={r.id} accessible={false} onPress={() => startEdit(r)}>
             <RuledPaper lineHeight={rule.line} firstLineTop={rule.line - rule.sit} style={styles.savedCard}>
               <View style={[styles.cardHead, { height: rule.line }]}>
-                <Txt variant="hand" style={[handLine, styles.flexText]}>
-                  {r.templateName}
-                </Txt>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`‘${r.templateName}’ 회고 고치기 또는 지우기`}
-                  accessibilityActions={[
-                    { name: 'edit', label: '고치기' },
-                    { name: 'delete', label: '지우기' },
-                  ]}
-                  onAccessibilityAction={(e) => {
-                    if (e.nativeEvent.actionName === 'edit') startEdit(r);
-                    else if (e.nativeEvent.actionName === 'delete') askDeleteReflection(r);
-                  }}
-                  hitSlop={{ top: 6, bottom: 6 }}
-                  style={dimPressed([styles.more, { height: rule.line }])}
-                  onPress={() => reflectionActions(r)}
+                  accessibilityLabel={`‘${r.templateName}’ 회고 고치기`}
+                  style={styles.flexText}
+                  onPress={() => startEdit(r)}
                 >
-                  <Txt style={styles.moreText}>⋯</Txt>
+                  <Txt variant="hand" style={handLine}>
+                    {r.templateName}
+                  </Txt>
                 </Pressable>
+                <TrashButton label={`‘${r.templateName}’ 회고 지우기`} height={rule.line} onPress={() => askDeleteReflection(r)} />
               </View>
               {r.questions
                 .filter((q) => r.answers[q.key])
@@ -592,8 +579,6 @@ const styles = StyleSheet.create({
   },
   flexText: { flex: 1 },
   cardHead: { flexDirection: 'row', alignItems: 'center' },
-  more: { width: 44, marginRight: -10, alignItems: 'center', justifyContent: 'center' },
-  moreText: { fontSize: 18, color: colors.muted },
   error: { color: colors.danger, fontSize: 14 },
   savedCard: { paddingHorizontal: 14, paddingVertical: 0, borderWidth: 1, borderColor: colors.lineFaint },
   blank: { opacity: 0.7 },

@@ -5,7 +5,6 @@ import { moodWord } from '../../days/moods';
 import type { Item } from '../../items/repo';
 import { formatLongDate } from '../../lib/date';
 import type { Reflection } from '../../reflections/repo';
-import { dimPressed } from '../../ui/press';
 import { RuledPaper } from '../../ui/RuledPaper';
 import { StatusSymbol } from '../../ui/StatusSymbol';
 import { symbolKind } from '../../ui/symbols';
@@ -14,6 +13,7 @@ import { Txt } from '../../ui/Txt';
 import { hasAnswer } from '../evening/draft';
 import { ReflectionForm } from '../evening/ReflectionForm';
 import { textBox } from './metrics';
+import { TrashButton } from '../../ui/TrashButton';
 
 const DAY_ITEMS_MAX = 10; // 날짜 상세에 보이는 할 일·메모 수(나머지는 "외 N개")
 // 할 일 줄: 글은 16/24, 기호는 첫 줄 높이만 한 상자 가운데에 앉혀 여러 줄이어도 첫 줄에 맞춘다
@@ -39,7 +39,6 @@ type Props = {
   onCancelEdit: () => void;
   onStartEdit: (r: Reflection) => void;
   onDeleteReflection: (r: Reflection) => void;
-  onReflectionActions: (r: Reflection) => void;
   onLayout?: (e: LayoutChangeEvent) => void;
   divided?: boolean; // 달력 아래에 이어 붙을 때 위에 점선
 };
@@ -48,7 +47,7 @@ function answersOf(r: Reflection): string[] {
   return r.questions.map((q) => r.answers[q.key]).filter((a): a is string => !!a);
 }
 
-// 고른 날의 기분, 할 일, 회고. 회고는 길게 누르거나 ⋯로 고치고 지운다.
+// 고른 날의 기분, 할 일, 회고. 회고는 카드를 눌러 고치고, 휴지통으로 지운다.
 export function DayDetail(p: Props) {
   const { day, editing, large, future = false } = p;
   const shown = p.items.slice(0, DAY_ITEMS_MAX);
@@ -112,30 +111,21 @@ export function DayDetail(p: Props) {
                 style={styles.card}
               />
             ) : (
-              // 카드를 길게 눌러도 고치기·지우기가 나온다. 글은 줄마다 따로 읽히도록 카드 자체는 접근성 요소로 묶지 않는다.
-              <Pressable key={r.id} accessible={false} onLongPress={() => p.onReflectionActions(r)}>
+              // 카드를 누르면 바로 고친다. 글은 줄마다 따로 읽히도록 카드는 접근성 요소로 묶지 않고, 제목을 고치기 버튼으로 읽힌다.
+              <Pressable key={r.id} accessible={false} onPress={() => p.onStartEdit(r)}>
                 <RuledPaper lineHeight={rule} style={[styles.card, large && styles.cardLarge]}>
                   <View style={[styles.cardHead, { height: rule }]}>
-                    <Txt variant="hand" style={[styles.cardTitle, large && styles.cardTitleLarge, styles.flexText]}>
-                      {r.templateName}
-                    </Txt>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`‘${r.templateName}’ 회고 고치기 또는 지우기`}
-                      accessibilityActions={[
-                        { name: 'edit', label: '고치기' },
-                        { name: 'delete', label: '지우기' },
-                      ]}
-                      onAccessibilityAction={(e) => {
-                        if (e.nativeEvent.actionName === 'edit') p.onStartEdit(r);
-                        else if (e.nativeEvent.actionName === 'delete') p.onDeleteReflection(r);
-                      }}
-                      hitSlop={{ top: 7, bottom: 7 }}
-                      style={dimPressed([styles.more, { height: rule }])}
-                      onPress={() => p.onReflectionActions(r)}
+                      accessibilityLabel={`‘${r.templateName}’ 회고 고치기`}
+                      style={styles.flexText}
+                      onPress={() => p.onStartEdit(r)}
                     >
-                      <Txt style={styles.moreText}>⋯</Txt>
+                      <Txt variant="hand" style={[styles.cardTitle, large && styles.cardTitleLarge]}>
+                        {r.templateName}
+                      </Txt>
                     </Pressable>
+                    <TrashButton label={`‘${r.templateName}’ 회고 지우기`} height={rule} onPress={() => p.onDeleteReflection(r)} />
                   </View>
                   {answersOf(r).map((a, i) => (
                     <Txt key={i} style={[styles.cardLine, large && styles.cardLineLarge]}>
@@ -186,8 +176,6 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 21, lineHeight: CARD_RULE },
   cardTitleLarge: { fontSize: 23, lineHeight: 32 },
   flexText: { flex: 1 },
-  more: { width: 44, marginRight: -10, alignItems: 'center', justifyContent: 'center' },
-  moreText: { fontSize: 18, color: colors.muted },
   cardLine: { fontSize: 15, lineHeight: CARD_RULE },
   cardLineLarge: { fontSize: 16, lineHeight: 32 },
 });
