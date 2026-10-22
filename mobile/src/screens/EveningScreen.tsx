@@ -365,7 +365,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
             questions={r.questions}
             values={editing.answers}
             onChange={(key, v) => setEditing((e) => e && { ...e, answers: { ...e.answers, [key]: v } })}
-            submitLabel="고쳐 두기"
+            submitLabel="저장"
             canSubmit={hasAnswer(editing.answers)}
             onSubmit={saveEdit}
             onCancel={() => setEditing(null)}

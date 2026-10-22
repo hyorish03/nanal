@@ -51,7 +51,7 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
       <View style={styles.actions}>
         {onCancel && (
           <Pressable accessibilityRole="button" style={dimPressed(styles.cancel)} onPress={onCancel}>
-            <Txt style={styles.cancelText}>그만두기</Txt>
+            <Txt style={styles.cancelText}>취소</Txt>
           </Pressable>
         )}
         <Pressable

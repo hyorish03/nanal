@@ -103,7 +103,7 @@ export function DayDetail(p: Props) {
                 questions={r.questions}
                 values={editing.answers}
                 onChange={p.onEditChange}
-                submitLabel="고쳐 두기"
+                submitLabel="저장"
                 canSubmit={hasAnswer(editing.answers)}
                 onSubmit={p.onSaveEdit}
                 onCancel={p.onCancelEdit}
