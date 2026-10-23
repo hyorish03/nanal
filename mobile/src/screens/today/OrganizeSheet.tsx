@@ -16,7 +16,7 @@ import { colors, fonts, HIT, SCREEN_X } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { Paper } from '../../ui/Paper';
 import { useReduceMotion } from '../../ui/useReduceMotion';
-import { openPrivacy } from '../../ui/AccountLinks';
+import { openPrivacy } from '../../lib/links';
 import { FadeIn } from '../../ui/FadeIn';
 import { dimPressed } from '../../ui/press';
 import { useScaledText } from '../../ui/typeScale';

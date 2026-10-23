@@ -2,29 +2,26 @@ import { type ReactNode, type Ref, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Line, Path, Rect } from 'react-native-svg';
-import { useAccountEmail } from '../lib/account';
-import type { Db } from '../db/types';
-import { AccountLinks } from './AccountLinks';
-import { NotificationSettings } from './NotificationSettings';
+import { type Account, accountInitial, accountName, useAccount } from '../lib/account';
 import { Paper } from './Paper';
 import { WIDE } from './responsive';
 import { colors, HIT } from './theme';
 import { Txt } from './Txt';
 import { useSpace } from './typeScale';
 
-export type SidebarKey = 'today' | 'evening' | 'archive';
+export type SidebarKey = 'today' | 'evening' | 'archive' | 'settings';
 
 // archiveRef: 오늘 장 처음 한 번 코치마크가 '지난 기록' 줄을 가리킨다
-type Props = { db?: Db; current: SidebarKey; onSelect: (key: SidebarKey) => void; onCollapse?: () => void; onSignOut?: () => void; onDeleteAccount?: () => void; archiveRef?: Ref<View> };
+type Props = { current: SidebarKey; onSelect: (key: SidebarKey) => void; onCollapse?: () => void; archiveRef?: Ref<View> };
 
 const ICON = 20;
 const SPINE_W = 10; // 왼쪽 끝 남색 천 책등
 
 // 아이패드·Mac의 왼쪽 칸. 공책 왼쪽에 붙은 남색 책등과 면지 한 장에 오늘·하루 마무리·지난 기록을 적어 둔다.
 // 휴대폰의 하루 마무리 버튼과 지난 기록 책갈피 끈을 대신한다.
-export function Sidebar({ db, current, onSelect, onCollapse, onSignOut, onDeleteAccount, archiveRef }: Props) {
+export function Sidebar({ current, onSelect, onCollapse, archiveRef }: Props) {
   const insets = useSafeAreaInsets();
-  const email = useAccountEmail();
+  const account = useAccount();
   const s = useSpace();
   return (
     <View style={[styles.wrap, { width: WIDE.sidebarWidth + insets.left, paddingTop: insets.top + s.lg, paddingBottom: insets.bottom + s.lg }]}>
@@ -53,28 +50,10 @@ export function Sidebar({ db, current, onSelect, onCollapse, onSignOut, onDelete
           <Row label="하루 마무리" icon={<LampIcon />} selected={current === 'evening'} onPress={() => onSelect('evening')} />
           <Row label="지난 기록" icon={<RibbonIcon />} selected={current === 'archive'} onPress={() => onSelect('archive')} rowRef={archiveRef} />
         </View>
-        {/* 맨 아래: 알림 켜기·끄기, 이 노트의 주인(이메일)과 로그아웃 */}
-        {onSignOut && (
-          <View style={styles.account}>
-            {db && (
-              <View style={styles.notifications}>
-                <NotificationSettings db={db} compact />
-              </View>
-            )}
-            <Txt variant="hand">이 노트의 주인</Txt>
-            <Txt style={styles.email} numberOfLines={1}>
-              {email ?? ''}
-            </Txt>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onSignOut}
-              style={({ pressed }) => [styles.signOut, pressed && styles.rowHover]}
-            >
-              <Txt style={styles.signOutText}>로그아웃</Txt>
-            </Pressable>
-            <AccountLinks compact onDeleteAccount={onDeleteAccount} />
-          </View>
-        )}
+        {/* 맨 아래: 이 노트의 주인(아바타·이름·이메일). 누르면 설정(알림·로그아웃·계정 삭제) */}
+        <View style={styles.account}>
+          <AccountRow account={account} selected={current === 'settings'} onPress={() => onSelect('settings')} />
+        </View>
       </View>
     </View>
   );
@@ -98,6 +77,37 @@ function Row({ label, icon, selected, onPress, rowRef }: { label: string; icon: 
       <Txt variant={selected ? 'medium' : 'body'} numberOfLines={1} style={selected ? styles.labelOn : styles.label}>
         {label}
       </Txt>
+    </Pressable>
+  );
+}
+
+function AccountRow({ account, selected, onPress }: { account: Account; selected: boolean; onPress: () => void }) {
+  const [hover, setHover] = useState(false);
+  const name = accountName(account);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`설정, ${name}`}
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      onHoverIn={() => setHover(true)}
+      onHoverOut={() => setHover(false)}
+      style={({ pressed }) => [styles.row, styles.accountRow, (hover || pressed) && styles.rowHover, selected && styles.rowSelected]}
+    >
+      {selected && <View style={styles.mark} />}
+      <View style={styles.avatar}>
+        <Txt variant="title" style={styles.avatarText}>
+          {accountInitial(account)}
+        </Txt>
+      </View>
+      <View style={styles.accountText}>
+        <Txt variant="medium" numberOfLines={1} style={styles.labelOn}>
+          {name}
+        </Txt>
+        <Txt numberOfLines={1} style={styles.email}>
+          {account.email ?? ''}
+        </Txt>
+      </View>
     </Pressable>
   );
 }
@@ -180,20 +190,12 @@ const styles = StyleSheet.create({
   brand: { fontSize: 24, letterSpacing: 4, paddingHorizontal: 12, color: colors.navy },
   list: { gap: 2 },
   // 남은 자리를 밀어내고 맨 아래에 붙는다
-  notifications: { marginBottom: 10 },
-  account: { marginTop: 'auto', paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.lineSoft, gap: 4 },
-  email: { fontSize: 13, color: colors.inkSoft },
-  signOut: {
-    alignSelf: 'flex-start',
-    marginTop: 6,
-    minHeight: 36,
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.chipBorder,
-    justifyContent: 'center',
-  },
-  signOutText: { fontSize: 13, color: colors.inkSoft },
+  account: { marginTop: 'auto', paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.lineSoft },
+  accountRow: { minHeight: 52, gap: 10 },
+  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 15, lineHeight: 19, color: colors.onDark },
+  accountText: { flex: 1, minWidth: 0 },
+  email: { fontSize: 12, lineHeight: 16, color: colors.muted },
   row: {
     minHeight: HIT,
     paddingHorizontal: 12,

@@ -52,8 +52,7 @@ import { usePane } from '../ui/pane';
 import { useLayoutClass, WIDE } from '../ui/responsive';
 import { useSpace } from '../ui/typeScale';
 import { PANEL_W, TodayPanel } from './today/TodayPanel';
-import { accountInitial, confirmDeleteAccount, confirmSignOut, useAccountEmail } from '../lib/account';
-import { AccountSheet } from '../ui/AccountSheet';
+import { accountInitial, useAccount } from '../lib/account';
 import { TodayTour, type TourRefs } from './today/TodayTour';
 
 // 개발용·출시 빌드에서만 말로 적기 시트를 불러온다(Expo Go에서는 네이티브 모듈이 없어 import 시 오류).
@@ -67,6 +66,7 @@ type Props = {
   onChanged: () => void;
   onOpenEvening: () => void;
   onOpenArchive?: () => void;
+  onOpenSettings?: () => void;
   focusReady?: boolean;
   onFocused?: () => void;
   pendingAction?: LinkAction | null;
@@ -77,7 +77,7 @@ type Props = {
   sidebarArchiveRef?: RefObject<View | null>; // 넓은 배치: 사이드바의 '지난 기록' 줄
 };
 
-export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchive, focusReady = true, onFocused, pendingAction = null, onActionHandled, tourReady = false, onTourDone, sidebarArchiveRef }: Props) {
+export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchive, onOpenSettings, focusReady = true, onFocused, pendingAction = null, onActionHandled, tourReady = false, onTourDone, sidebarArchiveRef }: Props) {
   const today = logicalDate(new Date());
   const [items, setItems] = useState<Item[]>([]);
   const [candidates, setCandidates] = useState<Item[]>([]);
@@ -90,10 +90,8 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
   const afterVoice = useRef<{ text: string; auto: boolean } | null>(null); // 말로 적기 시트가 내려간 뒤 열 정리 시트
   const [notice, setNotice] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastSpec | null>(null);
-  const [accountOpen, setAccountOpen] = useState(false);
-  const afterAccount = useRef<(() => void) | null>(null); // 계정 시트가 다 내려간 뒤 할 일(삭제 확인 창)
   const [postponing, setPostponing] = useState<{ id: string; prev: 'open' | 'doing' } | null>(null); // 언제로 미룰지 고르는 줄
-  const email = useAccountEmail();
+  const account = useAccount();
   const busy = useRef(false);
   const reorder = useRef(false); // 상태·중요를 바꿨거나 포스트잇을 정리했다: 다음에 불러온 목록을 넣을 때만 자리 이동을 애니메이션한다
   const reduce = useReduceMotion();
@@ -422,17 +420,17 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
         </View>
         {showNav && (
           <View style={styles.headerActions}>
-            {/* 왼쪽: 계정(이 노트의 주인·로그아웃). 오른쪽: 하루 마무리 */}
+            {/* 왼쪽: 계정 → 설정(알림·이 노트의 주인·정보). 오른쪽: 하루 마무리 */}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="계정"
-              accessibilityHint="이메일을 보고 로그아웃하거나 계정을 삭제할 수 있어요"
+              accessibilityLabel="설정"
+              accessibilityHint="알림을 켜고 끄거나 로그아웃할 수 있어요"
               hitSlop={CHIP_SLOP}
               style={dimPressed(styles.account)}
-              onPress={() => setAccountOpen(true)}
+              onPress={onOpenSettings}
             >
               <Txt variant="medium" style={styles.accountText}>
-                {accountInitial(email)}
+                {accountInitial(account)}
               </Txt>
             </Pressable>
             <Pressable
@@ -534,7 +532,7 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
     }),
     [empty, showNav, sidebarArchiveRef],
   );
-  const tourOn = tourReady && loaded && !organizeOpen && !voiceOpen && !accountOpen && postponing === null && dragging === null;
+  const tourOn = tourReady && loaded && !organizeOpen && !voiceOpen && postponing === null && dragging === null;
 
   // 밀어 연 줄 바깥 어디를 만져도 그 줄을 닫는다(줄 안의 만짐은 줄이 먼저 알려 둔다)
   return (
@@ -583,25 +581,6 @@ export function TodayScreen({ db, version, onChanged, onOpenEvening, onOpenArchi
       {tourReady && onTourDone && (
         <TodayTour active={tourOn} refs={tourRefs} voice={VoiceSheet !== null} empty={empty} sidebar={!showNav} onDone={onTourDone} />
       )}
-      <AccountSheet
-        db={db}
-        visible={accountOpen}
-        email={email}
-        onClose={() => setAccountOpen(false)}
-        onSignOut={() => {
-          afterAccount.current = () => void confirmSignOut(db);
-          setAccountOpen(false);
-        }}
-        onDeleteAccount={() => {
-          afterAccount.current = () => confirmDeleteAccount(db);
-          setAccountOpen(false);
-        }}
-        onDismissed={() => {
-          const next = afterAccount.current;
-          afterAccount.current = null;
-          next?.();
-        }}
-      />
     </View>
   );
 }

@@ -21,7 +21,7 @@ import { colors, SCREEN_X } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 import { Paper } from '../ui/Paper';
 import { type Draft, hasAnswer, readDraft, withoutTemplate, writeDraft } from './evening/draft';
-import { NotifyAsk, shouldAskNotifications } from './evening/NotifyAsk';
+import { NotifyAsk, notifyAskTurn } from './evening/NotifyAsk';
 import { ReflectionForm } from './evening/ReflectionForm';
 import { useRule } from './evening/rule';
 import { TemplateSheet } from './evening/TemplateSheet';
@@ -54,7 +54,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     setSheetVisible(true);
   };
   const [error, setError] = useState<string | null>(null);
-  const [askNotify, setAskNotify] = useState(false); // 처음 마무리를 남긴 뒤 알림을 한 번 묻는다
+  const [askNotify, setAskNotify] = useState<{ again: boolean } | null>(null); // 마무리를 남긴 뒤 알림을 묻는다(다시 묻기 포함)
   const busy = useRef(false);
   const reduce = useReduceMotion();
   const stampIn = useRef(new Animated.Value(1)).current;
@@ -124,10 +124,10 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
     };
   }, [db, today, version]);
 
-  // 기분이나 회고를 남긴 뒤, 알림을 아직 정하지 않았으면 포스트잇으로 묻는다
+  // 기분이나 회고를 남긴 뒤, 알림을 아직 정하지 않았고 물을 차례면 포스트잇으로 묻는다
   const offerNotifications = () => {
     if (askNotify) return;
-    shouldAskNotifications().then((ask) => ask && setAskNotify(true), () => {});
+    notifyAskTurn().then((turn) => turn && setAskNotify(turn), () => {});
   };
 
   const run = async (action: () => Promise<unknown>): Promise<boolean> => {
@@ -504,7 +504,7 @@ export function EveningScreen({ db, version, onChanged, onClose }: Props) {
         {errorText}
         {savedSection}
         {stamp}
-        {askNotify && <NotifyAsk db={db} onDone={() => setAskNotify(false)} />}
+        {askNotify && <NotifyAsk db={db} again={askNotify.again} onDone={() => setAskNotify(null)} />}
         {doneList}
       </ScrollView>
       {sheet}

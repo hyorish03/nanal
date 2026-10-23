@@ -19,8 +19,8 @@ import { claimOwner } from '../sync/owner';
 import { createSupabaseRemote } from '../sync/supabaseRemote';
 import { useSync } from '../sync/useSync';
 import { Cover } from '../ui/Cover';
-import { confirmDeleteAccount, confirmSignOut, confirmStartFresh, useDeletingAccount } from '../lib/account';
-import { DeletingAccountOverlay } from '../ui/AccountSheet';
+import { confirmStartFresh, useDeletingAccount } from '../lib/account';
+import { DeletingAccountOverlay } from '../ui/DeletingAccountOverlay';
 import { FadeIn } from '../ui/FadeIn';
 import { LAMP_PAPER, LAMP_SHADE } from '../ui/lamp';
 import { EASE_IN_OUT, EASE_OUT } from '../ui/motion';
@@ -39,6 +39,7 @@ import { EveningScreen } from './EveningScreen';
 import { MonthlyReviewScreen } from './MonthlyReviewScreen';
 import { MonthRitualSheet } from './MonthRitualSheet';
 import { OnboardingScreen } from './OnboardingScreen';
+import { SettingsScreen } from './SettingsScreen';
 import { TodayScreen } from './TodayScreen';
 
 const SIDEBAR_KEY = 'nanal.sidebarCollapsed';
@@ -117,7 +118,7 @@ export function Main({ db, userId }: { db: Db; userId: string }) {
 
 // 'today'는 오늘 → 하루 마무리·지난 기록 → 월간 돌아보기 네이티브 스택이다(밀어 넣기, 가장자리 밀어 돌아가기).
 type Screen = 'onboarding' | 'today';
-type StackParams = { today: undefined; evening: undefined; archive: undefined; review: { month: string } };
+type StackParams = { today: undefined; evening: undefined; archive: undefined; review: { month: string }; settings: undefined };
 
 const Stack = createNativeStackNavigator<StackParams>();
 // 화면 사이에 흰 바탕이 비치지 않게 종이색으로 칠한다.
@@ -422,12 +423,9 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
               }}
             >
               <Sidebar
-                db={db}
-                current={route === 'today' ? 'today' : route === 'evening' ? 'evening' : 'archive'}
+                current={route === 'review' ? 'archive' : route}
                 onSelect={selectSection}
                 onCollapse={toggleSidebar}
-                onSignOut={() => void confirmSignOut(db)}
-                onDeleteAccount={() => confirmDeleteAccount(db)}
                 archiveRef={sidebarArchiveRef}
               />
             </Animated.View>
@@ -475,6 +473,10 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                             Keyboard.dismiss(); // 오늘은 스택 아래에 남아 있으니 키보드를 직접 내린다
                             navigation.navigate('archive');
                           }}
+                          onOpenSettings={() => {
+                            Keyboard.dismiss();
+                            navigation.navigate('settings');
+                          }}
                           focusReady={coverSettled && ritualChecked && focusPending && !tourDue}
                           onFocused={() => setFocusPending(false)}
                           pendingAction={coverSettled ? linkAction : null}
@@ -509,6 +511,9 @@ function MainContent({ db, userId }: { db: Db; userId: string }) {
                           onChanged={onChanged}
                         />
                       )}
+                    </Stack.Screen>
+                    <Stack.Screen name="settings">
+                      {({ navigation }) => <SettingsScreen db={db} onClose={() => navigation.goBack()} />}
                     </Stack.Screen>
                     <Stack.Screen name="review">
                       {({ navigation, route }) => (

@@ -29,6 +29,7 @@ import {
   signInErrorMessage,
   signUpErrorMessage,
 } from '../lib/authErrors';
+import { cleanName, NAME_MAX } from '../lib/account';
 import { parseAuthLink } from '../lib/deepLink';
 import { AUTH_CONFIRMED_URL, PRIVACY_URL } from '../lib/links';
 import { userMessage } from '../lib/userError';
@@ -81,6 +82,7 @@ export function LoginScreen() {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState(''); // 가입: 뭐라고 부를지(적지 않아도 된다)
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +96,7 @@ export function LoginScreen() {
   const fade = useRef(new Animated.Value(1)).current; // 장면이 바뀔 때 잠깐 흐려졌다 돌아온다
   const [roomH, setRoomH] = useState(0); // 키보드가 내려가 있을 때 쓸 수 있는 높이
   const passwordRef = useRef<TextInput>(null);
+  const nameRef = useRef<TextInput>(null);
 
   useEffect(() => {
     const ios = Platform.OS === 'ios';
@@ -200,7 +203,8 @@ export function LoginScreen() {
       const { data, error: e } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { emailRedirectTo: AUTH_CONFIRMED_URL },
+        // 적은 이름은 계정에 둔다(설정에서 바꿀 수 있다). 비우면 이메일 앞부분으로 부른다
+        options: { emailRedirectTo: AUTH_CONFIRMED_URL, data: cleanName(name) ? { name: cleanName(name) } : undefined },
       });
       if (e) setError(signUpErrorMessage(e));
       else if (isExistingAccount(data.user)) setError(ALREADY_REGISTERED);
@@ -308,11 +312,33 @@ export function LoginScreen() {
         autoComplete={signup ? 'new-password' : 'current-password'}
         textContentType={signup ? 'newPassword' : 'password'}
         passwordRules={signup ? `minlength: ${MIN_PASSWORD};` : undefined}
-        returnKeyType={signup ? 'done' : 'go'}
+        returnKeyType={signup ? 'next' : 'go'}
+        submitBehavior={signup ? 'submit' : undefined}
         value={password}
         onChangeText={edit(setPassword)}
-        onSubmitEditing={signup ? undefined : signIn}
+        onSubmitEditing={signup ? () => nameRef.current?.focus() : signIn}
       />
+    </View>
+  );
+  // 가입: 비밀번호 다음에 이름. 적지 않아도 된다
+  const nameField = (
+    <View style={styles.field}>
+      <Txt style={styles.label}>뭐라고 부를까요? (적지 않아도 돼요)</Txt>
+      <TextInput
+        ref={nameRef}
+        style={macText(styles.input)}
+        placeholder="이름이나 별명"
+        placeholderTextColor={colors.muted}
+        accessibilityLabel="뭐라고 부를까요? 적지 않아도 돼요"
+        accessibilityHint="비워 두면 이메일 앞부분으로 불러요. 설정에서 바꿀 수 있어요"
+        autoComplete="name"
+        textContentType="nickname"
+        maxLength={NAME_MAX}
+        returnKeyType="done"
+        value={name}
+        onChangeText={setName}
+      />
+      <Txt style={styles.hint}>비워 두면 이메일 앞부분으로 불러요. 설정에서 언제든 바꿀 수 있어요</Txt>
     </View>
   );
   const errorLine = error && (
@@ -396,6 +422,7 @@ export function LoginScreen() {
     <>
       {emailField}
       {passwordField}
+      {nameField}
       {consentRow}
       {errorLine}
     </>
@@ -621,6 +648,7 @@ const styles = StyleSheet.create({
   wideButton: { marginTop: 10 },
   field: { gap: 6 },
   label: { fontSize: 14, color: colors.muted },
+  hint: { fontSize: 12, lineHeight: 17, color: colors.muted },
   input: {
     height: 48,
     paddingHorizontal: 14,

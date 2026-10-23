@@ -7,27 +7,54 @@ import { switchOwner, wipeLocalData } from '../sync/owner';
 import { reloadWidgets } from '../widget/reload';
 import { FunctionsFetchError } from '@supabase/supabase-js';
 
-// 로그인한 계정의 이메일. 세션이 바뀌면(로그아웃 등) 따라 바뀐다
-export function useAccountEmail(): string | null {
-  const [email, setEmail] = useState<string | null>(null);
+// 로그인한 계정: 이메일과 이름(가입할 때나 설정에서 적은 것, 계정 user_metadata.name). 세션이 바뀌면(로그아웃·이름 바꾸기) 따라 바뀐다
+export type Account = { email: string | null; name: string | null };
+type MaybeUser = { email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined;
+
+export function accountOf(user: MaybeUser): Account {
+  const raw = user?.user_metadata?.name;
+  return { email: user?.email ?? null, name: typeof raw === 'string' && raw.trim() ? raw.trim() : null };
+}
+
+export function useAccount(): Account {
+  const [account, setAccount] = useState<Account>({ email: null, name: null });
   useEffect(() => {
     let alive = true;
     supabase.auth.getSession().then(({ data }) => {
-      if (alive) setEmail(data.session?.user.email ?? null);
+      if (alive) setAccount(accountOf(data.session?.user));
     });
-    const { data } = supabase.auth.onAuthStateChange((_e, session) => setEmail(session?.user.email ?? null));
+    const { data } = supabase.auth.onAuthStateChange((_e, session) => setAccount(accountOf(session?.user)));
     return () => {
       alive = false;
       data.subscription.unsubscribe();
     };
   }, []);
-  return email;
+  return account;
 }
 
-// 계정 버튼에 넣을 한 글자(이메일 맨 앞 글자)
-export function accountInitial(email: string | null): string {
-  const c = email?.trim()[0];
+export const NAME_MAX = 20;
+
+// 적은 이름을 다듬는다: 앞뒤 빈칸을 빼고, 빈칸은 하나로, NAME_MAX자까지
+export function cleanName(raw: string): string {
+  return raw.trim().replace(/\s+/g, ' ').slice(0, NAME_MAX);
+}
+
+// 화면에 보일 이름. 적은 이름이 없으면 이메일 @ 앞부분
+export function accountName(account: Account): string {
+  return account.name ?? (account.email?.split('@')[0]?.trim() || '나');
+}
+
+// 아바타·계정 버튼에 넣을 한 글자(보이는 이름의 맨 앞 글자)
+export function accountInitial(account: Account): string {
+  const c = Array.from(accountName(account))[0];
   return c ? c.toUpperCase() : '나';
+}
+
+// 설정에서 이름 바꾸기. 비우면 지운다(이메일 앞부분으로 돌아간다). 기기끼리 같게 보이도록 계정에 둔다(인터넷이 필요하다)
+export async function saveAccountName(raw: string): Promise<void> {
+  const name = cleanName(raw);
+  const { error } = await supabase.auth.updateUser({ data: { name: name || null } });
+  if (error) throw error;
 }
 
 // 로그아웃 전에 한 번 묻는다. 아직 서버로 보내지 못한 기록이 있으면 함께 알린다.

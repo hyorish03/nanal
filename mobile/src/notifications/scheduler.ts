@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import type { Db } from '../db/types';
 import { NOTIFICATION_KINDS, planNotifications } from './plan';
-import { readPrefs, readTodayFacts } from './prefs';
+import { activePrefs, readSettings, readTodayFacts } from './prefs';
 
 // 알림 모듈이 들어간 빌드에서만 불러온다(예전 개발용 빌드·웹에서는 import만 해도 멈춘다).
 export const notificationsAvailable = Platform.OS !== 'web' && requireOptionalNativeModule('ExpoNotificationScheduler') != null;
@@ -17,7 +17,8 @@ N?.setNotificationHandler({
   handleNotification: async () => ({ shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true }),
 });
 
-export type PermissionResult = 'granted' | 'denied';
+// granted: 허용됨. denied: 방금 시스템 창에서 거절. blocked: 예전에 거절해 앱이 다시 물을 수 없다(설정 앱에서 켜야 한다).
+export type PermissionResult = 'granted' | 'denied' | 'blocked';
 
 async function isGranted(): Promise<boolean> {
   if (!N) return false;
@@ -25,11 +26,13 @@ async function isGranted(): Promise<boolean> {
   return p.granted || p.ios?.status === N.IosAuthorizationStatus.PROVISIONAL;
 }
 
-// 아직 묻지 않았으면 시스템 창으로 묻는다. 예전에 거절했으면 다시 묻지 못한다(설정 앱에서 켜야 한다).
+// 아직 묻지 않았으면 시스템 창으로 묻는다.
 export async function requestNotificationPermission(): Promise<PermissionResult> {
-  if (!N) return 'denied';
+  if (!N) return 'blocked';
   try {
-    if (await isGranted()) return 'granted';
+    const current = await N.getPermissionsAsync();
+    if (current.granted || current.ios?.status === N.IosAuthorizationStatus.PROVISIONAL) return 'granted';
+    if (!current.canAskAgain) return 'blocked';
     // Android 13은 채널이 하나는 있어야 권한 창이 뜬다
     if (Platform.OS === 'android') await ensureChannel();
     const p = await N.requestPermissionsAsync({ ios: { allowAlert: true, allowSound: true, allowBadge: false } });
@@ -61,8 +64,8 @@ export function rescheduleNotifications(db: Db): Promise<void> {
 async function reschedule(db: Db) {
   if (!N) return;
   const now = new Date();
-  const prefs = await readPrefs(AsyncStorage);
-  const on = prefs && NOTIFICATION_KINDS.some((k) => prefs[k]) && (await isGranted());
+  const prefs = activePrefs(await readSettings(AsyncStorage));
+  const on = NOTIFICATION_KINDS.some((k) => prefs[k]) && (await isGranted());
   const planned = on ? planNotifications(prefs, await readTodayFacts(db, now), now) : [];
   await N.cancelAllScheduledNotificationsAsync();
   if (planned.length === 0) return;

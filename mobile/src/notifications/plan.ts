@@ -41,7 +41,7 @@ function shorten(text: string): string {
   return t.length > TEXT_MAX ? `${t.slice(0, TEXT_MAX)}…` : t;
 }
 
-const EVENING_GENERIC = ['퇴근했어요? 남은 일은 내일 장에 챙겨 둘게요', '오늘 할 일은 여기까지. 나머지는 내일 아침에 봐요'];
+const EVENING_GENERIC = ['오늘 남은 일, 저녁에 하나씩 끝내 봐요', '아직 오늘이 남았어요. 하나만 더 해 봐요'];
 const NIGHT = ['오늘 기분 한 줄, 한 달이면 나를 알 수 있어요', '하루 1분씩 쌓으면, 한 달 뒤엔 내 마음이 보여요'];
 
 export function morningBody(leftovers: number | null): string {
@@ -58,7 +58,7 @@ export function eveningBody(date: string, facts: TodayFacts | null): string {
   const n = facts.todayOpenTexts.length;
   if (n === 0) return facts.todayHasTasks ? '오늘 할 일을 다 끝냈어요. 편하게 쉬어요' : pick(EVENING_GENERIC, date);
   const first = facts.todayOpenTexts[0];
-  return pick([`오늘도 수고했어요. 남은 ${n}개는 내일 이어서 해요`, `‘${shorten(first)}’, 내일로 미뤄도 괜찮아요`, ...EVENING_GENERIC], date);
+  return pick([`퇴근했어요? 남은 ${n}개, 오늘 안에 해낼 수 있어요`, `‘${shorten(first)}’ 하나만 더 해 볼까요? 할 수 있어요`, ...EVENING_GENERIC], date);
 }
 
 export function nightBody(date: string): string {

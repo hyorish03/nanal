@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
-import { openPrivacy } from '../../ui/AccountLinks';
+import { openPrivacy } from '../../lib/links';
 import { dimPressed } from '../../ui/press';
 import { colors, HIT } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
