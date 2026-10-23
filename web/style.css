@@ -1,0 +1,20 @@
+:root{--paper:#F6F0E4;--card:#FBF7EE;--ink:#2A2520;--soft:#4A4234;--muted:#6E6456;--line:#D8CDB9;--navy:#1E2F4D;--danger:#9A2B1E;--border:#928670}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans KR',system-ui,sans-serif;display:flex;justify-content:center;padding:48px 16px}
+main{width:100%;max-width:420px;display:flex;flex-direction:column;gap:20px}
+h1{margin:0;font-family:'Gowun Batang',serif;font-weight:700;font-size:28px;line-height:1.35}
+.hand{font-family:'Nanum Pen Script',cursive;font-size:24px;color:var(--navy)}
+p{margin:0;font-size:16px;line-height:1.6;color:var(--soft)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.card h2{margin:0;font-size:14px;font-weight:600;color:var(--ink)}
+.card ul{margin:0;padding-left:20px;font-size:15px;line-height:1.7}
+label{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--soft)}
+input{font:inherit;font-size:16px;padding:12px;border:1px solid var(--border);border-radius:8px;background:#FFFDF8;color:var(--ink)}
+button{font:inherit;font-size:17px;min-height:52px;border-radius:26px;border:0;cursor:pointer}
+.primary{background:var(--navy);color:var(--paper);font-weight:500}
+.secondary{background:transparent;border:1px solid var(--border);color:var(--ink);font-size:16px;min-height:48px}
+.link{background:none;border:0;min-height:44px;color:var(--soft);text-decoration:underline;font-size:14px}
+.error{color:var(--danger);font-size:14px}
+.small{font-size:13px;color:var(--muted)}
+.hidden{display:none}
+a{color:var(--navy)}

@@ -25,7 +25,7 @@ import { haptic } from '../ui/haptics';
 import { Paper } from '../ui/Paper';
 import { dimPressed } from '../ui/press';
 import { useLayoutClass, WIDE } from '../ui/responsive';
-import { colors, HIT, SCREEN_X } from '../ui/theme';
+import { colors, HIT, SCREEN_X, SLIM_H, SLIM_SLOP } from '../ui/theme';
 import { Toast, type ToastSpec } from '../ui/Toast';
 import { Txt } from '../ui/Txt';
 import { useReduceMotion } from '../ui/useReduceMotion';
@@ -312,7 +312,7 @@ export function MonthRitualSheet({ db, visible, onClose, onChanged, onOpenReview
                 </Txt>
               )}
               {fresh.length > 1 && (
-                <Pressable accessibilityRole="button" style={dimPressed(styles.all)} onPress={moveAll}>
+                <Pressable accessibilityRole="button" hitSlop={SLIM_SLOP} style={dimPressed(styles.all)} onPress={moveAll}>
                   <Txt variant="medium" style={styles.allText}>
                     {chronic.length > 0 ? '처음 넘어온 일 모두 이번 달로' : '모두 이번 달로'}
                   </Txt>
@@ -470,14 +470,14 @@ const styles = StyleSheet.create({
   empty: { color: colors.muted, marginVertical: 16 },
   all: {
     alignSelf: 'flex-start',
-    minHeight: Math.max(HIT, 48),
-    paddingHorizontal: 20,
-    borderRadius: 24,
+    minHeight: SLIM_H,
+    paddingHorizontal: 16,
+    borderRadius: SLIM_H / 2,
     backgroundColor: colors.navy,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  allText: { color: colors.onDark, fontSize: 15 },
+  allText: { color: colors.onDark, fontSize: 14 },
   group: { gap: 2 },
   date: { color: colors.inkSoft, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: colors.lineSoft },
   row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 2, borderBottomWidth: 1, borderStyle: 'dashed', borderBottomColor: colors.inkDash },

@@ -22,8 +22,8 @@ describe('노트 날짜와 읽는 문구', () => {
   });
   it('첫 장의 기호는 말로 풀어 읽고 예시 글을 함께 읽는다', () => {
     const label = noteLabel(0, '2026-10-14');
-    expect(label).not.toMatch(/[•◐●✓›–←]/);
-    expect(label).toContain('점은 할 일. 보고서 초안.');
+    expect(label).not.toMatch(/[•○◐●✓›–←]/);
+    expect(label).toContain('빈 동그라미는 할 일. 보고서 초안.');
     expect(label).toContain('창가 자리 최고');
     expect(label).toMatch(/꺾쇠는 내일로 옮김\. 은행 들르기\. 기호를 톡 누르면 상태가 바뀌어요\.$/);
   });

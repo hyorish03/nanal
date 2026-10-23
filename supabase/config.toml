@@ -411,3 +411,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# 나날 MCP 서버: 인증은 함수 안의 withSupabase가 한다(OAuth 발견 정보는 로그인 없이 읽혀야 한다)
+[functions.mcp]
+verify_jwt = false

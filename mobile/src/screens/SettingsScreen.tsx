@@ -12,7 +12,7 @@ import { Paper } from '../ui/Paper';
 import { dimPressed, tintPressed } from '../ui/press';
 import { useLayoutClass, WIDE } from '../ui/responsive';
 import { macText } from '../ui/desktop';
-import { colors, fonts } from '../ui/theme';
+import { colors, fonts, SLIM_H, SLIM_SLOP } from '../ui/theme';
 import { Txt } from '../ui/Txt';
 
 // 앱 버전 '1.0.1 (14)'
@@ -157,7 +157,6 @@ function PencilIcon() {
   );
 }
 
-const SLIM_SLOP = { top: 7, bottom: 7, left: 4, right: 4 };
 const AVATAR = 52;
 
 const styles = StyleSheet.create({
@@ -172,7 +171,7 @@ const styles = StyleSheet.create({
   nameButton: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 32 },
   nameInput: { height: 36, paddingHorizontal: 8, marginLeft: -8, borderBottomWidth: 1.5, borderBottomColor: colors.navy, fontSize: 18, fontFamily: fonts.medium, color: colors.ink },
   email: { fontSize: 13, lineHeight: 18, color: colors.muted },
-  saveButton: { height: 30, paddingHorizontal: 12, borderRadius: 15, backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center' },
+  saveButton: { height: SLIM_H, paddingHorizontal: 14, borderRadius: SLIM_H / 2, backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center' },
   saveText: { fontSize: 13, color: colors.onDark },
   chevron: { fontSize: 20, color: colors.muted },
   muted: { fontSize: 15, color: colors.muted },

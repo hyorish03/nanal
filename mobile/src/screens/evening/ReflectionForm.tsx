@@ -5,7 +5,7 @@ import { MAX_ANSWER_LENGTH } from '../../reflections/repo';
 import type { TemplateQuestion } from '../../reflections/templates';
 import { dimPressed } from '../../ui/press';
 import { RuledPaper } from '../../ui/RuledPaper';
-import { colors, fonts } from '../../ui/theme';
+import { colors, fonts, SLIM_H, SLIM_SLOP } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 import { macText } from '../../ui/desktop';
 import { answerLines, useRule } from './rule';
@@ -34,7 +34,13 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
   const rule = useRule();
   const formQ = { fontSize: rule.hand, lineHeight: rule.lineHeight };
   // 적을 자리를 넉넉히 비워 둔다(질문 하나면 5줄). 글이 길어지면 칸이 따라 늘어난다.
-  const answer = { minHeight: rule.line * answerLines(questions.length), fontSize: rule.body, lineHeight: rule.lineHeight };
+  // 입력칸 글자는 줄 상자 바닥에 붙어 그려지므로(rule.ts) 칸을 inputLift만큼 올려 질문 글씨와 같은 자리에 앉힌다
+  const answer = {
+    minHeight: rule.line * answerLines(questions.length),
+    fontSize: rule.body,
+    lineHeight: rule.lineHeight,
+    transform: [{ translateY: -rule.inputLift }],
+  };
 
   // 버튼은 쓰는 줄 위에 얹지 않고, 줄 아래 점선으로 나눈 칸에 따로 둔다
   const footer = (
@@ -44,8 +50,8 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
       </Svg>
       <View style={styles.actions}>
         {onCancel && (
-          <Pressable accessibilityRole="button" style={dimPressed(styles.cancel)} onPress={onCancel}>
-            <Txt style={styles.cancelText}>그만두기</Txt>
+          <Pressable accessibilityRole="button" hitSlop={SLIM_SLOP} style={dimPressed(styles.cancel)} onPress={onCancel}>
+            <Txt style={styles.cancelText}>취소</Txt>
           </Pressable>
         )}
         <Pressable
@@ -53,6 +59,7 @@ export function ReflectionForm({ title, questions, values, onChange, submitLabel
           accessibilityState={{ disabled: !canSubmit }}
           accessibilityHint={canSubmit ? undefined : '한 줄이라도 적으면 남길 수 있어요'}
           disabled={!canSubmit}
+          hitSlop={SLIM_SLOP}
           style={dimPressed([styles.save, !canSubmit && styles.saveOff])}
           onPress={onSubmit}
         >
@@ -116,15 +123,15 @@ const styles = StyleSheet.create({
   footer: { marginTop: 8, paddingBottom: 10 },
   dash: { marginBottom: 10 },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 },
-  cancel: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center' },
-  cancelText: { fontSize: 15, color: colors.inkSoft },
+  cancel: { minHeight: SLIM_H, paddingHorizontal: 12, justifyContent: 'center' },
+  cancelText: { fontSize: 14, color: colors.inkSoft },
   save: {
-    minHeight: 44,
-    paddingHorizontal: 22,
-    borderRadius: 22,
+    minHeight: SLIM_H,
+    paddingHorizontal: 16,
+    borderRadius: SLIM_H / 2,
     backgroundColor: colors.ink,
     justifyContent: 'center',
   },
   saveOff: { opacity: 0.35 },
-  saveText: { color: colors.card, fontSize: 15 },
+  saveText: { color: colors.card, fontSize: 14 },
 });

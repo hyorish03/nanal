@@ -21,6 +21,24 @@ describe('ruleFor', () => {
   });
 });
 
+describe('inputLift', () => {
+  it('입력칸은 남는 줄 간격의 절반만큼 올린다(IBM Plex Sans KR 자연 줄 높이 1.5배)', () => {
+    expect(ruleFor('compact', false).inputLift).toBe(Math.round((32 - 15 * 1.5) / 2));
+    expect(ruleFor('wide', true).inputLift).toBe(Math.round((Math.round(40 * MAC_TEXT_SCALE) - Math.round(17 * MAC_TEXT_SCALE) * 1.5) / 2));
+  });
+
+  it('올린 뒤 답 글자 기준선이 선(sit) 위에 온다', () => {
+    for (const mac of [false, true]) {
+      for (const l of ['compact', 'regular', 'wide'] as const) {
+        const r = ruleFor(l, mac);
+        const body = mac ? Math.round(r.body * MAC_TEXT_SCALE) : r.body;
+        const baseline = r.line - body * 1.5 + body * 1.085 - r.inputLift; // 줄 상자 위에서 기준선까지
+        expect(baseline).toBeLessThanOrEqual(r.line - r.sit + 1);
+      }
+    }
+  });
+});
+
 describe('answerLines', () => {
   it('질문이 하나면 5줄을 비워 둔다', () => {
     expect(answerLines(1)).toBe(5);

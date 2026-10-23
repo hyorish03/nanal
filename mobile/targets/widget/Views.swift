@@ -22,7 +22,7 @@ extension Font {
 let todayURL = URL(string: "nanal://today")!
 let newLineURL = URL(string: "nanal://today?focus=1")!
 
-// 상태 기호(스펙 11.2): • 할 일, ◐ 진행 중, ●✓ 끝낸 일
+// 상태 기호(스펙 11.2): ○ 할 일, ◐ 진행 중, ●✓ 끝낸 일
 func statusSymbol(_ status: String) -> String {
   switch status {
   case "doing": return "circle.lefthalf.filled"

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>나날 · AI 앱 연결</title>
+<meta name="description" content="평소 쓰는 AI에게 말하면 나날에 한 줄 적혀요. 나날을 AI 앱에 연결하는 법.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Nanum+Pen+Script&display=swap">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/home.css">
+</head>
+<body class="home">
+<main>
+  <header class="top">
+    <div class="wordmark">나날</div>
+    <nav>
+      <a href="#connect">연결하는 법</a>
+      <a href="https://hyorinleee.notion.site/3c3b7bc9ffaa8003a919ce49d8ecb34a">개인정보 처리방침</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-text">
+      <div class="hand">말하면, 적혀요</div>
+      <h1>평소 쓰는 AI에게 말하면<br>나날에 한 줄 적혀요</h1>
+      <p>오늘 남은 일을 묻고, 떠오른 일을 맡기고, 한 달을 돌아보세요. 나날을 AI 앱에 연결하면 대화가 곧 기록이 돼요.</p>
+      <div><a class="cta" href="#connect">연결하는 법 보기</a></div>
+    </div>
+    <div class="chat" aria-label="AI 앱과 나눈 대화 예시">
+      <div class="bubble me">내일 3시 치과 넣어주고, 오늘 남은 거 알려줘</div>
+      <div class="bubble ai">
+        <div>내일 페이지에 적었어요. 오늘은 두 가지 남았어요.</div>
+        <div class="day">
+          <div class="label">10월 22일 목</div>
+          <div><span class="sym">○</span>15:00 치과</div>
+          <div class="label">오늘 남은 일</div>
+          <div><span class="sym">◐</span>기획서 초안</div>
+          <div><span class="sym">○</span>장보기</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>이렇게 말해 보세요</h2>
+    <div class="examples">
+      <div class="card"><div class="say">“오늘 뭐 남았어?”</div><p>오늘 페이지의 할 일과 진행 상태를 읽어 줘요.</p></div>
+      <div class="card"><div class="say">“밀린 거 뭐 있어?”</div><p>지난 날에 남은 할 일을 모아 보여줘요.</p></div>
+      <div class="card"><div class="say">“이거 메모해 줘”</div><p>할 일이나 메모를 오늘, 혹은 원하는 날에 한 줄 적어요.</p></div>
+      <div class="card"><div class="say">“이번 달 어땠어?”</div><p>한 달의 기록과 기분 흐름을 차분히 정리해 줘요.</p></div>
+    </div>
+  </section>
+
+  <section class="block split" id="connect">
+    <div class="split-head">
+      <h2>연결하는 법</h2>
+      <p>MCP 커넥터를 지원하는 AI 앱이면 어디든 같은 주소로 연결할 수 있어요.</p>
+    </div>
+    <ol class="steps">
+      <li>
+        <span class="num">1</span>
+        <div class="step-body">
+          <div>AI 앱의 커넥터(MCP) 설정에 아래 주소를 붙여 넣어요</div>
+          <div class="url">
+            <code id="mcp-url">https://xckbdxtgfcvdacwrolvb.supabase.co/functions/v1/mcp</code>
+            <button type="button" class="secondary" id="copy">복사</button>
+          </div>
+          <div class="small">예: Claude는 설정 → 커넥터 → 커스텀 커넥터 추가</div>
+        </div>
+      </li>
+      <li><span class="num">2</span><div class="step-body">나날 화면이 열리면 로그인하고 ‘허락하기’를 눌러요</div></li>
+      <li><span class="num">3</span><div class="step-body">끝. 대화에서 “나날” 하고 불러 보세요</div></li>
+    </ol>
+  </section>
+
+  <section class="trust">
+    <h2>내 기록은<br>내가 허락한 만큼만</h2>
+    <ul>
+      <li>AI 앱은 내 계정 권한으로만, 내 기록만 볼 수 있어요.</li>
+      <li>한 줄을 더하고 상태를 바꾸는 것까지만 해요. 지우거나 고치거나 옮기지는 못해요.</li>
+      <li>연결은 내가 허락할 때만 생겨요. 끊고 싶으면 AI 앱에서 커넥터를 지우거나 고객 지원으로 알려 주세요.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>나날 · 하루를 한 줄씩, 기호 하나로 적는 불렛 노트</span>
+    <a href="https://hyorinleee.notion.site/3c3b7bc9ffaa8003a919ce49d8ecb34a">개인정보 처리방침</a>
+    <a href="https://hyorinleee.notion.site/3feb7bc9ffaa811da520cda5813f4db3">고객 지원</a>
+  </footer>
+</main>
+<script>
+document.getElementById('copy').addEventListener('click', async (e) => {
+  const button = e.currentTarget;
+  try {
+    await navigator.clipboard.writeText(document.getElementById('mcp-url').textContent);
+    button.textContent = '복사했어요';
+  } catch {
+    button.textContent = '직접 복사해 주세요';
+  }
+  setTimeout(() => { button.textContent = '복사'; }, 2000);
+});
+</script>
+</body>
+</html>

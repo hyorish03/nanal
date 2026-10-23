@@ -19,7 +19,7 @@ import { Chip } from '../ui/Chip';
 import { PageHeader } from '../ui/PageHeader';
 import { useLayoutClass, WIDE } from '../ui/responsive';
 import { useReduceMotion } from '../ui/useReduceMotion';
-import { confirmDelete, showActionSheet } from '../ui/dialogs';
+import { confirmDelete } from '../ui/dialogs';
 import { DayDetail, type Editing } from './archive/DayDetail';
 import { EntryCard } from './archive/EntryCard';
 import { MonthCalendar } from './archive/MonthCalendar';
@@ -271,11 +271,6 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
         setEditing((e) => (e?.id === r.id ? null : e));
       }),
     );
-  const reflectionActions = (r: Reflection) =>
-    showActionSheet(`‘${r.templateName}’`, [
-      { label: '고치기', onPress: () => startEdit(r) },
-      { label: '지우기', destructive: true, onPress: () => askDeleteReflection(r) },
-    ]);
 
   const showBanner = !!onOpenReview && canOfferReview(reviewOffer);
   // 넓은 화면의 글 칸: 두 칸이면 달력+기록 폭(FRAME)으로, 한 칸이면 읽기 폭으로 가운데에 모은다.
@@ -370,7 +365,6 @@ export function ArchiveScreen({ db, version: rawVersion, onClose, onOpenReview, 
       onCancelEdit={() => setEditing(null)}
       onStartEdit={startEdit}
       onDeleteReflection={askDeleteReflection}
-      onReflectionActions={reflectionActions}
       onLayout={
         divided
           ? (e) => {

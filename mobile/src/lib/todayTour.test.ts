@@ -97,7 +97,7 @@ describe('단계 고르기', () => {
   });
 
   test('기호 단계는 스크린 리더용 말을 따로 둔다', () => {
-    expect(tourSteps(all, opts)[2].spoken).not.toContain('•');
+    expect(tourSteps(all, opts)[2].spoken).not.toContain('○');
   });
 });
 

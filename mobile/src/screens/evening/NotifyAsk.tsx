@@ -7,7 +7,7 @@ import { askDue, readAskState, readSettings, recordDecline, writeSettings } from
 import { notificationsAvailable, requestNotificationPermission, rescheduleNotifications } from '../../notifications/scheduler';
 import { alertNotificationsBlocked } from '../../ui/NotificationSettings';
 import { dimPressed } from '../../ui/press';
-import { colors, HIT } from '../../ui/theme';
+import { colors, SLIM_H, SLIM_SLOP } from '../../ui/theme';
 import { Txt } from '../../ui/Txt';
 
 // 물을 차례면 몇 번째로 묻는지(처음이면 false, 다시 묻는 거면 true), 아니면 null
@@ -44,13 +44,14 @@ export function NotifyAsk({ db, again, onDone }: { db: Db; again: boolean; onDon
           : '아침 8시에 오늘 장을, 평일 저녁 6시에 남은 일을, 밤 10시에 마무리를 알려 드려요. 설정에서 언제든 끌 수 있어요.'}
       </Txt>
       <View style={styles.actions}>
-        <Pressable accessibilityRole="button" style={dimPressed([styles.button, styles.primary])} onPress={() => void accept()}>
+        <Pressable accessibilityRole="button" hitSlop={SLIM_SLOP} style={dimPressed([styles.button, styles.primary])} onPress={() => void accept()}>
           <Txt variant="medium" style={styles.primaryText}>
             알림 받기
           </Txt>
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          hitSlop={SLIM_SLOP}
           style={dimPressed([styles.button, styles.secondary])}
           onPress={() => {
             void decline();
@@ -83,9 +84,9 @@ const styles = StyleSheet.create({
   title: { color: colors.ink },
   body: { fontSize: 14, lineHeight: 21, color: colors.postitText },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  button: { flexGrow: 1, flexBasis: 120, minHeight: Math.max(HIT, 48), borderRadius: 24, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  button: { flexGrow: 1, flexBasis: 120, minHeight: SLIM_H, borderRadius: SLIM_H / 2, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   primary: { backgroundColor: colors.navy },
-  primaryText: { fontSize: 15, color: colors.onDark },
+  primaryText: { fontSize: 14, color: colors.onDark },
   secondary: { borderWidth: 1, borderColor: colors.chipBorder },
-  secondaryText: { fontSize: 15, color: colors.inkSoft },
+  secondaryText: { fontSize: 14, color: colors.inkSoft },
 });

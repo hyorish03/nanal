@@ -5,7 +5,7 @@ import { colors } from './theme';
 import { Txt } from './Txt';
 
 // 줄 앞의 상태 기호 하나(스펙 11.2). 의미는 줄의 접근성 문구가 전한다.
-// •·–·›도 글자가 아니라 같은 칸(size) 가운데에 그린다: 글자로 쓰면 작고 가늘어 •와 ›가 헷갈렸다.
+// ○·–·›도 글자가 아니라 같은 칸(size) 가운데에 그린다: 글자로 쓰면 작고 가늘어 서로 헷갈렸다.
 export function StatusSymbol({ kind, size = 19 }: { kind: SymbolKind; size?: number }) {
   if (kind === 'doing') {
     return (
@@ -50,13 +50,8 @@ export function StatusSymbol({ kind, size = 19 }: { kind: SymbolKind; size?: num
       </View>
     );
   }
-  // 할 일: 찬 점
-  const dot = Math.max(5, Math.round(size * 0.47));
-  return (
-    <View accessible={false} style={box}>
-      <View style={[styles.dot, { width: dot, height: dot, borderRadius: dot / 2 }]} />
-    </View>
-  );
+  // 할 일: 빈 동그라미. 진행 중(반 찬 원)·끝(찬 원)과 같은 링이라 누를수록 차오른다
+  return <View accessible={false} style={[styles.circle, styles.ring, { width: size, height: size, borderRadius: size / 2 }]} />;
 }
 
 const styles = StyleSheet.create({
@@ -66,7 +61,6 @@ const styles = StyleSheet.create({
   filled: { backgroundColor: colors.navy },
   check: { color: colors.card },
   box: { alignItems: 'center', justifyContent: 'center' },
-  dot: { backgroundColor: colors.ink },
   bar: { height: 2, borderRadius: 1, backgroundColor: colors.ink },
   cross: { alignItems: 'center', justifyContent: 'center' },
   stroke: { position: 'absolute', height: 1.5, borderRadius: 1, backgroundColor: colors.muted },
